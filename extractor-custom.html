@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation Content Extractor</title>
+  <style>
+    /* Modern, clean base styles */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      background-color: #f7f9fc;
+      color: #333;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2, h3 {
+      color: #2c3e50;
+    }
+    /* Textarea & inputs */
+    textarea {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+    #urlList {
+      height: 180px;
+    }
+    /* Toggle advanced options button */
+    .toggle-section {
+      cursor: pointer;
+      background-color: #3498db;
+      color: #fff;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      width: fit-content;
+    }
+    /* Advanced options container */
+    .advanced-options {
+      display: none;
+      background-color: #ecf0f1;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+    /* Button styling */
+    button {
+      padding: 10px 20px;
+      background-color: #2980b9;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      font-size: 15px;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #1f6391;
+    }
+    /* Status messages */
+    .status {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    /* Progress bar */
+    #progressBarContainer {
+      width: 100%;
+      background-color: #e1e1e1;
+      border-radius: 5px;
+      overflow: hidden;
+      margin: 15px 0;
+    }
+    #progressBar {
+      width: 0%;
+      height: 20px;
+      background-color: #27ae60;
+      transition: width 0.3s ease;
+    }
+    /* Output styling */
+    #output {
+      background-color: #fff;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    /* Counts section */
+    .counts {
+      background-color: #fff;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+    .counts p {
+      margin: 5px 0;
+    }
+    .counts ul {
+      list-style-type: disc;
+      margin-left: 20px;
+    }
+    /* Fetched URL list */
+    .url-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+    }
+    .url-text {
+      flex-grow: 1;
+      margin-right: 10px;
+      word-break: break-all;
+    }
+    .control-buttons button {
+      padding: 5px 10px;
+      margin-left: 5px;
+      font-size: 13px;
+    }
+    .control-buttons button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>Documentation Content Extractor</h1>
+
+  <div class="input-section">
+    <h2>URL List</h2>
+    <textarea id="urlList" placeholder="Enter URLs (one per line)">
+https://www.docs.inductiveautomation.com/docs/8.1/ignition-modules/perspective/views-in-perspective/popup-views#__docusaurus_skipToContent_fallback
+https://www.docs.inductiveautomation.com/docs/8.1/ignition-modules/perspective/popup-views#
+https://helpx.adobe.com/illustrator/kb/illustrator-for-apple-silicon.html
+    </textarea>
+  </div>
+
+  <div class="toggle-section" onclick="toggleAdvancedOptions()">
+    <span id="toggleIcon">▶</span> Advanced Content Selection Options
+  </div>
+
+  <div class="advanced-options" id="advancedOptions">
+    <div class="selector-settings">
+      <label for="customSelectors">Custom CSS/XPath Selectors</label>
+      <p class="description">
+        Enter one selector per line. Use standard CSS selectors normally, or prefix an XPath expression with <code>xpath:</code>.
+        Example: <code>xpath://div[@class='custom-content']</code>
+      </p>
+      <textarea id="customSelectors" placeholder="e.g., .cmp-text, xpath://div[@class='custom-content']">
+.cmp-text
+.aem-GridColumn
+.page-description
+.dexter-Position
+#root_content_flex_items_position
+.dexter-Cta
+table
+xpath://div[@class='custom-content']
+      </textarea>
+      <ul class="helper-list">
+        <li>Default selectors (if left blank, these will be applied): 'main article', '.DocSearch-content',
+          'article.DocItem_container', '.theme-doc-markdown', '.markdown', 'article',
+          'div.theme-doc-markdown.markdown', 'div.content', 'main'</li>
+        <li>Additional examples: '#main-content', '.documentation-section', 'div.docs-content'</li>
+      </ul>
+    </div>
+  </div>
+
+  <div>
+    <button onclick="fetchAllDocs()">Fetch All Documentation</button>
+    <button id="downloadCombinedBtn" onclick="downloadCombined()" disabled>Combine and Download</button>
+    <button id="fetchFailedBtn" onclick="retryFailedUrls()" disabled>Fetch Failed URLs</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="progress"></div>
+  <div id="progressBarContainer">
+    <div id="progressBar"></div>
+  </div>
+
+  <div class="counts" id="counts">
+    <p><strong>Total URLs Input:</strong> <span id="totalCount">0</span></p>
+    <p><strong>URLs After Cleaning:</strong> <span id="cleanedCount">0</span></p>
+    <p><strong>URLs Successfully Fetched:</strong> <span id="fetchedCount">0</span></p>
+    <p><strong>URLs Failed to Fetch:</strong> <span id="failedCount">0</span></p>
+    <p><strong>Skipped URLs (Duplicates):</strong></p>
+    <ul id="skippedDuplicates"></ul>
+    <p><strong>Skipped URLs (Invalid Paths):</strong></p>
+    <ul id="skippedInvalid"></ul>
+  </div>
+
+  <div id="output"></div>
+
+  <script>
+    const docs = new Map();
+    let orderedUrls = [];
+    let skippedDuplicates = [];
+    let skippedInvalid = [];
+    let failedUrls = [];
+
+    /**
+     * Toggles the display of advanced options section.
+     */
+    function toggleAdvancedOptions() {
+      const advancedOptions = document.getElementById('advancedOptions');
+      const toggleIcon = document.getElementById('toggleIcon');
+      if (advancedOptions.style.display === 'block') {
+        advancedOptions.style.display = 'none';
+        toggleIcon.textContent = '▶';
+      } else {
+        advancedOptions.style.display = 'block';
+        toggleIcon.textContent = '▼';
+      }
+    }
+    window.toggleAdvancedOptions = toggleAdvancedOptions;
+
+    /**
+     * Cleans the URL list by removing duplicates.
+     */
+    function cleanUrlList(urls) {
+      const uniqueUrls = new Set();
+      const cleanedUrls = [];
+      urls.forEach(url => {
+        const trimmedUrl = url.trim();
+        if (trimmedUrl && !uniqueUrls.has(trimmedUrl)) {
+          uniqueUrls.add(trimmedUrl);
+          cleanedUrls.push(trimmedUrl);
+        } else if (trimmedUrl) {
+          skippedDuplicates.push(url);
+        }
+      });
+      return cleanedUrls;
+    }
+
+    /**
+     * Validates if a URL is likely to contain documentation content.
+     */
+    function isValidDocumentationUrl(url) {
+      const documentationPaths = [
+        '/browserql/', '/browserQL/', '/baas/', '/open-api/', '/docs/',
+        '/help/', '/helpx/', '/kb/', '/using/', '/guide/', '/manual/',
+        '/documentation/', '/support/', '/learn/'
+      ];
+      const documentationDomains = [
+        'docs.', 'documentation.', 'help.', 'helpx.', 'support.', 'learn.',
+        'guide.', 'developer.', 'api.', 'manual.', 'wiki.'
+      ];
+      return documentationPaths.some(path => url.includes(path)) ||
+             documentationDomains.some(domain => url.includes(domain));
+    }
+
+    /**
+     * Fetches and extracts the main content from a given URL.
+     */
+    async function fetchDoc(url, retries = 4) {
+      try {
+        const options = {
+          cache: 'no-store',
+          headers: {
+            'User-Agent': 'Mozilla/5.0'
+          }
+        };
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          throw new Error(`Status ${response.status}`);
+        }
+        const html = await response.text();
+        if (!html || html.trim() === '') {
+          throw new Error(`Empty content`);
+        }
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+
+        const customSelectorsText = document.getElementById('customSelectors').value;
+        const customSelectors = customSelectorsText.split('\n').map(s => s.trim()).filter(s => s);
+        const defaultSelectors = [
+          ...(url.includes('inductiveautomation.com') ? [
+            'main article', '.DocSearch-content', 'article.DocItem_container',
+            '.theme-doc-markdown', '.markdown'
+          ] : []),
+          ...(url.includes('adobe.com') ? [
+            '.cmp-text', '.aem-GridColumn', '.page-description',
+            '.dexter-Position', '#root_content_flex_items_position', '.dexter-Cta'
+          ] : []),
+          'article', 'div.theme-doc-markdown.markdown', 'div.content', 'main',
+          '#content', '.documentation', '.doc-content', '.article', '.page-content',
+          '.content-container', 'body'
+        ];
+        const allSelectors = [...customSelectors, ...defaultSelectors];
+        let mainContent = null;
+        const findContent = (selector) => {
+          try {
+            if (selector.startsWith("xpath:")) {
+              const xpathExpr = selector.slice("xpath:".length).trim();
+              const xpathResult = doc.evaluate(xpathExpr, doc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+              if (xpathResult.snapshotLength > 0) {
+                if (xpathResult.snapshotLength === 1) {
+                  const node = xpathResult.snapshotItem(0);
+                  if (node && node.innerHTML && node.innerHTML.trim()) {
+                    return { element: node, method: 'xpath-single' };
+                  }
+                } else {
+                  const container = document.createElement('div');
+                  for (let i = 0; i < xpathResult.snapshotLength; i++) {
+                    const node = xpathResult.snapshotItem(i);
+                    if (node && node.innerHTML && node.innerHTML.trim()) {
+                      container.appendChild(node.cloneNode(true));
+                    }
+                  }
+                  if (container.innerHTML && container.innerHTML.trim()) {
+                    return { element: container, method: 'xpath-multiple' };
+                  }
+                }
+              }
+              return null;
+            } else {
+              const element = doc.querySelector(selector);
+              if (element && element.innerHTML && element.innerHTML.trim()) {
+                return { element, method: 'single' };
+              }
+              const elements = doc.querySelectorAll(selector);
+              if (elements && elements.length > 0) {
+                const container = document.createElement('div');
+                elements.forEach(el => {
+                  if (el.innerHTML && el.innerHTML.trim()) {
+                    container.appendChild(el.cloneNode(true));
+                  }
+                });
+                if (container.innerHTML && container.innerHTML.trim()) {
+                  return { element: container, method: 'multiple' };
+                }
+              }
+              return null;
+            }
+          } catch (err) {
+            console.warn(`Error with selector "${selector}":`, err);
+            return null;
+          }
+        };
+
+        for (const selector of allSelectors) {
+          const result = findContent(selector);
+          if (result) {
+            mainContent = result.element;
+            break;
+          }
+        }
+
+        if (!mainContent || !mainContent.innerHTML || !mainContent.innerHTML.trim()) {
+          throw new Error(`No content found`);
+        }
+
+        // Remove inline SVGs
+        const svgs = mainContent.querySelectorAll('svg');
+        svgs.forEach(svg => svg.remove());
+        return { content: `\n${mainContent.innerHTML}` };
+      } catch (error) {
+        if (retries > 0) {
+          console.warn(`Retrying ${url} (${retries} left)...`);
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, 4 - retries) * 1000));
+          return await fetchDoc(url, retries - 1);
+        }
+        throw new Error(`Failed to fetch ${url}: ${error.message}`);
+      }
+    }
+
+    /**
+     * Fetches all documentation URLs provided by the user.
+     */
+    async function fetchAllDocs() {
+      skippedDuplicates = [];
+      skippedInvalid = [];
+      failedUrls = [];
+      orderedUrls = [];
+      docs.clear();
+
+      const urlListRaw = document.getElementById('urlList').value.split('\n')
+                              .map(url => url.trim())
+                              .filter(url => url);
+      document.getElementById('totalCount').textContent = urlListRaw.length;
+      const urlListCleaned = cleanUrlList(urlListRaw);
+      const urlList = [];
+      urlListCleaned.forEach(url => {
+        if (isValidDocumentationUrl(url)) {
+          urlList.push(url);
+        } else {
+          skippedInvalid.push(url);
+        }
+      });
+      document.getElementById('cleanedCount').textContent = urlList.length;
+
+      // Update duplicate and invalid lists
+      const skippedDuplicatesList = document.getElementById('skippedDuplicates');
+      skippedDuplicatesList.innerHTML = '';
+      skippedDuplicates.forEach(url => {
+        const li = document.createElement('li');
+        li.textContent = url;
+        skippedDuplicatesList.appendChild(li);
+      });
+      const skippedInvalidList = document.getElementById('skippedInvalid');
+      skippedInvalidList.innerHTML = '';
+      skippedInvalid.forEach(url => {
+        const li = document.createElement('li');
+        li.textContent = url;
+        skippedInvalidList.appendChild(li);
+      });
+
+      const progressDiv = document.getElementById('progress');
+      const progressBar = document.getElementById('progressBar');
+      const outputDiv = document.getElementById('output');
+      const downloadCombinedBtn = document.getElementById('downloadCombinedBtn');
+      const fetchFailedBtn = document.getElementById('fetchFailedBtn');
+      const fetchedCountElem = document.getElementById('fetchedCount');
+      const failedCountElem = document.getElementById('failedCount');
+
+      fetchedCountElem.textContent = '0';
+      failedCountElem.textContent = '0';
+      outputDiv.innerHTML = '';
+      downloadCombinedBtn.disabled = true;
+      fetchFailedBtn.disabled = true;
+      progressBar.style.width = '0%';
+      progressDiv.innerHTML = '';
+
+      if (urlList.length === 0) {
+        alert('Please enter at least one valid documentation URL.');
+        return;
+      }
+
+      const concurrencyLimit = 3;
+      let index = 0, completed = 0;
+      async function worker() {
+        while (index < urlList.length) {
+          const currentIndex = index++;
+          const url = urlList[currentIndex];
+          progressDiv.innerHTML = `Processing ${completed + 1} of ${urlList.length}: ${url}`;
+          try {
+            const delay = Math.floor(Math.random() * 1000) + 500;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            const result = await fetchDoc(url);
+            if (!result || !result.content || result.content === '') {
+              throw new Error(`No content found for ${url}`);
+            }
+            docs.set(url, result.content);
+            orderedUrls.push(url);
+            const status = document.createElement('div');
+            status.className = 'status success';
+            status.textContent = `✓ Successfully fetched: ${url}`;
+            outputDiv.appendChild(status);
+            fetchedCountElem.textContent = parseInt(fetchedCountElem.textContent) + 1;
+          } catch (error) {
+            const status = document.createElement('div');
+            status.className = 'status error';
+            status.textContent = `✗ ${error.message}`;
+            outputDiv.appendChild(status);
+            failedCountElem.textContent = parseInt(failedCountElem.textContent) + 1;
+            failedUrls.push(url);
+          }
+          completed++;
+          progressBar.style.width = `${(completed / urlList.length) * 100}%`;
+        }
+      }
+      const workers = [];
+      for (let i = 0; i < concurrencyLimit; i++) {
+        workers.push(worker());
+      }
+      await Promise.all(workers);
+      progressDiv.innerHTML = `Completed processing ${urlList.length} URLs`;
+
+      if (docs.size > 0) {
+        renderUrlList();
+        downloadCombinedBtn.disabled = false;
+      } else {
+        alert('No documentation content was successfully fetched.');
+      }
+      fetchFailedBtn.disabled = failedUrls.length === 0;
+      if (failedUrls.length > 0) {
+        const failedUrlsList = document.createElement('ul');
+        failedUrls.forEach(url => {
+          const li = document.createElement('li');
+          li.textContent = url;
+          failedUrlsList.appendChild(li);
+        });
+        const failedDiv = document.createElement('div');
+        failedDiv.className = 'status error';
+        failedDiv.innerHTML = `<strong>Failed to fetch the following URLs:</strong>`;
+        failedDiv.appendChild(failedUrlsList);
+        outputDiv.appendChild(failedDiv);
+      }
+    }
+
+    /**
+     * Attempts to re-fetch only the failed URLs.
+     */
+    async function retryFailedUrls() {
+      if (failedUrls.length === 0) {
+        alert('No failed URLs to retry.');
+        return;
+      }
+      const progressDiv = document.getElementById('progress');
+      const progressBar = document.getElementById('progressBar');
+      const outputDiv = document.getElementById('output');
+      const fetchedCountElem = document.getElementById('fetchedCount');
+      const failedCountElem = document.getElementById('failedCount');
+
+      const urlsToRetry = [...failedUrls];
+      failedUrls = [];
+      progressDiv.innerHTML = `Retrying ${urlsToRetry.length} failed URLs...`;
+      progressBar.style.width = '0%';
+
+      const concurrencyLimit = 2;
+      let index = 0, completed = 0, newlySucceeded = 0;
+      async function worker() {
+        while (index < urlsToRetry.length) {
+          const currentIndex = index++;
+          const url = urlsToRetry[currentIndex];
+          progressDiv.innerHTML = `Retrying ${completed + 1} of ${urlsToRetry.length}: ${url}`;
+          try {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            const result = await fetchDoc(url, 5);
+            if (!result || !result.content || result.content === '') {
+              throw new Error(`No content found for ${url}`);
+            }
+            docs.set(url, result.content);
+            if (!orderedUrls.includes(url)) {
+              orderedUrls.push(url);
+            }
+            const status = document.createElement('div');
+            status.className = 'status success';
+            status.textContent = `✓ Successfully fetched on retry: ${url}`;
+            outputDiv.appendChild(status);
+            newlySucceeded++;
+            fetchedCountElem.textContent = (parseInt(fetchedCountElem.textContent) + 1).toString();
+          } catch (error) {
+            const status = document.createElement('div');
+            status.className = 'status error';
+            status.textContent = `✗ Still failed after retry: ${url}`;
+            outputDiv.appendChild(status);
+            failedUrls.push(url);
+          }
+          completed++;
+          progressBar.style.width = `${(completed / urlsToRetry.length) * 100}%`;
+        }
+      }
+      const workers = [];
+      for (let i = 0; i < concurrencyLimit; i++) {
+        workers.push(worker());
+      }
+      await Promise.all(workers);
+      failedCountElem.textContent = failedUrls.length.toString();
+      progressDiv.innerHTML = `Completed retrying ${urlsToRetry.length} URLs. Successfully fetched ${newlySucceeded} previously failed URLs.`;
+      if (docs.size > 0) {
+        renderUrlList();
+        document.getElementById('downloadCombinedBtn').disabled = false;
+      }
+      document.getElementById('fetchFailedBtn').disabled = failedUrls.length === 0;
+    }
+
+    /**
+     * Renders the list of fetched URLs with controls to reorder them.
+     */
+    function renderUrlList() {
+      const outputDiv = document.getElementById('output');
+      outputDiv.innerHTML = '';
+      if (orderedUrls.length === 0) {
+        outputDiv.innerHTML = '<div class="status error">No documentation content to display.</div>';
+        return;
+      }
+      const listContainer = document.createElement('div');
+      listContainer.id = 'urlListContainer';
+      orderedUrls.forEach((url, index) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'url-item';
+        const urlText = document.createElement('div');
+        urlText.className = 'url-text';
+        urlText.textContent = url;
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'control-buttons';
+
+        const upButton = document.createElement('button');
+        upButton.textContent = '↑';
+        upButton.title = 'Move Up';
+        upButton.onclick = () => moveUp(index);
+        upButton.disabled = index === 0;
+
+        const downButton = document.createElement('button');
+        downButton.textContent = '↓';
+        downButton.title = 'Move Down';
+        downButton.onclick = () => moveDown(index);
+        downButton.disabled = index === orderedUrls.length - 1;
+
+        const previewButton = document.createElement('button');
+        previewButton.textContent = '👁️';
+        previewButton.title = 'Preview Content';
+        previewButton.onclick = () => previewContent(url);
+
+        controlsDiv.appendChild(upButton);
+        controlsDiv.appendChild(downButton);
+        controlsDiv.appendChild(previewButton);
+        itemDiv.appendChild(urlText);
+        itemDiv.appendChild(controlsDiv);
+        listContainer.appendChild(itemDiv);
+      });
+      outputDiv.appendChild(listContainer);
+    }
+
+    /**
+     * Opens a modal to preview the content from a URL.
+     */
+    function previewContent(url) {
+      const content = docs.get(url);
+      if (!content) {
+        alert(`No content available for ${url}`);
+        return;
+      }
+      const modal = document.createElement('div');
+      modal.style.position = 'fixed';
+      modal.style.top = '0';
+      modal.style.left = '0';
+      modal.style.width = '100%';
+      modal.style.height = '100%';
+      modal.style.backgroundColor = 'rgba(0,0,0,0.7)';
+      modal.style.zIndex = '1000';
+      modal.style.display = 'flex';
+      modal.style.justifyContent = 'center';
+      modal.style.alignItems = 'center';
+      const modalContent = document.createElement('div');
+      modalContent.style.backgroundColor = '#fff';
+      modalContent.style.padding = '20px';
+      modalContent.style.borderRadius = '5px';
+      modalContent.style.width = '80%';
+      modalContent.style.height = '80%';
+      modalContent.style.overflowY = 'auto';
+      modalContent.style.position = 'relative';
+      const closeButton = document.createElement('button');
+      closeButton.textContent = '✕';
+      closeButton.style.position = 'absolute';
+      closeButton.style.top = '10px';
+      closeButton.style.right = '10px';
+      closeButton.style.backgroundColor = '#e74c3c';
+      closeButton.style.color = '#fff';
+      closeButton.style.border = 'none';
+      closeButton.style.borderRadius = '50%';
+      closeButton.style.width = '30px';
+      closeButton.style.height = '30px';
+      closeButton.style.cursor = 'pointer';
+      closeButton.onclick = () => document.body.removeChild(modal);
+      const title = document.createElement('h3');
+      title.textContent = `Preview of content from: ${url}`;
+      const contentDiv = document.createElement('div');
+      contentDiv.innerHTML = content;
+      modalContent.appendChild(closeButton);
+      modalContent.appendChild(title);
+      modalContent.appendChild(contentDiv);
+      modal.appendChild(modalContent);
+      document.body.appendChild(modal);
+    }
+
+    /**
+     * Moves a URL up in the order.
+     */
+    function moveUp(index) {
+      if (index <= 0) return;
+      [orderedUrls[index - 1], orderedUrls[index]] = [orderedUrls[index], orderedUrls[index - 1]];
+      renderUrlList();
+    }
+
+    /**
+     * Moves a URL down in the order.
+     */
+    function moveDown(index) {
+      if (index >= orderedUrls.length - 1) return;
+      [orderedUrls[index + 1], orderedUrls[index]] = [orderedUrls[index], orderedUrls[index + 1]];
+      renderUrlList();
+    }
+
+    /**
+     * Processes content to fix relative image URLs.
+     */
+    function processContentImages(content, baseUrl) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+      const urlObj = new URL(baseUrl);
+      const baseDomain = urlObj.origin;
+      const basePath = urlObj.pathname.split('/').slice(0, -1).join('/');
+      const images = tempDiv.querySelectorAll('img');
+      images.forEach(img => {
+        const src = img.getAttribute('src');
+        if (src && src.startsWith('/')) {
+          img.setAttribute('src', `${baseDomain}${src}`);
+        } else if (src && !src.match(/^(https?:\/\/|data:)/)) {
+          img.setAttribute('src', `${baseDomain}${basePath}/${src}`);
+        }
+      });
+      const elementsWithStyle = tempDiv.querySelectorAll('[style*="background"]');
+      elementsWithStyle.forEach(el => {
+        const style = el.getAttribute('style');
+        if (style && style.includes('url(')) {
+          const newStyle = style.replace(/url\(['"]?([^'"]*?)['"]?\)/g, (match, url) => {
+            if (url.startsWith('/')) {
+              return `url("${baseDomain}${url}")`;
+            } else if (!url.match(/^(https?:\/\/|data:)/)) {
+              return `url("${baseDomain}${basePath}/${url}")`;
+            }
+            return match;
+          });
+          el.setAttribute('style', newStyle);
+        }
+      });
+      return tempDiv.innerHTML;
+    }
+
+    /**
+     * Combines all fetched contents into one HTML file and triggers a download.
+     */
+    function downloadCombined() {
+      if (docs.size === 0) {
+        alert('No documentation content has been fetched yet!');
+        return;
+      }
+      const combinedContent = [];
+      orderedUrls.forEach(url => {
+        const content = docs.get(url);
+        if (!content) {
+          combinedContent.push(`
+          <section>
+            <h2>Documentation from: <a href="${url}" target="_blank">${url}</a></h2>
+            <p><em>No content available.</em></p>
+          </section>
+          <hr/>
+          `);
+        } else {
+          const processedContent = processContentImages(content, url);
+          combinedContent.push(`
+          <section>
+            <h2>Documentation from: <a href="${url}" target="_blank">${url}</a></h2>
+            ${processedContent}
+          </section>
+          <hr/>
+          `);
+        }
+      });
+      const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Combined Documentation</title>
+          <style>
+              body {
+                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                  line-height: 1.6;
+                  background-color: #f7f9fc;
+                  color: #333;
+                  max-width: 1200px;
+                  margin: 0 auto;
+                  padding: 20px;
+              }
+              section {
+                  margin-bottom: 40px;
+              }
+              hr {
+                  border: none;
+                  border-top: 1px solid #ddd;
+              }
+              h2 a {
+                  color: #2980b9;
+                  text-decoration: none;
+              }
+              h2 a:hover {
+                  text-decoration: underline;
+              }
+              img {
+                  max-width: 100%;
+                  height: auto;
+              }
+          </style>
+      </head>
+      <body>
+          <h1>Combined Documentation</h1>
+          ${combinedContent.join('')}
+      </body>
+      </html>
+      `;
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const downloadLink = document.createElement('a');
+      downloadLink.href = URL.createObjectURL(blob);
+      downloadLink.download = 'combined_documentation.html';
+      downloadLink.style.display = 'none';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(downloadLink.href);
+    }
+
+    /**
+     * Placeholder for screenshot functionality.
+     */
+    async function takePhoto(url) {
+      alert(`Taking photo of ${url} (Implementation needed)`);
+    }
+  </script>
+</body>
+</html>
