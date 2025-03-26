@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Local Documentation Content Extractor</title>
+    <title>Local Documentation Screenshot Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-      /* Base styles for a clean, modern look */
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         line-height: 1.6;
@@ -14,13 +14,26 @@
         max-width: 1200px;
         margin: 0 auto;
         padding: 20px;
+        box-sizing: border-box;
       }
-      h1,
-      h2,
-      h3 {
+      h1 {
         color: #2c3e50;
+        font-size: 2.2em;
+        margin-bottom: 20px;
+        text-align: center;
       }
-      /* Textarea & inputs */
+      .input-section {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      .input-section h2 {
+        font-size: 1.5em;
+        color: #2c3e50;
+        margin-bottom: 10px;
+      }
       textarea {
         width: 100%;
         padding: 12px;
@@ -30,49 +43,34 @@
         margin-bottom: 15px;
         box-sizing: border-box;
         resize: vertical;
+        height: 150px;
       }
-      #urlList {
-        height: 180px;
+      .action-buttons {
+        text-align: center;
+        margin-bottom: 20px;
       }
-      /* Toggle advanced options button */
-      .toggle-section {
-        cursor: pointer;
-        background-color: #3498db;
-        color: #fff;
-        padding: 10px;
-        border-radius: 4px;
-        margin-bottom: 10px;
-        width: fit-content;
-      }
-      /* Advanced options container */
-      .advanced-options {
-        display: none;
-        background-color: #ecf0f1;
-        padding: 15px;
-        border-radius: 4px;
-        margin-bottom: 15px;
-      }
-      /* Button styling */
       button {
-        padding: 10px 20px;
+        padding: 12px 24px;
         background-color: #2980b9;
         color: #fff;
         border: none;
         border-radius: 4px;
         cursor: pointer;
-        margin-right: 10px;
-        margin-bottom: 10px;
-        font-size: 15px;
+        font-size: 16px;
         transition: background-color 0.3s ease;
       }
       button:hover {
         background-color: #1f6391;
       }
-      /* Status messages */
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
       .status {
         margin: 10px 0;
         padding: 10px;
         border-radius: 4px;
+        text-align: center;
       }
       .success {
         background-color: #d4edda;
@@ -82,7 +80,6 @@
         background-color: #f8d7da;
         color: #721c24;
       }
-      /* Progress bar */
       #progressBarContainer {
         width: 100%;
         background-color: #e1e1e1;
@@ -96,7 +93,21 @@
         background-color: #27ae60;
         transition: width 0.3s ease;
       }
-      /* Output styling */
+      .counts {
+        background-color: #fff;
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .counts p {
+        margin: 5px 0;
+        font-size: 14px;
+      }
       #output {
         background-color: #fff;
         border: 1px solid #ddd;
@@ -104,148 +115,123 @@
         border-radius: 4px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         margin-bottom: 20px;
-        max-height: 600px;
-        overflow-y: auto;
       }
-      /* Counts section */
-      .counts {
-        background-color: #fff;
-        border: 1px solid #ddd;
-        padding: 15px;
-        border-radius: 4px;
-        margin-bottom: 20px;
-      }
-      .counts p {
-        margin: 5px 0;
-      }
-      .counts ul {
-        list-style-type: disc;
-        margin-left: 20px;
-      }
-      /* Fetched URL list */
       .url-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 8px;
+        padding: 10px;
         border-bottom: 1px solid #eee;
+        transition: background-color 0.2s ease;
+      }
+      .url-item:hover {
+        background-color: #f9f9f9;
       }
       .url-text {
         flex-grow: 1;
         margin-right: 10px;
         word-break: break-all;
+        font-size: 14px;
       }
       .control-buttons button {
-        padding: 5px 10px;
+        padding: 6px 12px;
         margin-left: 5px;
         font-size: 13px;
+        background-color: #3498db;
+      }
+      .control-buttons button:hover {
+        background-color: #2980b9;
       }
       .control-buttons button:disabled {
         background-color: #ccc;
         cursor: not-allowed;
       }
+      #screenshotIframe {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+        width: 1200px;
+        height: 800px;
+        border: none;
+      }
+      .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .modal-content {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 5px;
+        max-width: 90%;
+        max-height: 90%;
+        overflow: auto;
+        position: relative;
+      }
+      .modal-content h3 {
+        margin-top: 0;
+        color: #2c3e50;
+      }
+      .modal-content img {
+        max-width: 100%;
+        height: auto;
+      }
+      .close-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: #e74c3c;
+        color: #fff;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        cursor: pointer;
+        font-size: 16px;
+      }
     </style>
   </head>
   <body>
-    <h1>Local Documentation Content Extractor</h1>
+    <h1>Local Documentation Screenshot Tool</h1>
 
     <div class="input-section">
-      <h2>URL List</h2>
+      <h2>Enter URLs to Capture</h2>
       <textarea id="urlList" placeholder="Enter URLs (one per line)">
 http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Overview
 http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Details
-    </textarea>
-    </div>
-
-    <div class="toggle-section" onclick="toggleAdvancedOptions()">
-      <span id="toggleIcon">▶</span> Advanced Content Selection Options
-    </div>
-
-    <div class="advanced-options" id="advancedOptions">
-      <div class="selector-settings">
-        <label for="customSelectors">Custom CSS/XPath Selectors</label>
-        <p class="description">
-          Enter one selector per line. Use standard CSS selectors normally, or
-          prefix an XPath expression with <code>xpath:</code>. Example:
-          <code>xpath://div[@class='custom-content']</code>
-        </p>
-        <textarea
-          id="customSelectors"
-          placeholder="e.g., .cmp-text, xpath://div[@class='custom-content']"
-        >
-/* If left blank for local pages, the tool will default to using the "#app-container" element */
       </textarea>
-        <ul class="helper-list">
-          <li>
-            For local pages, if no custom selector is provided, the tool will
-            attempt to extract content from <code>#app-container</code>
-          </li>
-        </ul>
-      </div>
     </div>
 
-    <div>
-      <button onclick="fetchAllDocs()">Fetch All Documentation</button>
-      <button id="downloadCombinedBtn" onclick="downloadCombined()" disabled>
-        Combine and Download
-      </button>
-      <button id="fetchFailedBtn" onclick="retryFailedUrls()" disabled>
-        Fetch Failed URLs
-      </button>
+    <div class="action-buttons">
+      <button onclick="captureScreenshots()">Capture Screenshots</button>
     </div>
 
-    <div id="status"></div>
     <div id="progress"></div>
     <div id="progressBarContainer">
       <div id="progressBar"></div>
     </div>
 
     <div class="counts" id="counts">
-      <p><strong>Total URLs Input:</strong> <span id="totalCount">0</span></p>
-      <p>
-        <strong>URLs After Cleaning:</strong> <span id="cleanedCount">0</span>
-      </p>
-      <p>
-        <strong>URLs Successfully Fetched:</strong>
-        <span id="fetchedCount">0</span>
-      </p>
-      <p>
-        <strong>URLs Failed to Fetch:</strong> <span id="failedCount">0</span>
-      </p>
-      <p><strong>Skipped URLs (Duplicates):</strong></p>
-      <ul id="skippedDuplicates"></ul>
-      <p><strong>Skipped URLs (Invalid Paths):</strong></p>
-      <ul id="skippedInvalid"></ul>
+      <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
+      <p><strong>Processed:</strong> <span id="processedCount">0</span></p>
+      <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
     </div>
 
     <div id="output"></div>
+    <iframe id="screenshotIframe"></iframe>
 
     <script>
-      const docs = new Map();
+      const screenshots = new Map();
       let orderedUrls = [];
-      let skippedDuplicates = [];
-      let skippedInvalid = [];
       let failedUrls = [];
 
-      /**
-       * Toggles the display of advanced options section.
-       */
-      function toggleAdvancedOptions() {
-        const advancedOptions = document.getElementById("advancedOptions");
-        const toggleIcon = document.getElementById("toggleIcon");
-        if (advancedOptions.style.display === "block") {
-          advancedOptions.style.display = "none";
-          toggleIcon.textContent = "▶";
-        } else {
-          advancedOptions.style.display = "block";
-          toggleIcon.textContent = "▼";
-        }
-      }
-      window.toggleAdvancedOptions = toggleAdvancedOptions;
-
-      /**
-       * Cleans the URL list by removing duplicates.
-       */
       function cleanUrlList(urls) {
         const uniqueUrls = new Set();
         const cleanedUrls = [];
@@ -254,278 +240,125 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
           if (trimmedUrl && !uniqueUrls.has(trimmedUrl)) {
             uniqueUrls.add(trimmedUrl);
             cleanedUrls.push(trimmedUrl);
-          } else if (trimmedUrl) {
-            skippedDuplicates.push(url);
           }
         });
         return cleanedUrls;
       }
 
-      /**
-       * Validates if a URL is likely to contain documentation content.
-       * For local pages, we check if the URL contains "localhost".
-       */
-      function isValidDocumentationUrl(url) {
-        // For local usage, accept only URLs that include "localhost"
+      function isValidUrl(url) {
         return url.includes("localhost");
       }
 
-      /**
-       * Fetches and extracts the main content from a given URL.
-       * Waits 30 seconds before fetching to allow page initialization.
-       * For local pages:
-       *   - Waits 10 seconds after fetching to allow dynamic content to load.
-       *   - Uses "#app-container" as the default selector if no custom selectors provided.
-       */
-      async function fetchDoc(url, retries = 4) {
-        try {
-          // Wait 30 seconds before fetching
-          await new Promise((resolve) => setTimeout(resolve, 30000));
+      async function takeScreenshotWithIframe(url) {
+        const iframe = document.getElementById("screenshotIframe");
+        const progressDiv = document.getElementById("progress");
 
-          const options = {
-            cache: "no-store",
-            headers: {
-              "User-Agent": "Mozilla/5.0",
-            },
-          };
-          const bustCacheUrl = `${url}${
-            url.includes("?") ? "&" : "?"
-          }_t=${Date.now()}`;
-          const response = await fetch(bustCacheUrl, options);
-          if (!response.ok) {
-            throw new Error(`Status ${response.status}`);
-          }
-          let html = await response.text();
-          // For local pages, wait 10 seconds for dynamic content to load
-          if (url.includes("localhost")) {
-            await new Promise((resolve) => setTimeout(resolve, 10000));
-            // Optionally, re-fetch if needed or proceed with current html.
-            // In this example, we proceed with the fetched HTML.
-          }
-          if (!html || html.trim() === "") {
-            throw new Error(`Empty content`);
-          }
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, "text/html");
+        return new Promise((resolve, reject) => {
+          progressDiv.innerHTML = `Loading ${url} in iframe for screenshot...`;
+          iframe.src = url;
 
-          const customSelectorsText = document
-            .getElementById("customSelectors")
-            .value.trim();
-          let customSelectors = customSelectorsText
-            ? customSelectorsText
-                .split("\n")
-                .map((s) => s.trim())
-                .filter((s) => s)
-            : [];
-          // For local pages, if no custom selector is provided, default to "#app-container"
-          let defaultSelectors = url.includes("localhost")
-            ? ["#app-container"]
-            : [
-                "article",
-                "div.theme-doc-markdown.markdown",
-                "div.content",
-                "main",
-                "#content",
-                ".documentation",
-                ".doc-content",
-                ".article",
-                ".page-content",
-                ".content-container",
-                "body",
-              ];
-          const allSelectors = [...customSelectors, ...defaultSelectors];
-          let mainContent = null;
-          const findContent = (selector) => {
+          iframe.onload = async () => {
             try {
-              if (selector.startsWith("xpath:")) {
-                const xpathExpr = selector.slice("xpath:".length).trim();
-                const xpathResult = doc.evaluate(
-                  xpathExpr,
-                  doc,
-                  null,
-                  XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-                  null
-                );
-                if (xpathResult.snapshotLength > 0) {
-                  if (xpathResult.snapshotLength === 1) {
-                    const node = xpathResult.snapshotItem(0);
-                    if (node && node.innerHTML && node.innerHTML.trim()) {
-                      return { element: node, method: "xpath-single" };
-                    }
-                  } else {
-                    const container = document.createElement("div");
-                    for (let i = 0; i < xpathResult.snapshotLength; i++) {
-                      const node = xpathResult.snapshotItem(i);
-                      if (node && node.innerHTML && node.innerHTML.trim()) {
-                        container.appendChild(node.cloneNode(true));
-                      }
-                    }
-                    if (container.innerHTML && container.innerHTML.trim()) {
-                      return { element: container, method: "xpath-multiple" };
-                    }
-                  }
-                }
-                return null;
-              } else {
-                const element = doc.querySelector(selector);
-                if (element && element.innerHTML && element.innerHTML.trim()) {
-                  return { element, method: "single" };
-                }
-                const elements = doc.querySelectorAll(selector);
-                if (elements && elements.length > 0) {
-                  const container = document.createElement("div");
-                  elements.forEach((el) => {
-                    if (el.innerHTML && el.innerHTML.trim()) {
-                      container.appendChild(el.cloneNode(true));
-                    }
-                  });
-                  if (container.innerHTML && container.innerHTML.trim()) {
-                    return { element: container, method: "multiple" };
-                  }
-                }
-                return null;
-              }
-            } catch (err) {
-              console.warn(`Error with selector "${selector}":`, err);
-              return null;
+              await new Promise((resolve) => setTimeout(resolve, 10000));
+              progressDiv.innerHTML = `Capturing screenshot for ${url}...`;
+
+              const canvas = await html2canvas(iframe.contentDocument.body, {
+                useCORS: true,
+                logging: true,
+                width: iframe.offsetWidth,
+                height: iframe.contentDocument.body.scrollHeight,
+              });
+              const screenshotData = canvas.toDataURL("image/png");
+              console.log(`Screenshot taken for ${url}`);
+              resolve(screenshotData);
+            } catch (error) {
+              console.error(`Failed to take screenshot for ${url}:`, error);
+              reject(error);
+            } finally {
+              iframe.src = "about:blank";
             }
           };
 
-          for (const selector of allSelectors) {
-            const result = findContent(selector);
-            if (result) {
-              mainContent = result.element;
-              break;
-            }
-          }
-          if (
-            !mainContent ||
-            !mainContent.innerHTML ||
-            !mainContent.innerHTML.trim()
-          ) {
-            throw new Error(`No content found using provided selectors`);
-          }
-          // Remove inline SVGs if any
-          const svgs = mainContent.querySelectorAll("svg");
-          svgs.forEach((svg) => svg.remove());
-          return { content: `\n${mainContent.innerHTML}` };
-        } catch (error) {
-          if (retries > 0) {
-            console.warn(`Retrying ${url} (${retries} left)...`);
-            await new Promise((resolve) =>
-              setTimeout(resolve, Math.pow(2, 4 - retries) * 1000)
-            );
-            return await fetchDoc(url, retries - 1);
-          }
-          throw new Error(`Failed to fetch ${url}: ${error.message}`);
-        }
+          iframe.onerror = (error) => {
+            console.error(`Failed to load ${url} in iframe:`, error);
+            reject(new Error(`Failed to load ${url} in iframe`));
+          };
+        });
       }
 
-      /**
-       * Fetches all documentation URLs provided by the user.
-       */
-      async function fetchAllDocs() {
-        skippedDuplicates = [];
-        skippedInvalid = [];
+      async function captureScreenshots() {
         failedUrls = [];
         orderedUrls = [];
-        docs.clear();
+        screenshots.clear();
 
-        const urlListRaw = document
-          .getElementById("urlList")
-          .value.split("\n")
-          .map((url) => url.trim())
-          .filter((url) => url);
+        const urlListRaw = document.getElementById("urlList").value.split("\n").map((url) => url.trim()).filter((url) => url);
         document.getElementById("totalCount").textContent = urlListRaw.length;
         const urlListCleaned = cleanUrlList(urlListRaw);
-        const urlList = [];
-        urlListCleaned.forEach((url) => {
-          if (isValidDocumentationUrl(url)) {
-            urlList.push(url);
-          } else {
-            skippedInvalid.push(url);
-          }
-        });
-        document.getElementById("cleanedCount").textContent = urlList.length;
-
-        // Update duplicate and invalid lists
-        const skippedDuplicatesList =
-          document.getElementById("skippedDuplicates");
-        skippedDuplicatesList.innerHTML = "";
-        skippedDuplicates.forEach((url) => {
-          const li = document.createElement("li");
-          li.textContent = url;
-          skippedDuplicatesList.appendChild(li);
-        });
-        const skippedInvalidList = document.getElementById("skippedInvalid");
-        skippedInvalidList.innerHTML = "";
-        skippedInvalid.forEach((url) => {
-          const li = document.createElement("li");
-          li.textContent = url;
-          skippedInvalidList.appendChild(li);
-        });
+        const urlList = urlListCleaned.filter(isValidUrl);
+        document.getElementById("totalCount").textContent = urlList.length;
 
         const progressDiv = document.getElementById("progress");
         const progressBar = document.getElementById("progressBar");
         const outputDiv = document.getElementById("output");
-        const downloadCombinedBtn = document.getElementById(
-          "downloadCombinedBtn"
-        );
-        const fetchFailedBtn = document.getElementById("fetchFailedBtn");
-        const fetchedCountElem = document.getElementById("fetchedCount");
+        const processedCountElem = document.getElementById("processedCount");
         const failedCountElem = document.getElementById("failedCount");
 
-        fetchedCountElem.textContent = "0";
+        processedCountElem.textContent = "0";
         failedCountElem.textContent = "0";
         outputDiv.innerHTML = "";
-        downloadCombinedBtn.disabled = true;
-        fetchFailedBtn.disabled = true;
         progressBar.style.width = "0%";
         progressDiv.innerHTML = "";
 
         if (urlList.length === 0) {
-          alert("Please enter at least one valid local documentation URL.");
+          alert("Please enter at least one valid local URL.");
           return;
         }
 
-        const concurrencyLimit = 3;
-        let index = 0,
-          completed = 0;
+        const concurrencyLimit = 1;
+        let index = 0, completed = 0;
+
         async function worker() {
           while (index < urlList.length) {
             const currentIndex = index++;
             const url = urlList[currentIndex];
-            progressDiv.innerHTML = `Processing ${completed + 1} of ${
-              urlList.length
-            }: ${url}`;
+            if (!url) {
+              console.warn(`URL at index ${currentIndex} is undefined`);
+              completed++;
+              continue;
+            }
+            progressDiv.innerHTML = `Processing ${completed + 1} of ${urlList.length}: ${url}`;
             try {
               const delay = Math.floor(Math.random() * 1000) + 500;
               await new Promise((resolve) => setTimeout(resolve, delay));
-              const result = await fetchDoc(url);
-              if (!result || !result.content || result.content === "") {
-                throw new Error(`No content found for ${url}`);
-              }
-              docs.set(url, result.content);
+              const screenshotData = await takeScreenshotWithIframe(url);
+              screenshots.set(url, screenshotData);
               orderedUrls.push(url);
               const status = document.createElement("div");
               status.className = "status success";
-              status.textContent = `✓ Successfully fetched: ${url}`;
+              status.textContent = `✓ Screenshot captured: ${url}`;
               outputDiv.appendChild(status);
-              fetchedCountElem.textContent =
-                parseInt(fetchedCountElem.textContent) + 1;
+              processedCountElem.textContent = parseInt(processedCountElem.textContent) + 1;
+
+              const link = document.createElement("a");
+              link.href = screenshotData;
+              link.download = `${url.split("/").pop() || "screenshot"}.png`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
             } catch (error) {
               const status = document.createElement("div");
               status.className = "status error";
-              status.textContent = `✗ ${error.message}`;
+              status.textContent = `✗ Failed to capture screenshot: ${url} (${error.message})`;
               outputDiv.appendChild(status);
-              failedCountElem.textContent =
-                parseInt(failedCountElem.textContent) + 1;
+              failedCountElem.textContent = parseInt(failedCountElem.textContent) + 1;
               failedUrls.push(url);
             }
             completed++;
             progressBar.style.width = `${(completed / urlList.length) * 100}%`;
+            console.log(`Completed ${completed}/${urlList.length}`);
           }
         }
+
         const workers = [];
         for (let i = 0; i < concurrencyLimit; i++) {
           workers.push(worker());
@@ -533,113 +366,18 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
         await Promise.all(workers);
         progressDiv.innerHTML = `Completed processing ${urlList.length} URLs`;
 
-        if (docs.size > 0) {
+        if (screenshots.size > 0) {
           renderUrlList();
-          downloadCombinedBtn.disabled = false;
         } else {
-          alert("No documentation content was successfully fetched.");
-        }
-        fetchFailedBtn.disabled = failedUrls.length === 0;
-        if (failedUrls.length > 0) {
-          const failedUrlsList = document.createElement("ul");
-          failedUrls.forEach((url) => {
-            const li = document.createElement("li");
-            li.textContent = url;
-            failedUrlsList.appendChild(li);
-          });
-          const failedDiv = document.createElement("div");
-          failedDiv.className = "status error";
-          failedDiv.innerHTML = `<strong>Failed to fetch the following URLs:</strong>`;
-          failedDiv.appendChild(failedUrlsList);
-          outputDiv.appendChild(failedDiv);
+          outputDiv.innerHTML = '<div class="status error">No screenshots were captured.</div>';
         }
       }
 
-      /**
-       * Attempts to re-fetch only the failed URLs.
-       */
-      async function retryFailedUrls() {
-        if (failedUrls.length === 0) {
-          alert("No failed URLs to retry.");
-          return;
-        }
-        const progressDiv = document.getElementById("progress");
-        const progressBar = document.getElementById("progressBar");
-        const outputDiv = document.getElementById("output");
-        const fetchedCountElem = document.getElementById("fetchedCount");
-        const failedCountElem = document.getElementById("failedCount");
-
-        const urlsToRetry = [...failedUrls];
-        failedUrls = [];
-        progressDiv.innerHTML = `Retrying ${urlsToRetry.length} failed URLs...`;
-        progressBar.style.width = "0%";
-
-        const concurrencyLimit = 2;
-        let index = 0,
-          completed = 0,
-          newlySucceeded = 0;
-        async function worker() {
-          while (index < urlsToRetry.length) {
-            const currentIndex = index++;
-            const url = urlsToRetry[currentIndex];
-            progressDiv.innerHTML = `Retrying ${completed + 1} of ${
-              urlsToRetry.length
-            }: ${url}`;
-            try {
-              await new Promise((resolve) => setTimeout(resolve, 3000));
-              const result = await fetchDoc(url, 5);
-              if (!result || !result.content || result.content === "") {
-                throw new Error(`No content found for ${url}`);
-              }
-              docs.set(url, result.content);
-              if (!orderedUrls.includes(url)) {
-                orderedUrls.push(url);
-              }
-              const status = document.createElement("div");
-              status.className = "status success";
-              status.textContent = `✓ Successfully fetched on retry: ${url}`;
-              outputDiv.appendChild(status);
-              newlySucceeded++;
-              fetchedCountElem.textContent = (
-                parseInt(fetchedCountElem.textContent) + 1
-              ).toString();
-            } catch (error) {
-              const status = document.createElement("div");
-              status.className = "status error";
-              status.textContent = `✗ Still failed after retry: ${url}`;
-              outputDiv.appendChild(status);
-              failedUrls.push(url);
-            }
-            completed++;
-            progressBar.style.width = `${
-              (completed / urlsToRetry.length) * 100
-            }%`;
-          }
-        }
-        const workers = [];
-        for (let i = 0; i < concurrencyLimit; i++) {
-          workers.push(worker());
-        }
-        await Promise.all(workers);
-        failedCountElem.textContent = failedUrls.length.toString();
-        progressDiv.innerHTML = `Completed retrying ${urlsToRetry.length} URLs. Successfully fetched ${newlySucceeded} previously failed URLs.`;
-        if (docs.size > 0) {
-          renderUrlList();
-          document.getElementById("downloadCombinedBtn").disabled = false;
-        }
-        document.getElementById("fetchFailedBtn").disabled =
-          failedUrls.length === 0;
-      }
-
-      /**
-       * Renders the list of fetched URLs with controls to reorder them.
-       */
       function renderUrlList() {
         const outputDiv = document.getElementById("output");
         outputDiv.innerHTML = "";
         if (orderedUrls.length === 0) {
-          outputDiv.innerHTML =
-            '<div class="status error">No documentation content to display.</div>';
+          outputDiv.innerHTML = '<div class="status error">No URLs to display.</div>';
           return;
         }
         const listContainer = document.createElement("div");
@@ -665,14 +403,14 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
           downButton.onclick = () => moveDown(index);
           downButton.disabled = index === orderedUrls.length - 1;
 
-          const previewButton = document.createElement("button");
-          previewButton.textContent = "👁️";
-          previewButton.title = "Preview Content";
-          previewButton.onclick = () => previewContent(url);
+          const viewButton = document.createElement("button");
+          viewButton.textContent = "📸";
+          viewButton.title = "View Screenshot";
+          viewButton.onclick = () => viewScreenshot(url);
 
           controlsDiv.appendChild(upButton);
           controlsDiv.appendChild(downButton);
-          controlsDiv.appendChild(previewButton);
+          controlsDiv.appendChild(viewButton);
           itemDiv.appendChild(urlText);
           itemDiv.appendChild(controlsDiv);
           listContainer.appendChild(itemDiv);
@@ -680,212 +418,41 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
         outputDiv.appendChild(listContainer);
       }
 
-      /**
-       * Opens a modal to preview the content from a URL.
-       */
-      function previewContent(url) {
-        const content = docs.get(url);
-        if (!content) {
-          alert(`No content available for ${url}`);
+      function viewScreenshot(url) {
+        const screenshotData = screenshots.get(url);
+        if (!screenshotData) {
+          alert(`No screenshot available for ${url}`);
           return;
         }
         const modal = document.createElement("div");
-        modal.style.position = "fixed";
-        modal.style.top = "0";
-        modal.style.left = "0";
-        modal.style.width = "100%";
-        modal.style.height = "100%";
-        modal.style.backgroundColor = "rgba(0,0,0,0.7)";
-        modal.style.zIndex = "1000";
-        modal.style.display = "flex";
-        modal.style.justifyContent = "center";
-        modal.style.alignItems = "center";
+        modal.className = "modal";
         const modalContent = document.createElement("div");
-        modalContent.style.backgroundColor = "#fff";
-        modalContent.style.padding = "20px";
-        modalContent.style.borderRadius = "5px";
-        modalContent.style.width = "80%";
-        modalContent.style.height = "80%";
-        modalContent.style.overflowY = "auto";
-        modalContent.style.position = "relative";
+        modalContent.className = "modal-content";
         const closeButton = document.createElement("button");
+        closeButton.className = "close-button";
         closeButton.textContent = "✕";
-        closeButton.style.position = "absolute";
-        closeButton.style.top = "10px";
-        closeButton.style.right = "10px";
-        closeButton.style.backgroundColor = "#e74c3c";
-        closeButton.style.color = "#fff";
-        closeButton.style.border = "none";
-        closeButton.style.borderRadius = "50%";
-        closeButton.style.width = "30px";
-        closeButton.style.height = "30px";
-        closeButton.style.cursor = "pointer";
         closeButton.onclick = () => document.body.removeChild(modal);
         const title = document.createElement("h3");
-        title.textContent = `Preview of content from: ${url}`;
-        const contentDiv = document.createElement("div");
-        contentDiv.innerHTML = content;
+        title.textContent = `Screenshot of: ${url}`;
+        const img = document.createElement("img");
+        img.src = screenshotData;
         modalContent.appendChild(closeButton);
         modalContent.appendChild(title);
-        modalContent.appendChild(contentDiv);
+        modalContent.appendChild(img);
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
       }
 
-      /**
-       * Moves a URL up in the order.
-       */
       function moveUp(index) {
         if (index <= 0) return;
-        [orderedUrls[index - 1], orderedUrls[index]] = [
-          orderedUrls[index],
-          orderedUrls[index - 1],
-        ];
+        [orderedUrls[index - 1], orderedUrls[index]] = [orderedUrls[index], orderedUrls[index - 1]];
         renderUrlList();
       }
 
-      /**
-       * Moves a URL down in the order.
-       */
       function moveDown(index) {
         if (index >= orderedUrls.length - 1) return;
-        [orderedUrls[index + 1], orderedUrls[index]] = [
-          orderedUrls[index],
-          orderedUrls[index + 1],
-        ];
+        [orderedUrls[index + 1], orderedUrls[index]] = [orderedUrls[index], orderedUrls[index + 1]];
         renderUrlList();
-      }
-
-      /**
-       * Processes content to fix relative image URLs.
-       */
-      function processContentImages(content, baseUrl) {
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = content;
-        const urlObj = new URL(baseUrl);
-        const baseDomain = urlObj.origin;
-        const basePath = urlObj.pathname.split("/").slice(0, -1).join("/");
-        const images = tempDiv.querySelectorAll("img");
-        images.forEach((img) => {
-          const src = img.getAttribute("src");
-          if (src && src.startsWith("/")) {
-            img.setAttribute("src", `${baseDomain}${src}`);
-          } else if (src && !src.match(/^(https?:\/\/|data:)/)) {
-            img.setAttribute("src", `${baseDomain}${basePath}/${src}`);
-          }
-        });
-        const elementsWithStyle = tempDiv.querySelectorAll(
-          '[style*="background"]'
-        );
-        elementsWithStyle.forEach((el) => {
-          const style = el.getAttribute("style");
-          if (style && style.includes("url(")) {
-            const newStyle = style.replace(
-              /url\(['"]?([^'"]*?)['"]?\)/g,
-              (match, url) => {
-                if (url.startsWith("/")) {
-                  return `url("${baseDomain}${url}")`;
-                } else if (!url.match(/^(https?:\/\/|data:)/)) {
-                  return `url("${baseDomain}${basePath}/${url}")`;
-                }
-                return match;
-              }
-            );
-            el.setAttribute("style", newStyle);
-          }
-        });
-        return tempDiv.innerHTML;
-      }
-
-      /**
-       * Combines all fetched contents into one HTML file and triggers a download.
-       */
-      function downloadCombined() {
-        if (docs.size === 0) {
-          alert("No documentation content has been fetched yet!");
-          return;
-        }
-        const combinedContent = [];
-        orderedUrls.forEach((url) => {
-          const content = docs.get(url);
-          if (!content) {
-            combinedContent.push(`
-          <section>
-            <h2>Documentation from: <a href="${url}" target="_blank">${url}</a></h2>
-            <p><em>No content available.</em></p>
-          </section>
-          <hr/>
-          `);
-          } else {
-            const processedContent = processContentImages(content, url);
-            combinedContent.push(`
-          <section>
-            <h2>Documentation from: <a href="${url}" target="_blank">${url}</a></h2>
-            ${processedContent}
-          </section>
-          <hr/>
-          `);
-          }
-        });
-        const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Combined Documentation</title>
-          <style>
-              body {
-                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                  line-height: 1.6;
-                  background-color: #f7f9fc;
-                  color: #333;
-                  max-width: 1200px;
-                  margin: 0 auto;
-                  padding: 20px;
-              }
-              section {
-                  margin-bottom: 40px;
-              }
-              hr {
-                  border: none;
-                  border-top: 1px solid #ddd;
-              }
-              h2 a {
-                  color: #2980b9;
-                  text-decoration: none;
-              }
-              h2 a:hover {
-                  text-decoration: underline;
-              }
-              img {
-                  max-width: 100%;
-                  height: auto;
-              }
-          </style>
-      </head>
-      <body>
-          <h1>Combined Documentation</h1>
-          ${combinedContent.join("")}
-      </body>
-      </html>
-      `;
-        const blob = new Blob([htmlContent], { type: "text/html" });
-        const downloadLink = document.createElement("a");
-        downloadLink.href = URL.createObjectURL(blob);
-        downloadLink.download = "combined_documentation.html";
-        downloadLink.style.display = "none";
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        URL.revokeObjectURL(downloadLink.href);
-      }
-
-      /**
-       * Placeholder for screenshot functionality.
-       */
-      async function takePhoto(url) {
-        alert(`Taking photo of ${url} (Implementation needed)`);
       }
     </script>
   </body>
