@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Documentation Content Extractor</title>
+  <title>Local Documentation Content Extractor</title>
   <style>
-    /* Modern, clean base styles */
+    /* Base styles for a clean, modern look */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       line-height: 1.6;
@@ -145,14 +145,13 @@
   </style>
 </head>
 <body>
-  <h1>Documentation Content Extractor</h1>
+  <h1>Local Documentation Content Extractor</h1>
 
   <div class="input-section">
     <h2>URL List</h2>
     <textarea id="urlList" placeholder="Enter URLs (one per line)">
-https://www.docs.inductiveautomation.com/docs/8.1/ignition-modules/perspective/views-in-perspective/popup-views#__docusaurus_skipToContent_fallback
-https://www.docs.inductiveautomation.com/docs/8.1/ignition-modules/perspective/popup-views#
-https://helpx.adobe.com/illustrator/kb/illustrator-for-apple-silicon.html
+http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Overview
+http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Details
     </textarea>
   </div>
 
@@ -168,20 +167,10 @@ https://helpx.adobe.com/illustrator/kb/illustrator-for-apple-silicon.html
         Example: <code>xpath://div[@class='custom-content']</code>
       </p>
       <textarea id="customSelectors" placeholder="e.g., .cmp-text, xpath://div[@class='custom-content']">
-.cmp-text
-.aem-GridColumn
-.page-description
-.dexter-Position
-#root_content_flex_items_position
-.dexter-Cta
-table
-xpath://div[@class='custom-content']
+/* If left blank for local pages, the tool will default to using the "#app-container" element */
       </textarea>
       <ul class="helper-list">
-        <li>Default selectors (if left blank, these will be applied): 'main article', '.DocSearch-content',
-          'article.DocItem_container', '.theme-doc-markdown', '.markdown', 'article',
-          'div.theme-doc-markdown.markdown', 'div.content', 'main'</li>
-        <li>Additional examples: '#main-content', '.documentation-section', 'div.docs-content'</li>
+        <li>For local pages, if no custom selector is provided, the tool will attempt to extract content from <code>#app-container</code></li>
       </ul>
     </div>
   </div>
@@ -254,23 +243,18 @@ xpath://div[@class='custom-content']
 
     /**
      * Validates if a URL is likely to contain documentation content.
+     * For local pages, we check if the URL contains "localhost".
      */
     function isValidDocumentationUrl(url) {
-      const documentationPaths = [
-        '/browserql/', '/browserQL/', '/baas/', '/open-api/', '/docs/',
-        '/help/', '/helpx/', '/kb/', '/using/', '/guide/', '/manual/',
-        '/documentation/', '/support/', '/learn/'
-      ];
-      const documentationDomains = [
-        'docs.', 'documentation.', 'help.', 'helpx.', 'support.', 'learn.',
-        'guide.', 'developer.', 'api.', 'manual.', 'wiki.'
-      ];
-      return documentationPaths.some(path => url.includes(path)) ||
-             documentationDomains.some(domain => url.includes(domain));
+      // For local usage, accept only URLs that include "localhost"
+      return url.includes("localhost");
     }
 
     /**
      * Fetches and extracts the main content from a given URL.
+     * For local pages:
+     *   - Waits 10 seconds after fetching to allow dynamic content to load.
+     *   - Uses "#app-container" as the default selector if no custom selectors provided.
      */
     async function fetchDoc(url, retries = 4) {
       try {
@@ -284,24 +268,23 @@ xpath://div[@class='custom-content']
         if (!response.ok) {
           throw new Error(`Status ${response.status}`);
         }
-        const html = await response.text();
+        let html = await response.text();
+        // For local pages, wait 10 seconds for dynamic content to load
+        if (url.includes("localhost")) {
+          await new Promise(resolve => setTimeout(resolve, 10000));
+          // Optionally, re-fetch if needed or proceed with current html.
+          // In this example, we proceed with the fetched HTML.
+        }
         if (!html || html.trim() === '') {
           throw new Error(`Empty content`);
         }
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
 
-        const customSelectorsText = document.getElementById('customSelectors').value;
-        const customSelectors = customSelectorsText.split('\n').map(s => s.trim()).filter(s => s);
-        const defaultSelectors = [
-          ...(url.includes('inductiveautomation.com') ? [
-            'main article', '.DocSearch-content', 'article.DocItem_container',
-            '.theme-doc-markdown', '.markdown'
-          ] : []),
-          ...(url.includes('adobe.com') ? [
-            '.cmp-text', '.aem-GridColumn', '.page-description',
-            '.dexter-Position', '#root_content_flex_items_position', '.dexter-Cta'
-          ] : []),
+        const customSelectorsText = document.getElementById('customSelectors').value.trim();
+        let customSelectors = customSelectorsText ? customSelectorsText.split('\n').map(s => s.trim()).filter(s => s) : [];
+        // For local pages, if no custom selector is provided, default to "#app-container"
+        let defaultSelectors = url.includes("localhost") ? ['#app-container'] : [
           'article', 'div.theme-doc-markdown.markdown', 'div.content', 'main',
           '#content', '.documentation', '.doc-content', '.article', '.page-content',
           '.content-container', 'body'
@@ -365,12 +348,10 @@ xpath://div[@class='custom-content']
             break;
           }
         }
-
         if (!mainContent || !mainContent.innerHTML || !mainContent.innerHTML.trim()) {
-          throw new Error(`No content found`);
+          throw new Error(`No content found using provided selectors`);
         }
-
-        // Remove inline SVGs
+        // Remove inline SVGs if any
         const svgs = mainContent.querySelectorAll('svg');
         svgs.forEach(svg => svg.remove());
         return { content: `\n${mainContent.innerHTML}` };
@@ -442,7 +423,7 @@ xpath://div[@class='custom-content']
       progressDiv.innerHTML = '';
 
       if (urlList.length === 0) {
-        alert('Please enter at least one valid documentation URL.');
+        alert('Please enter at least one valid local documentation URL.');
         return;
       }
 
