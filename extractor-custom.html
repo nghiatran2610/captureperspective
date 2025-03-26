@@ -154,8 +154,7 @@
       <textarea id="urlList" placeholder="Enter URLs (one per line)">
 http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Overview
 http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Details
-    </textarea
-      >
+    </textarea>
     </div>
 
     <div class="toggle-section" onclick="toggleAdvancedOptions()">
@@ -175,8 +174,7 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
           placeholder="e.g., .cmp-text, xpath://div[@class='custom-content']"
         >
 /* If left blank for local pages, the tool will default to using the "#app-container" element */
-      </textarea
-        >
+      </textarea>
         <ul class="helper-list">
           <li>
             For local pages, if no custom selector is provided, the tool will
@@ -274,12 +272,16 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
 
       /**
        * Fetches and extracts the main content from a given URL.
+       * Waits 30 seconds before fetching to allow page initialization.
        * For local pages:
        *   - Waits 10 seconds after fetching to allow dynamic content to load.
        *   - Uses "#app-container" as the default selector if no custom selectors provided.
        */
       async function fetchDoc(url, retries = 4) {
         try {
+          // Wait 30 seconds before fetching
+          await new Promise((resolve) => setTimeout(resolve, 30000));
+
           const options = {
             cache: "no-store",
             headers: {
