@@ -45,6 +45,22 @@
         resize: vertical;
         height: 150px;
       }
+      .dimensions-input {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 15px;
+      }
+      .dimensions-input label {
+        font-size: 14px;
+        color: #2c3e50;
+      }
+      .dimensions-input input {
+        width: 100px;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 14px;
+      }
       .action-buttons {
         text-align: center;
         margin-bottom: 20px;
@@ -57,6 +73,7 @@
         border-radius: 4px;
         cursor: pointer;
         font-size: 16px;
+        margin: 5px;
         transition: background-color 0.3s ease;
       }
       button:hover {
@@ -133,6 +150,14 @@
         word-break: break-all;
         font-size: 14px;
       }
+      .thumbnail {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        margin-right: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
       .control-buttons button {
         padding: 6px 12px;
         margin-left: 5px;
@@ -150,8 +175,6 @@
         position: absolute;
         top: -9999px;
         left: -9999px;
-        width: 1200px;
-        height: 800px;
         border: none;
       }
       .modal {
@@ -207,10 +230,15 @@
 http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Overview
 http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Details
       </textarea>
+      <div class="dimensions-input">
+        <label>Screenshot Width (px): <input type="number" id="screenshotWidth" value="1200" min="100" /></label>
+        <label>Screenshot Height (px): <input type="number" id="screenshotHeight" value="800" min="100" /></label>
+      </div>
     </div>
 
     <div class="action-buttons">
       <button onclick="captureScreenshots()">Capture Screenshots</button>
+      <button id="retryFailedBtn" onclick="retryFailedUrls()" disabled>Retry Failed URLs</button>
     </div>
 
     <div id="progress"></div>
@@ -222,6 +250,7 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
       <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
       <p><strong>Processed:</strong> <span id="processedCount">0</span></p>
       <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
+      <p><strong>Total Time Taken:</strong> <span id="totalTime">0s</span></p>
     </div>
 
     <div id="output"></div>
@@ -249,9 +278,42 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
         return url.includes("localhost");
       }
 
+      function createThumbnail(screenshotData, width = 50, height = 50) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.src = screenshotData;
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/png"));
+          };
+          img.onerror = () => resolve(null);
+        });
+      }
+
+      function getTimestamp() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        const seconds = String(now.getSeconds()).padStart(2, "0");
+        return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+      }
+
       async function takeScreenshotWithIframe(url) {
+        const startTime = performance.now();
         const iframe = document.getElementById("screenshotIframe");
         const progressDiv = document.getElementById("progress");
+        const width = parseInt(document.getElementById("screenshotWidth").value) || 1200;
+        const height = parseInt(document.getElementById("screenshotHeight").value) || 800;
+
+        iframe.style.width = `${width}px`;
+        iframe.style.height = `${height}px`;
 
         return new Promise((resolve, reject) => {
           progressDiv.innerHTML = `Loading ${url} in iframe for screenshot...`;
@@ -259,18 +321,26 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
 
           iframe.onload = async () => {
             try {
-              await new Promise((resolve) => setTimeout(resolve, 10000));
+              await new Promise((resolve) => setTimeout(resolve, 33000)); // 33 seconds wait
               progressDiv.innerHTML = `Capturing screenshot for ${url}...`;
 
               const canvas = await html2canvas(iframe.contentDocument.body, {
                 useCORS: true,
                 logging: true,
-                width: iframe.offsetWidth,
-                height: iframe.contentDocument.body.scrollHeight,
+                width: width,
+                height: height,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: width,
+                windowHeight: height,
+                scale: 1,
               });
               const screenshotData = canvas.toDataURL("image/png");
-              console.log(`Screenshot taken for ${url}`);
-              resolve(screenshotData);
+              const thumbnailData = await createThumbnail(screenshotData);
+              const endTime = performance.now();
+              const timeTaken = ((endTime - startTime) / 1000).toFixed(2); // Time in seconds
+              console.log(`Screenshot taken for ${url} in ${timeTaken}s`);
+              resolve({ screenshot: screenshotData, thumbnail: thumbnailData, timeTaken });
             } catch (error) {
               console.error(`Failed to take screenshot for ${url}:`, error);
               reject(error);
@@ -287,6 +357,7 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
       }
 
       async function captureScreenshots() {
+        const startTotalTime = performance.now();
         failedUrls = [];
         orderedUrls = [];
         screenshots.clear();
@@ -302,12 +373,16 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
         const outputDiv = document.getElementById("output");
         const processedCountElem = document.getElementById("processedCount");
         const failedCountElem = document.getElementById("failedCount");
+        const totalTimeElem = document.getElementById("totalTime");
+        const retryFailedBtn = document.getElementById("retryFailedBtn");
 
         processedCountElem.textContent = "0";
         failedCountElem.textContent = "0";
+        totalTimeElem.textContent = "0s";
         outputDiv.innerHTML = "";
         progressBar.style.width = "0%";
         progressDiv.innerHTML = "";
+        retryFailedBtn.disabled = true;
 
         if (urlList.length === 0) {
           alert("Please enter at least one valid local URL.");
@@ -330,18 +405,21 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
             try {
               const delay = Math.floor(Math.random() * 1000) + 500;
               await new Promise((resolve) => setTimeout(resolve, delay));
-              const screenshotData = await takeScreenshotWithIframe(url);
-              screenshots.set(url, screenshotData);
+              const { screenshot, thumbnail, timeTaken } = await takeScreenshotWithIframe(url);
+              screenshots.set(url, { screenshot, thumbnail, timeTaken });
               orderedUrls.push(url);
               const status = document.createElement("div");
               status.className = "status success";
-              status.textContent = `✓ Screenshot captured: ${url}`;
+              status.textContent = `✓ Screenshot captured: ${url} (Time: ${timeTaken}s)`;
               outputDiv.appendChild(status);
               processedCountElem.textContent = parseInt(processedCountElem.textContent) + 1;
 
+              const timestamp = getTimestamp();
+              const baseFileName = url.split("/").pop() || "screenshot";
+              const fileName = `${baseFileName}_${timestamp}.png`;
               const link = document.createElement("a");
-              link.href = screenshotData;
-              link.download = `${url.split("/").pop() || "screenshot"}.png`;
+              link.href = screenshot;
+              link.download = fileName;
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);
@@ -364,13 +442,91 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
           workers.push(worker());
         }
         await Promise.all(workers);
-        progressDiv.innerHTML = `Completed processing ${urlList.length} URLs`;
+        const endTotalTime = performance.now();
+        const totalTimeTaken = ((endTotalTime - startTotalTime) / 1000).toFixed(2);
+        totalTimeElem.textContent = `${totalTimeTaken}s`;
+        progressDiv.innerHTML = `Completed processing ${urlList.length} URLs (Total Time: ${totalTimeTaken}s)`;
 
         if (screenshots.size > 0) {
           renderUrlList();
         } else {
           outputDiv.innerHTML = '<div class="status error">No screenshots were captured.</div>';
         }
+        retryFailedBtn.disabled = failedUrls.length === 0;
+      }
+
+      async function retryFailedUrls() {
+        const startTotalTime = performance.now();
+        if (failedUrls.length === 0) {
+          alert("No failed URLs to retry.");
+          return;
+        }
+        const urlsToRetry = [...failedUrls];
+        failedUrls = [];
+        const progressDiv = document.getElementById("progress");
+        const progressBar = document.getElementById("progressBar");
+        const outputDiv = document.getElementById("output");
+        const processedCountElem = document.getElementById("processedCount");
+        const failedCountElem = document.getElementById("failedCount");
+        const totalTimeElem = document.getElementById("totalTime");
+        const retryFailedBtn = document.getElementById("retryFailedBtn");
+
+        progressDiv.innerHTML = `Retrying ${urlsToRetry.length} failed URLs...`;
+        progressBar.style.width = "0%";
+
+        const concurrencyLimit = 1;
+        let index = 0, completed = 0;
+
+        async function worker() {
+          while (index < urlsToRetry.length) {
+            const currentIndex = index++;
+            const url = urlsToRetry[currentIndex];
+            progressDiv.innerHTML = `Retrying ${completed + 1} of ${urlsToRetry.length}: ${url}`;
+            try {
+              const { screenshot, thumbnail, timeTaken } = await takeScreenshotWithIframe(url);
+              screenshots.set(url, { screenshot, thumbnail, timeTaken });
+              if (!orderedUrls.includes(url)) {
+                orderedUrls.push(url);
+              }
+              const status = document.createElement("div");
+              status.className = "status success";
+              status.textContent = `✓ Screenshot captured on retry: ${url} (Time: ${timeTaken}s)`;
+              outputDiv.appendChild(status);
+              processedCountElem.textContent = parseInt(processedCountElem.textContent) + 1;
+
+              const timestamp = getTimestamp();
+              const baseFileName = url.split("/").pop() || "screenshot";
+              const fileName = `${baseFileName}_${timestamp}.png`;
+              const link = document.createElement("a");
+              link.href = screenshot;
+              link.download = fileName;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            } catch (error) {
+              const status = document.createElement("div");
+              status.className = "status error";
+              status.textContent = `✗ Failed to capture screenshot on retry: ${url} (${error.message})`;
+              outputDiv.appendChild(status);
+              failedUrls.push(url);
+            }
+            completed++;
+            progressBar.style.width = `${(completed / urlsToRetry.length) * 100}%`;
+          }
+        }
+
+        const workers = [];
+        for (let i = 0; i < concurrencyLimit; i++) {
+          workers.push(worker());
+        }
+        await Promise.all(workers);
+        const endTotalTime = performance.now();
+        const totalTimeTaken = ((endTotalTime - startTotalTime) / 1000).toFixed(2);
+        failedCountElem.textContent = failedUrls.length.toString();
+        totalTimeElem.textContent = `${totalTimeTaken}s`;
+        progressDiv.innerHTML = `Completed retrying ${urlsToRetry.length} URLs (Total Time: ${totalTimeTaken}s).`;
+        renderUrlList();
+        retryFailedBtn.disabled = failedUrls.length === 0;
       }
 
       function renderUrlList() {
@@ -385,6 +541,10 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
         orderedUrls.forEach((url, index) => {
           const itemDiv = document.createElement("div");
           itemDiv.className = "url-item";
+          const thumbnailImg = document.createElement("img");
+          thumbnailImg.className = "thumbnail";
+          const data = screenshots.get(url);
+          thumbnailImg.src = data && data.thumbnail ? data.thumbnail : "";
           const urlText = document.createElement("div");
           urlText.className = "url-text";
           urlText.textContent = url;
@@ -411,6 +571,7 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
           controlsDiv.appendChild(upButton);
           controlsDiv.appendChild(downButton);
           controlsDiv.appendChild(viewButton);
+          itemDiv.appendChild(thumbnailImg);
           itemDiv.appendChild(urlText);
           itemDiv.appendChild(controlsDiv);
           listContainer.appendChild(itemDiv);
@@ -419,8 +580,8 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
       }
 
       function viewScreenshot(url) {
-        const screenshotData = screenshots.get(url);
-        if (!screenshotData) {
+        const data = screenshots.get(url);
+        if (!data || !data.screenshot) {
           alert(`No screenshot available for ${url}`);
           return;
         }
@@ -433,9 +594,9 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
         closeButton.textContent = "✕";
         closeButton.onclick = () => document.body.removeChild(modal);
         const title = document.createElement("h3");
-        title.textContent = `Screenshot of: ${url}`;
+        title.textContent = `Screenshot of: ${url} (Time Taken: ${data.timeTaken}s)`;
         const img = document.createElement("img");
-        img.src = screenshotData;
+        img.src = data.screenshot;
         modalContent.appendChild(closeButton);
         modalContent.appendChild(title);
         modalContent.appendChild(img);
