@@ -45,21 +45,30 @@
         resize: vertical;
         height: 150px;
       }
-      .dimensions-input {
+      .dimensions-input, .naming-input {
         display: flex;
         gap: 15px;
         margin-bottom: 15px;
+        flex-wrap: wrap;
       }
-      .dimensions-input label {
+      .dimensions-input label, .naming-input label {
         font-size: 14px;
         color: #2c3e50;
+        display: flex;
+        align-items: center;
+        gap: 5px;
       }
-      .dimensions-input input {
-        width: 100px;
+      .dimensions-input input, .naming-input input {
         padding: 8px;
         border: 1px solid #ccc;
         border-radius: 4px;
         font-size: 14px;
+      }
+      .dimensions-input input[type="number"] {
+        width: 100px;
+      }
+      .naming-input input[type="text"] {
+        width: 200px;
       }
       .action-buttons {
         text-align: center;
@@ -210,14 +219,32 @@
         position: absolute;
         top: 10px;
         right: 10px;
-        background-color: #e74c3c;
+        background: linear-gradient(145deg, #ff6b6b, #e74c3c);
         color: #fff;
-        border: none;
+        border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 50%;
-        width: 30px;
-        height: 30px;
+        width: 40px;
+        height: 40px;
         cursor: pointer;
-        font-size: 16px;
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 40px;
+        text-align: center;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+      .close-button:hover {
+        background: linear-gradient(145deg, #e74c3c, #c0392b);
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.15);
+      }
+      .close-button:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.4), 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+      .close-button:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
     </style>
   </head>
@@ -233,6 +260,31 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
       <div class="dimensions-input">
         <label>Screenshot Width (px): <input type="number" id="screenshotWidth" value="1200" min="100" /></label>
         <label>Screenshot Height (px): <input type="number" id="screenshotHeight" value="800" min="100" /></label>
+      </div>
+      <div class="naming-input">
+        <label>
+          Naming Pattern:
+          <input
+            type="text"
+            id="namingPattern"
+            value="{url}"
+            placeholder="e.g., {custom}_{url}_{index}_{timestamp}"
+          />
+        </label>
+        <label>
+          Custom Text:
+          <input type="text" id="customText" value="Screenshot" placeholder="e.g., MyProject" />
+        </label>
+        <label>
+          URL Regex (optional):
+          <input
+            type="text"
+            id="urlRegex"
+            value="client/([^/]+)/([^/]+)/([^/]+)/([^/]+)"
+            placeholder="e.g., /Refrigeration/([^/]+)/"
+            title="Regex to extract part of the URL (e.g., client/([^/]+)/([^/]+)/([^/]+)/([^/]+) to get 'RF_Main_STG_Refrigeration_Refrig4_Overview')"
+          />
+        </label>
       </div>
     </div>
 
@@ -305,6 +357,54 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
         return `${year}${month}${day}_${hours}${minutes}${seconds}`;
       }
 
+      function sanitizeFilename(filename) {
+        return filename.replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_+/g, "_");
+      }
+
+      function applyRegexToUrl(url, regexPattern) {
+        if (!regexPattern) {
+          // Default behavior: use the last segment of the URL
+          return url.split("/").pop() || "screenshot";
+        }
+
+        try {
+          const regex = new RegExp(regexPattern);
+          const match = url.match(regex);
+          if (match) {
+            // If there are multiple capturing groups, join them with underscores
+            const groups = match.slice(1).filter(Boolean); // Get all capturing groups, exclude the full match (match[0])
+            if (groups.length > 0) {
+              return groups.join("_");
+            } else if (match[0]) {
+              // If no capturing groups, return the full match
+              return match[0];
+            }
+          }
+          // Fallback to the last segment if no match
+          return url.split("/").pop() || "screenshot";
+        } catch (error) {
+          console.error(`Invalid regex pattern: ${regexPattern}`, error);
+          // Fallback to the last segment if regex is invalid
+          return url.split("/").pop() || "screenshot";
+        }
+      }
+
+      function generateFilename(url, index, pattern, regexPattern) {
+        const timestamp = getTimestamp();
+        const urlSegment = applyRegexToUrl(url, regexPattern);
+        const customText = document.getElementById("customText").value.trim() || "Screenshot";
+
+        let filename = pattern;
+        filename = filename.replace("{url}", urlSegment);
+        filename = filename.replace("{timestamp}", timestamp);
+        filename = filename.replace("{index}", index + 1);
+        filename = filename.replace("{custom}", customText);
+
+        // Sanitize the filename to remove invalid characters
+        filename = sanitizeFilename(filename);
+        return `${filename}.png`;
+      }
+
       async function takeScreenshotWithIframe(url) {
         const startTime = performance.now();
         const iframe = document.getElementById("screenshotIframe");
@@ -368,6 +468,8 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
         const urlList = urlListCleaned.filter(isValidUrl);
         document.getElementById("totalCount").textContent = urlList.length;
 
+        const namingPattern = document.getElementById("namingPattern").value.trim() || "{url}";
+        const urlRegex = document.getElementById("urlRegex").value.trim();
         const progressDiv = document.getElementById("progress");
         const progressBar = document.getElementById("progressBar");
         const outputDiv = document.getElementById("output");
@@ -414,9 +516,7 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
               outputDiv.appendChild(status);
               processedCountElem.textContent = parseInt(processedCountElem.textContent) + 1;
 
-              const timestamp = getTimestamp();
-              const baseFileName = url.split("/").pop() || "screenshot";
-              const fileName = `${baseFileName}_${timestamp}.png`;
+              const fileName = generateFilename(url, currentIndex, namingPattern, urlRegex);
               const link = document.createElement("a");
               link.href = screenshot;
               link.download = fileName;
@@ -463,6 +563,8 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
         }
         const urlsToRetry = [...failedUrls];
         failedUrls = [];
+        const namingPattern = document.getElementById("namingPattern").value.trim() || "{url}";
+        const urlRegex = document.getElementById("urlRegex").value.trim();
         const progressDiv = document.getElementById("progress");
         const progressBar = document.getElementById("progressBar");
         const outputDiv = document.getElementById("output");
@@ -494,9 +596,7 @@ http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/
               outputDiv.appendChild(status);
               processedCountElem.textContent = parseInt(processedCountElem.textContent) + 1;
 
-              const timestamp = getTimestamp();
-              const baseFileName = url.split("/").pop() || "screenshot";
-              const fileName = `${baseFileName}_${timestamp}.png`;
+              const fileName = generateFilename(url, orderedUrls.indexOf(url), namingPattern, urlRegex);
               const link = document.createElement("a");
               link.href = screenshot;
               link.download = fileName;
