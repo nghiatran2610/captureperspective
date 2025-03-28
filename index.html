@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Screenshot Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <h1>Screenshot Tool</h1>
+
+    <div class="card">
+      <h2>Enter URLs to Capture</h2>
+      <textarea id="urlList" placeholder="Enter URLs (one per line)">
+http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Overview
+http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Details
+      </textarea>
+      <div class="input-row">
+        <label>Screenshot Width (px): <input type="number" id="screenshotWidth" value="1200" min="100" /></label>
+        <label>Screenshot Height (px): <input type="number" id="screenshotHeight" value="800" min="100" /></label>
+      </div>
+      
+      <div class="advanced-toggle">
+        <button id="toggleAdvanced" class="btn-link">Advanced Options ▼</button>
+      </div>
+      
+      <div id="advancedOptions" class="advanced-section">
+        <div class="input-row">
+          <label title="Maximum time to wait before capturing the screenshot">
+            Max Wait Time (sec): <input type="number" id="waitTime" value="33" min="1" max="120" />
+          </label>
+        </div>
+      </div>
+      <div class="input-row">
+        <label>
+          Naming Pattern:
+          <input
+            type="text"
+            id="namingPattern"
+            value="{url}"
+            placeholder="e.g., {custom}_{url}_{index}_{timestamp}"
+            title="Available variables: {url}, {custom}, {index}, {timestamp}"
+          />
+        </label>
+        <label>
+          Custom Text:
+          <input type="text" id="customText" value="Screenshot" placeholder="e.g., MyProject" />
+        </label>
+      </div>
+      <div class="input-row">
+        <label>
+          URL Regex (optional):
+          <input
+            type="text"
+            id="urlRegex"
+            value="client/([^/]+)/([^/]+)/([^/]+)/([^/]+)"
+            placeholder="e.g., /Refrigeration/([^/]+)/"
+            title="Regex to extract part of the URL"
+          />
+        </label>
+      </div>
+    </div>
+
+    <div class="btn-container">
+      <button id="captureBtn" class="btn">Capture Screenshots</button>
+      <button id="retryFailedBtn" class="btn" disabled>Retry Failed URLs</button>
+    </div>
+
+    <div id="progress" class="status-message"></div>
+    <div class="progress-container">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+
+    <div class="card stats" id="stats">
+      <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
+      <p><strong>Processed:</strong> <span id="processedCount">0</span></p>
+      <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
+      <p><strong>Total Time Taken:</strong> <span id="totalTime">0s</span></p>
+    </div>
+
+    <div id="output" class="card"></div>
+    <iframe id="screenshotIframe"></iframe>
+
+    <!-- Load JavaScript modules -->
+    <script src="js/state.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/url-processor.js"></script>
+    <script src="js/screenshot.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
