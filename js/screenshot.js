@@ -6,12 +6,20 @@ const ScreenshotCapture = {
   // Store timeout ID so we can cancel it
   _waitTimeout: null,
   
+  // Preset screen sizes
+  presetSizes: {
+    fullHD: { width: 1920, height: 1080, name: "Full HD (1920x1080)" },
+    mobile: { width: 375, height: 812, name: "Mobile (iPhone X/11/12)" },
+    tablet: { width: 768, height: 1024, name: "Tablet (iPad)" }
+  },
+  
   /**
    * Take a screenshot of a URL using iframe
    * @param {string} url - URL to capture
+   * @param {string} preset - Size preset to use ('fullHD', 'mobile', or 'tablet')
    * @returns {Promise<Object>} - Promise resolving to screenshot data
    */
-  takeScreenshot(url) {
+  takeScreenshot(url, preset = 'fullHD') {
     // Clear any existing timeout
     if (this._waitTimeout) {
       clearTimeout(this._waitTimeout);
@@ -20,9 +28,13 @@ const ScreenshotCapture = {
     
     const startTime = performance.now();
     const iframe = UI.elements.iframe;
-    const width = parseInt(UI.elements.screenshotWidth.value) || 1200;
-    const height = parseInt(UI.elements.screenshotHeight.value) || 800;
     
+    // Get dimensions from preset
+    const sizePreset = this.presetSizes[preset] || this.presetSizes.fullHD;
+    const width = sizePreset.width;
+    const height = sizePreset.height;
+    
+    // Set iframe size to chosen preset
     iframe.style.width = `${width}px`;
     iframe.style.height = `${height}px`;
     
@@ -45,18 +57,19 @@ const ScreenshotCapture = {
           // Start countdown display
           this._startCountdown(url, () => {
             try {
-              UI.updateProgressMessage(`Capturing screenshot for ${url}...`);
+              UI.updateProgressMessage(`Capturing ${sizePreset.name} screenshot for ${url}...`);
               
-              // Take screenshot
-              html2canvas(iframe.contentDocument.body, {
+              // Simply capture the entire document without any style modifications
+              html2canvas(iframe.contentDocument.documentElement, {
+                allowTaint: true,
+                backgroundColor: null,
                 useCORS: true,
                 width: width,
                 height: height,
-                scrollX: 0,
-                scrollY: 0,
                 windowWidth: width,
                 windowHeight: height,
-                scale: 1
+                scale: 1,
+                logging: true
               }).then(canvas => {
                 const screenshotData = canvas.toDataURL('image/png');
                 
@@ -65,14 +78,17 @@ const ScreenshotCapture = {
                   const endTime = performance.now();
                   const timeTaken = ((endTime - startTime) / 1000).toFixed(2);
                   
-                  console.log(`Screenshot taken for ${url} in ${timeTaken}s`);
+                  console.log(`${sizePreset.name} screenshot taken for ${url} in ${timeTaken}s`);
                   
                   // Clean up and resolve
                   cleanup();
                   resolve({ 
                     screenshot: screenshotData, 
                     thumbnail: thumbnailData, 
-                    timeTaken 
+                    timeTaken,
+                    preset: preset,
+                    width: width,
+                    height: height
                   });
                 });
               }).catch(error => {
@@ -107,7 +123,7 @@ const ScreenshotCapture = {
       iframe.addEventListener('error', handleError);
       
       // Start loading the URL
-      UI.updateProgressMessage(`Loading ${url} in iframe...`);
+      UI.updateProgressMessage(`Loading ${url} in iframe (${sizePreset.name})...`);
       iframe.src = url;
     });
   },

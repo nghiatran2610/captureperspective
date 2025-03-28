@@ -39,6 +39,7 @@ async function captureScreenshots() {
   
   const namingPattern = UI.elements.namingPattern.value.trim() || '{url}';
   const urlRegex = UI.elements.urlRegex.value.trim();
+  const capturePreset = UI.elements.capturePreset.value || 'fullHD';
   
   UI.elements.retryFailedBtn.disabled = true;
   
@@ -48,8 +49,8 @@ async function captureScreenshots() {
     UI.updateProgressMessage(`Processing ${i + 1} of ${urlList.length}: ${url}`);
     
     try {
-      // Take screenshot
-      const result = await ScreenshotCapture.takeScreenshot(url);
+      // Take screenshot with the selected preset
+      const result = await ScreenshotCapture.takeScreenshot(url, capturePreset);
       AppState.addScreenshot(url, result);
       
       // Download screenshot
@@ -57,7 +58,7 @@ async function captureScreenshots() {
       ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
       
       // Update UI
-      UI.showStatus(`✓ Screenshot captured: ${url} (Time: ${result.timeTaken}s)`);
+      UI.showStatus(`✓ Screenshot captured: ${url} (${result.preset} - ${result.width}x${result.height}) (Time: ${result.timeTaken}s)`);
       UI.updateStats(urlList.length, i + 1, AppState.failedUrls.length, 0);
     } catch (error) {
       AppState.addFailedUrl(url);
@@ -99,6 +100,7 @@ async function retryFailedUrls() {
   
   const namingPattern = UI.elements.namingPattern.value.trim() || '{url}';
   const urlRegex = UI.elements.urlRegex.value.trim();
+  const capturePreset = UI.elements.capturePreset.value || 'fullHD';
   let completed = 0;
   
   UI.updateProgressMessage(`Retrying ${urlsToRetry.length} failed URLs...`);
@@ -109,7 +111,7 @@ async function retryFailedUrls() {
     UI.updateProgressMessage(`Retrying ${i + 1} of ${urlsToRetry.length}: ${url}`);
     
     try {
-      const result = await ScreenshotCapture.takeScreenshot(url);
+      const result = await ScreenshotCapture.takeScreenshot(url, capturePreset);
       AppState.addScreenshot(url, result);
       AppState.removeFailedUrl(url);
       
@@ -117,7 +119,7 @@ async function retryFailedUrls() {
       const fileName = URLProcessor.generateFilename(url, urlIndex, namingPattern, urlRegex);
       ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
       
-      UI.showStatus(`✓ Screenshot captured on retry: ${url} (Time: ${result.timeTaken}s)`);
+      UI.showStatus(`✓ Screenshot captured on retry: ${url} (${result.preset} - ${result.width}x${result.height}) (Time: ${result.timeTaken}s)`);
       UI.elements.processedCount.textContent = parseInt(UI.elements.processedCount.textContent) + 1;
     } catch (error) {
       AppState.addFailedUrl(url);

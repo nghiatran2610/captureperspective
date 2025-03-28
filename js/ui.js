@@ -5,8 +5,7 @@
 const UI = {
   elements: {
     urlList: document.getElementById('urlList'),
-    screenshotWidth: document.getElementById('screenshotWidth'),
-    screenshotHeight: document.getElementById('screenshotHeight'),
+    capturePreset: document.getElementById('capturePreset'),
     waitTime: document.getElementById('waitTime'),
     namingPattern: document.getElementById('namingPattern'),
     customText: document.getElementById('customText'),
@@ -186,7 +185,11 @@ const UI = {
     closeButton.onclick = () => document.body.removeChild(modal);
     
     const title = document.createElement('h3');
-    title.textContent = `Screenshot of: ${url} (Time Taken: ${data.timeTaken}s)`;
+    if (data.preset && data.width && data.height) {
+      title.textContent = `Screenshot of: ${url} (${ScreenshotCapture.presetSizes[data.preset].name} - ${data.width}x${data.height}) (Time: ${data.timeTaken}s)`;
+    } else {
+      title.textContent = `Screenshot of: ${url} (Time: ${data.timeTaken}s)`;
+    }
     
     const img = document.createElement('img');
     img.src = data.screenshot;
