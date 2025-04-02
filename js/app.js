@@ -22,7 +22,6 @@ class App {
         this.captureScreenshots = this.captureScreenshots.bind(this);
         this.retryFailedUrls = this.retryFailedUrls.bind(this);
         this.toggleAdvancedOptions = this.toggleAdvancedOptions.bind(this);
-        this._downloadAllScreenshots = this._downloadAllScreenshots.bind(this);
 
         // Initialize helpers
         this.menuActionsHelper = MenuActionsHelper;
@@ -103,14 +102,15 @@ class App {
             UI.utils.showStatus(`✗ Failed to capture screenshot: ${data.url} (${data.error.message})`, true);
         });
 
+        // Modified event handler to avoid duplicate messages
         events.on(events.events.SCREENSHOT_TAKEN, (data) => {
-            UI.utils.showStatus(
-                `✓ Screenshot captured: ${data.url} (${data.result.preset} - ${data.result.width}x${data.result.height}) (Time: ${data.result.timeTaken}s)`
-            );
-        });
-
-        events.on(events.events.DOWNLOAD_ALL_REQUESTED, () => {
-            this._downloadAllScreenshots();
+            // Only show status if we're not using action sequences
+            // Will be handled by _processSequentialResults for sequences
+            if (!this.usingActionSequences) {
+                UI.utils.showStatus(
+                    `✓ Screenshot captured: ${data.url} (${data.result.preset} - ${data.result.width}x${data.result.height}) (Time: ${data.result.timeTaken}s)`
+                );
+            }
         });
     }
 
@@ -131,6 +131,65 @@ class App {
     }
 
     /**
+     * Process the results from sequential screenshot captures
+     * @param {Array} results - Array of screenshot results
+     * @param {number} i - Current URL index
+     * @param {string} url - Current URL
+     * @param {string} namingPattern - Filename pattern
+     * @param {string} urlRegex - URL regex pattern
+     * @param {number} timestamp - Timestamp for filename
+     * @private
+     */
+    _processSequentialResults(results, i, url, namingPattern, urlRegex, timestamp) {
+        let validScreenshots = 0;
+        let errorScreenshots = 0;
+
+        // Process each result
+        for (let j = 0; j < results.length; j++) {
+            const actionResult = results[j];
+            const sequenceName = actionResult.sequenceName || `Step ${j+1}`;
+
+            // Generate filename with sequence info and timestamp
+            const baseFileName = URLProcessor.generateFilename(url, i, namingPattern, urlRegex);
+            const fileName = baseFileName.replace('.png', `_${sequenceName.replace(/\s+/g, '_')}_${timestamp}.png`);
+
+            // Check if this is an error result
+            if (actionResult.error) {
+                errorScreenshots++;
+                
+                // Add to the live thumbnails display as an error thumbnail
+                UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName, false, false);
+                
+                // Show error status
+                UI.utils.showStatus(`✗ Failed for "${sequenceName}": ${actionResult.errorMessage || 'Mount error'}`, true);
+                
+                continue;
+            }
+
+            // This is a valid screenshot
+            validScreenshots++;
+
+            // Detect if this is a toolbar button action
+            const isToolbarAction = sequenceName.includes('Button');
+
+            // Add filename to result
+            actionResult.fileName = fileName;
+
+            // Add to the live thumbnails display with appropriate categorization
+            UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName, false, isToolbarAction);
+        }
+
+        // Show a summary status message
+        if (validScreenshots > 0 && errorScreenshots > 0) {
+            UI.utils.showStatus(`✓ ${validScreenshots} screenshots captured for ${url} (${errorScreenshots} errors)`, false);
+        } else if (validScreenshots > 0) {
+            UI.utils.showStatus(`✓ ${validScreenshots} screenshots captured for ${url}`, false);
+        } else if (errorScreenshots > 0) {
+            UI.utils.showStatus(`✗ All ${errorScreenshots} screenshot attempts failed for ${url}`, true);
+        }
+    }
+
+    /**
      * Capture screenshots for all URLs in the list
      */
     async captureScreenshots() {
@@ -140,9 +199,13 @@ class App {
             // Reset application state
             AppState.reset();
             UI.utils.resetUI();
+            this.usingActionSequences = false;  // Default flag value
 
             // Create live thumbnails container
             UI.thumbnails.createLiveThumbnailsContainer();
+
+            // Add the Combine All to PDF button
+            UI.thumbnails.addCombineAllToPDFButton();
 
             // Get and process URLs
             const rawUrlList = UI.elements.urlList.value;
@@ -167,6 +230,7 @@ class App {
                     // Parse actions JSON
                     actionSequences = JSON.parse(actionsText);
                     console.log(`Loaded ${actionSequences.length} action sequences`);
+                    this.usingActionSequences = actionSequences.length > 0;  // Set flag based on sequences
                 } catch (error) {
                     throw new Error(`Error parsing actions JSON: ${error.message}. Please check the format.`);
                 }
@@ -184,55 +248,95 @@ class App {
 
                     // Take screenshots with or without actions
                     if (actionSequences && actionSequences.length > 0) {
-                        // Take sequential screenshots with actions
-                        const results = await ScreenshotCapture.takeSequentialScreenshots(url, capturePreset, actionSequences);
-
-                        // Process each result
-                        for (let j = 0; j < results.length; j++) {
-                            const actionResult = results[j];
-                            const sequenceName = actionResult.sequenceName || `Step ${j+1}`;
-
-                            // Generate filename with sequence info and timestamp
+                        try {
+                            // Take sequential screenshots with actions
+                            const results = await ScreenshotCapture.takeSequentialScreenshots(url, capturePreset, actionSequences);
+                            console.log(`Got ${results.length} results for ${url}`, results);
+                            
+                            // Get timestamp once for all files in this sequence
                             const timestamp = URLProcessor.getTimestamp();
-                            const baseFileName = URLProcessor.generateFilename(url, i, namingPattern, urlRegex);
-                            const fileName = baseFileName.replace('.png', `_${sequenceName.replace(/\s+/g, '_')}_${timestamp}.png`);
+                            
+                            // Process the results with the new helper method
+                            this._processSequentialResults(results, i, url, namingPattern, urlRegex, timestamp);
+                            
+                            // Find the last valid result to store in AppState
+                            const lastValidResult = results.filter(r => !r.error).pop();
+                            if (lastValidResult) {
+                                result = lastValidResult;
+                                console.log(`Valid result found for ${url}`, result);
+                            } else {
+                                console.warn(`No valid results found for ${url}`);
+                            }
+                        } catch (error) {
+                            console.error(`Error capturing screenshots for ${url}:`, error);
+                            AppState.addFailedUrl(url);
+                            UI.utils.showStatus(`✗ Failed to capture screenshots: ${url} (${error.message})`, true);
+                            UI.progress.updateStats(urlList.length, i, AppState.failedUrls.length + 1, 0);
+                            continue;
+                        }
+                    } else {
+                        try {
+                            // Take single screenshot without actions
+                            result = await ScreenshotCapture.takeScreenshot(url, capturePreset);
+                            console.log(`Screenshot captured for ${url}`, result);
 
-                            // Add to AppState with the filename
-                            actionResult.fileName = fileName;
+                            // Generate filename with timestamp
+                            const timestamp = URLProcessor.getTimestamp();
+                            const fileName = URLProcessor.generateFilename(url, i, namingPattern, urlRegex).replace('.png', `_${timestamp}.png`);
+
+                            // Add filename to result
+                            result.fileName = fileName;
 
                             // Add to the live thumbnails display
-                            UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName);
-
-                            // Download the screenshot
-                            ScreenshotCapture.downloadScreenshot(actionResult.screenshot, fileName);
-
-                            // Store only the last result in AppState
-                            if (j === results.length - 1) {
-                                result = actionResult;
+                            const thumbnailAdded = UI.thumbnails.addLiveThumbnail(result, fileName);
+                            console.log(`Thumbnail added for ${url}: ${!!thumbnailAdded}`);
+                            
+                            // Don't show status here - will be handled by event handler
+                            // to avoid duplicate messages
+                        } catch (error) {
+                            console.error(`Error capturing screenshot for ${url}:`, error);
+                            
+                            // Check if this is a mount error
+                            if (error.message && (
+                                error.message.includes('No view configured for center mount') ||
+                                error.message.includes('Mount definition should contain a property')
+                            )) {
+                                // Create an error result
+                                const errorResult = {
+                                    error: true,
+                                    errorMessage: error.message,
+                                    sequenceName: url
+                                };
+                                
+                                // Generate a filename for the error
+                                const timestamp = URLProcessor.getTimestamp();
+                                const fileName = URLProcessor.generateFilename(url, i, namingPattern, urlRegex).replace('.png', `_Error_${timestamp}.png`);
+                                
+                                // Add to the thumbnails as an error
+                                UI.thumbnails.addLiveThumbnail(errorResult, fileName, url, false, false);
+                                
+                                UI.utils.showStatus(`✗ Failed to capture screenshot: ${url} (Mount error)`, true);
+                                
+                                // Add this URL to failed URLs
+                                AppState.addFailedUrl(url);
+                                continue;
                             }
+                            
+                            // For other errors, add to failed URLs and continue
+                            AppState.addFailedUrl(url);
+                            UI.utils.showStatus(`✗ Failed to capture screenshot: ${url} (${error.message})`, true);
+                            UI.progress.updateStats(urlList.length, i, AppState.failedUrls.length + 1, 0);
+                            continue;
                         }
-
-                        UI.utils.showStatus(`✓ ${results.length} screenshots captured for ${url} with actions`);
-                    } else {
-                        // Take single screenshot without actions
-                        result = await ScreenshotCapture.takeScreenshot(url, capturePreset);
-
-                        // Generate filename with timestamp
-                        const timestamp = URLProcessor.getTimestamp();
-                        const fileName = URLProcessor.generateFilename(url, i, namingPattern, urlRegex).replace('.png', `_${timestamp}.png`);
-
-                        // Add filename to result
-                        result.fileName = fileName;
-
-                        // Add to the live thumbnails display
-                        UI.thumbnails.addLiveThumbnail(result, fileName);
-
-                        // Download the screenshot
-                        ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
                     }
 
-                    // Add the result to AppState
-                    AppState.addScreenshot(url, result);
+                    // Add this after the try/catch block
+                    if (result) {
+                        // Add the result to AppState if we got a valid result
+                        AppState.addScreenshot(url, result);
+                    } else {
+                        console.warn(`No result available to add to AppState for ${url}`);
+                    }
 
                     // Update UI
                     UI.progress.updateStats(urlList.length, i + 1, AppState.failedUrls.length, 0);
@@ -252,14 +356,6 @@ class App {
             UI.progress.updateStats(urlList.length, successCount, AppState.failedUrls.length, totalTimeTaken);
             UI.progress.updateProgressMessage(`Completed processing ${urlList.length} URLs (Total Time: ${totalTimeTaken}s)`);
 
-            // Add download all button if there are screenshots
-            if (AppState.screenshots.size > 0) {
-                this._addDownloadAllButton();
-                this._renderUrlList();
-            } else {
-                UI.utils.showStatus('No screenshots were captured.', true);
-            }
-
             UI.elements.retryFailedBtn.disabled = AppState.failedUrls.length === 0;
 
         } catch (error) {
@@ -268,217 +364,6 @@ class App {
                 showToUser: true
             });
         }
-    }
-
-    /**
-     * Add download all button to the UI
-     * @private
-     */
-    _addDownloadAllButton() {
-        // Create button container
-        const btnContainer = document.createElement('div');
-        btnContainer.className = 'download-all-container';
-
-        // Create button
-        const downloadAllBtn = document.createElement('button');
-        downloadAllBtn.id = 'downloadAllBtn';
-        downloadAllBtn.className = 'btn';
-        downloadAllBtn.textContent = 'Download All Screenshots (ZIP)';
-
-        // Add click handler
-        downloadAllBtn.addEventListener('click', this._downloadAllScreenshots);
-
-        btnContainer.appendChild(downloadAllBtn);
-
-        // Add to output
-        if (UI.elements.liveThumbnails) {
-            UI.elements.liveThumbnails.parentNode.insertBefore(btnContainer, UI.elements.liveThumbnails.nextSibling);
-        } else {
-            UI.elements.output.appendChild(btnContainer);
-        }
-    }
-
-    /**
-     * Download all screenshots as a zip file
-     * @private
-     */
-    _downloadAllScreenshots() {
-        if (typeof JSZip === 'undefined') {
-            // Load JSZip dynamically if not present
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-            script.onload = () => this._createScreenshotsZip();
-            document.head.appendChild(script);
-        } else {
-            this._createScreenshotsZip();
-        }
-    }
-
-    /**
-     * Create a zip file with all screenshots
-     * @private
-     */
-    _createScreenshotsZip() {
-        const downloadBtn = document.getElementById('downloadAllBtn');
-        if (!downloadBtn) return;
-
-        try {
-            // Update button to show progress
-            downloadBtn.textContent = 'Preparing ZIP file...';
-            downloadBtn.disabled = true;
-
-            // Create a new JSZip instance
-            const zip = new JSZip();
-
-            // Add all screenshots to the zip
-            const thumbnailContainers = document.querySelectorAll('.thumbnail-container');
-            thumbnailContainers.forEach(container => {
-                const fileName = container.dataset.filename;
-                const screenshot = container.dataset.screenshot;
-
-                if (fileName && screenshot) {
-                    // Convert data URL to blob
-                    const blob = utils.dataURLtoBlob(screenshot);
-
-                    // Add to zip
-                    zip.file(fileName, blob);
-                }
-            });
-
-            // Generate the zip
-            zip.generateAsync({ type: 'blob' }).then(content => {
-                // Create a download link
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(content);
-                link.download = `Screenshots_${URLProcessor.getTimestamp()}.zip`;
-                document.body.appendChild(link);
-
-                // Trigger download
-                link.click();
-                document.body.removeChild(link);
-
-                // Reset button
-                downloadBtn.textContent = 'Download All Screenshots (ZIP)';
-                downloadBtn.disabled = false;
-            }).catch(error => {
-                console.error('Error creating ZIP file:', error);
-                downloadBtn.textContent = 'Error creating ZIP. Try again.';
-                downloadBtn.disabled = false;
-            });
-        } catch (error) {
-            handleError(error, {
-                logToConsole: true,
-                showToUser: true
-            });
-
-            if (downloadBtn) {
-                downloadBtn.textContent = 'Error creating ZIP. Try again.';
-                downloadBtn.disabled = false;
-            }
-        }
-    }
-
-    /**
-     * Render the list of URLs with screenshots
-     * @private
-     */
-    _renderUrlList() {
-        if (AppState.orderedUrls.length === 0) {
-            UI.utils.showStatus('No URLs to display.', true);
-            return;
-        }
-
-        const listContainer = document.createElement('div');
-        listContainer.className = 'url-list-container';
-
-        const listTitle = document.createElement('h3');
-        listTitle.textContent = 'Processed URLs';
-        listContainer.appendChild(listTitle);
-
-        AppState.orderedUrls.forEach((url, index) => {
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'url-item';
-
-            // Thumbnail
-            const thumbnailImg = document.createElement('img');
-            thumbnailImg.className = 'thumbnail';
-            const data = AppState.screenshots.get(url);
-            thumbnailImg.src = data && data.thumbnail ? data.thumbnail : '';
-
-            // URL text
-            const urlText = document.createElement('div');
-            urlText.className = 'url-text';
-            urlText.textContent = url;
-
-            // Controls
-            const controlsDiv = document.createElement('div');
-
-            const upButton = UI.utils.createButton('↑', 'Move Up', () => this._moveUrl(index, 'up'));
-            upButton.disabled = index === 0;
-
-            const downButton = UI.utils.createButton('↓', 'Move Down', () => this._moveUrl(index, 'down'));
-            downButton.disabled = index === AppState.orderedUrls.length - 1;
-
-            const viewButton = UI.utils.createButton('📸', 'View Screenshot', () => this._viewScreenshot(url));
-
-            controlsDiv.appendChild(upButton);
-            controlsDiv.appendChild(downButton);
-            controlsDiv.appendChild(viewButton);
-
-            // Assemble item
-            itemDiv.appendChild(thumbnailImg);
-            itemDiv.appendChild(urlText);
-            itemDiv.appendChild(controlsDiv);
-            listContainer.appendChild(itemDiv);
-        });
-
-        UI.elements.output.appendChild(listContainer);
-    }
-
-    /**
-     * Move a URL up or down in the ordered list
-     * @param {number} index - Current index of the URL
-     * @param {string} direction - Direction to move ('up' or 'down')
-     * @private
-     */
-    _moveUrl(index, direction) {
-        if (direction === 'up' && index > 0) {
-            [AppState.orderedUrls[index - 1], AppState.orderedUrls[index]] =
-                [AppState.orderedUrls[index], AppState.orderedUrls[index - 1]];
-        } else if (direction === 'down' && index < AppState.orderedUrls.length - 1) {
-            [AppState.orderedUrls[index + 1], AppState.orderedUrls[index]] =
-                [AppState.orderedUrls[index], AppState.orderedUrls[index + 1]];
-        }
-
-        // Find and remove the url-list-container if it exists
-        const existingList = document.querySelector('.url-list-container');
-        if (existingList) {
-            existingList.remove();
-        }
-
-        // Re-render the list
-        this._renderUrlList();
-    }
-
-    /**
-     * Show screenshot in a modal
-     * @param {string} url - URL of the screenshot to display
-     * @private
-     */
-    _viewScreenshot(url) {
-        const data = AppState.screenshots.get(url);
-        if (!data || !data.screenshot) {
-            alert(`No screenshot available for ${url}`);
-            return;
-        }
-
-        UI.modals.viewScreenshotFromImage(
-            data.screenshot,
-            url,
-            data.width || 'unknown',
-            data.height || 'unknown',
-            data.timeTaken || '0'
-        );
     }
 
     /**
@@ -495,6 +380,7 @@ class App {
         try {
             const urlsToRetry = [...AppState.failedUrls];
             AppState.failedUrls = [];
+            this.usingActionSequences = false;  // Reset flag
 
             const namingPattern = UI.elements.namingPattern.value.trim() || '{url}';
             const urlRegex = UI.elements.urlRegex.value.trim();
@@ -508,6 +394,7 @@ class App {
                 try {
                     // Parse actions JSON
                     actionSequences = JSON.parse(actionsText);
+                    this.usingActionSequences = actionSequences.length > 0;  // Set flag
                 } catch (error) {
                     throw new Error(`Error parsing actions JSON: ${error.message}. Please check the format.`);
                 }
@@ -527,61 +414,83 @@ class App {
 
                     // Take screenshots with or without actions
                     if (actionSequences && actionSequences.length > 0) {
-                        // Take sequential screenshots with actions
-                        const results = await ScreenshotCapture.takeSequentialScreenshots(url, capturePreset, actionSequences);
+                        try {
+                            // Take sequential screenshots with actions
+                            const results = await ScreenshotCapture.takeSequentialScreenshots(url, capturePreset, actionSequences);
+                            
+                            // Get timestamp once for all files in this sequence
+                            const timestamp = URLProcessor.getTimestamp();
+                            
+                            // Process the results with the helper method
+                            this._processSequentialResults(results, i, url, namingPattern, urlRegex, timestamp);
+                            
+                            // Find the last valid result to store in AppState
+                            const lastValidResult = results.filter(r => !r.error).pop();
+                            if (lastValidResult) {
+                                result = lastValidResult;
+                            }
+                        } catch (error) {
+                            console.error(`Error capturing screenshots for ${url}:`, error);
+                            AppState.addFailedUrl(url);
+                            UI.utils.showStatus(`✗ Failed to retry screenshot: ${url} (${error.message})`, true);
+                            continue;
+                        }
+                    } else {
+                        try {
+                            // Take a single screenshot without actions
+                            result = await ScreenshotCapture.takeScreenshot(url, capturePreset);
 
-                        // Process each result
-                        for (let j = 0; j < results.length; j++) {
-                            const actionResult = results[j];
-                            const sequenceName = actionResult.sequenceName || `Step ${j+1}`;
-
-                            // Generate filename with sequence info and timestamp
+                            // Generate filename with timestamp
                             const timestamp = URLProcessor.getTimestamp();
                             const urlIndex = AppState.orderedUrls.indexOf(url);
-                            const baseFileName = URLProcessor.generateFilename(url, urlIndex, namingPattern, urlRegex);
-                            const fileName = baseFileName.replace('.png', `_${sequenceName.replace(/\s+/g, '_')}_${timestamp}.png`);
+                            const fileName = URLProcessor.generateFilename(url, urlIndex, namingPattern, urlRegex).replace('.png', `_${timestamp}.png`);
 
-                            // Add to result
-                            actionResult.fileName = fileName;
+                            // Add filename to result
+                            result.fileName = fileName;
 
                             // Add to the live thumbnails display
-                            UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName, true);
-
-                            // Download the screenshot
-                            ScreenshotCapture.downloadScreenshot(actionResult.screenshot, fileName);
-
-                            // Store only the last result in AppState
-                            if (j === results.length - 1) {
-                                result = actionResult;
+                            UI.thumbnails.addLiveThumbnail(result, fileName, null, true);
+                            
+                            // No need to show status here - will be handled by event
+                        } catch (error) {
+                            // Check if this is a mount error
+                            if (error.message && (
+                                error.message.includes('No view configured for center mount') ||
+                                error.message.includes('Mount definition should contain a property')
+                            )) {
+                                // Create an error result
+                                const errorResult = {
+                                    error: true,
+                                    errorMessage: error.message,
+                                    sequenceName: url
+                                };
+                                
+                                // Generate a filename for the error
+                                const timestamp = URLProcessor.getTimestamp();
+                                const urlIndex = AppState.orderedUrls.indexOf(url);
+                                const fileName = URLProcessor.generateFilename(url, urlIndex, namingPattern, urlRegex).replace('.png', `_Error_${timestamp}.png`);
+                                
+                                // Add to the thumbnails as an error
+                                UI.thumbnails.addLiveThumbnail(errorResult, fileName, url, true, false);
+                                
+                                UI.utils.showStatus(`✗ Failed to retry screenshot: ${url} (Mount error)`, true);
+                                
+                                // Add this URL back to failed URLs
+                                AppState.addFailedUrl(url);
+                                continue;
                             }
+                            
+                            // For other errors, rethrow
+                            throw error;
                         }
-
-                        UI.utils.showStatus(`✓ ${results.length} screenshots captured on retry for ${url} with actions`);
-                    } else {
-                        // Take a single screenshot without actions
-                        result = await ScreenshotCapture.takeScreenshot(url, capturePreset);
-
-                        // Generate filename with timestamp
-                        const timestamp = URLProcessor.getTimestamp();
-                        const urlIndex = AppState.orderedUrls.indexOf(url);
-                        const fileName = URLProcessor.generateFilename(url, urlIndex, namingPattern, urlRegex).replace('.png', `_${timestamp}.png`);
-
-                        // Add filename to result
-                        result.fileName = fileName;
-
-                        // Add to the live thumbnails display
-                        UI.thumbnails.addLiveThumbnail(result, fileName, null, true);
-
-                        // Download the screenshot
-                        ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
-
-                        UI.utils.showStatus(`✓ Screenshot captured on retry: ${url}`);
                     }
 
-                    AppState.addScreenshot(url, result);
-                    AppState.removeFailedUrl(url);
-
-                    UI.elements.processedCount.textContent = parseInt(UI.elements.processedCount.textContent) + 1;
+                    // Add the result to AppState if we got a valid result
+                    if (result) {
+                        AppState.addScreenshot(url, result);
+                        AppState.removeFailedUrl(url);
+                        UI.elements.processedCount.textContent = parseInt(UI.elements.processedCount.textContent) + 1;
+                    }
                 } catch (error) {
                     AppState.addFailedUrl(url);
                     UI.utils.showStatus(`✗ Failed to capture screenshot on retry: ${url} (${error.message})`, true);
@@ -598,7 +507,6 @@ class App {
             UI.elements.totalTime.textContent = `${totalTimeTaken}s`;
             UI.progress.updateProgressMessage(`Completed retrying ${urlsToRetry.length} URLs (Total Time: ${totalTimeTaken}s).`);
 
-            this._renderUrlList();
             UI.elements.retryFailedBtn.disabled = AppState.failedUrls.length === 0;
         } catch (error) {
             handleError(error, {
