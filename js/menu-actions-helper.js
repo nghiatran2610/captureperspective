@@ -231,85 +231,9 @@ const MenuActionsHelper = {
         reject(error);
       }
     });
-  },
+  }
   
-  /**
-   * Add menu action generator UI controls  (REMOVED - functionality moved to context-menu-actions-helper.js)
-   */
-  // addUIControls() {
-  //   // Create a container for the helper buttons
-  //   const container = document.createElement('div');
-  //   container.className = 'menu-actions-buttons';
-  //   container.style.marginTop = '10px';
-  //   container.style.marginBottom = '10px';
-  //   container.style.display = 'flex';
-  //   container.style.gap = '10px';
-    
-  //   // Create "Load URL" button
-  //   const loadButton = document.createElement('button');
-  //   loadButton.className = 'btn btn-small';
-  //   loadButton.textContent = 'Load First URL';
-  //   loadButton.title = 'Load the first URL from the list into the iframe';
-  //   loadButton.onclick = () => {
-  //     const urlList = document.getElementById('urlList');
-  //     const urls = urlList.value.trim().split('\n');
-  //     if (urls.length > 0) {
-  //       const firstUrl = urls[0].trim();
-  //       if (firstUrl) {
-  //         const iframe = UI.elements.iframe;
-  //         iframe.src = firstUrl;
-  //         UI.progress.updateProgressMessage(`Loading ${firstUrl} in iframe...`);
-  //       }
-  //     }
-  //   };
-    
-  //   // Create "Generate Menu Actions" button
-  //   const generateButton = document.createElement('button');
-  //   generateButton.className = 'btn btn-small';
-  //   generateButton.textContent = 'Generate Menu Actions';
-  //   generateButton.title = 'Automatically generate actions for menu items';
-  //   generateButton.onclick = () => {
-  //     const iframe = UI.elements.iframe;
-  //     if (!iframe.src || iframe.src === 'about:blank') {
-  //       alert('Please load a URL first using the "Load First URL" button');
-  //       return;
-  //     }
-      
-  //     // Disable button during generation
-  //     generateButton.disabled = true;
-  //     generateButton.textContent = 'Generating...';
-      
-  //     // Call the enhanced submenu generation method
-  //     MenuActionsHelper.generateMenuActionsWithSubmenus()
-  //       .then(actions => {
-  //         if (actions.length > 0) {
-  //           document.getElementById('actionsField').value = JSON.stringify(actions, null, 2);
-  //           UI.utils.showStatus(`Generated actions for ${actions.length} menu items (including submenus)`, false);
-  //         } else {
-  //           alert('No menu items found. Try adjusting the URL or wait for the page to fully load.');
-  //         }
-  //       })
-  //       .catch(error => {
-  //         console.error('Error generating menu actions:', error);
-  //         alert('Error generating menu actions: ' + error.message);
-  //       })
-  //       .finally(() => {
-  //         // Re-enable button
-  //         generateButton.disabled = false;
-  //         generateButton.textContent = 'Generate Menu Actions';
-  //       });
-  //   };
-    
-  //   // Add buttons to container
-  //   container.appendChild(loadButton);
-  //   container.appendChild(generateButton);
-    
-  //   // Add container to page
-  //   const actionsField = document.getElementById('actionsField');
-  //   if (actionsField) {
-  //     actionsField.parentNode.insertBefore(container, actionsField);
-  //   }
-  // }
+  // UI controls functionality has been moved to context-menu-actions-helper.js
 };
 
 // Add default export

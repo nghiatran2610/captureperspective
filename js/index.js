@@ -3,7 +3,6 @@ import config from './config.js';
 import App from './app.js';
 import * as events from './events.js';
 import { handleError } from './errors.js';
-import MenuActionsHelper from './menu-actions-helper.js'; // Import if needed for other uses
 import ContextMenuActionsHelper from './context-menu-actions-helper.js';
 
 /**
@@ -23,14 +22,9 @@ function initializeApp() {
             window.screenshotApp = app;
         }
 
-        // Initialize UI controls (ONLY from ContextMenuActionsHelper)
+        // Initialize UI controls from ContextMenuActionsHelper
+        // This is the only place where UI controls should be initialized
         ContextMenuActionsHelper.addUIControls();
-
-        // Optional: Remove the original MenuActionsHelper's UI if it exists (safety check)
-        const oldButtons = document.querySelector('.menu-actions-buttons');
-        if (oldButtons) {
-            oldButtons.remove();
-        }
 
         // Return app instance
         return app;

@@ -69,10 +69,8 @@ class App {
      * Initialize UI components
      */
     _initializeUI() {
-        // Initialize menu action helpers
-        // this.menuActionsHelper.addUIControls();  //  DEFINITELY REMOVE THIS LINE
-        this.contextMenuActionsHelper.addUIControls();  //  **USE THIS ONE INSTEAD**
-
+        // No longer initialize UI controls here - this is now handled in index.js
+        
         // Set default values from config
         if (UI.elements.waitTime) {
             UI.elements.waitTime.value = config.ui.defaultWaitTime;
@@ -231,10 +229,6 @@ class App {
 
                         // Download the screenshot
                         ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
-
-                        // UI.utils.showStatus(   // REMOVE THIS LINE
-                        //     `✓ Screenshot captured: ${url} (${result.preset} - ${result.width}x${result.height}) (Time: ${result.timeTaken}s)`
-                        // );
                     }
 
                     // Add the result to AppState
@@ -244,7 +238,7 @@ class App {
                     UI.progress.updateStats(urlList.length, i + 1, AppState.failedUrls.length, 0);
                 } catch (error) {
                     AppState.addFailedUrl(url);
-                    UI.utils.showStatus(`✗ Failed to capture screenshot: ${data.url} (${data.error.message})`, true);
+                    UI.utils.showStatus(`✗ Failed to capture screenshot: ${url} (${error.message})`, true);
                     UI.progress.updateStats(urlList.length, i, AppState.failedUrls.length + 1, 0);
                 }
 
