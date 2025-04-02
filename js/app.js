@@ -70,7 +70,7 @@ class App {
    */
   _initializeUI() {
     // Initialize menu action helpers
-    this.menuActionsHelper.addUIControls();
+    //this.menuActionsHelper.addUIControls();  // REMOVED: This line was causing the error
     this.contextMenuActionsHelper.addUIControls();
     
     // Set default values from config
@@ -380,109 +380,6 @@ class App {
         downloadBtn.disabled = false;
       }
     }
-  }
-  
-  /**
-   * Render the list of URLs with screenshots
-   * @private
-   */
-  _renderUrlList() {
-    if (AppState.orderedUrls.length === 0) {
-      UI.utils.showStatus('No URLs to display.', true);
-      return;
-    }
-    
-    const listContainer = document.createElement('div');
-    listContainer.className = 'url-list-container';
-    
-    const listTitle = document.createElement('h3');
-    listTitle.textContent = 'Processed URLs';
-    listContainer.appendChild(listTitle);
-    
-    AppState.orderedUrls.forEach((url, index) => {
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'url-item';
-      
-      // Thumbnail
-      const thumbnailImg = document.createElement('img');
-      thumbnailImg.className = 'thumbnail';
-      const data = AppState.screenshots.get(url);
-      thumbnailImg.src = data && data.thumbnail ? data.thumbnail : '';
-      
-      // URL text
-      const urlText = document.createElement('div');
-      urlText.className = 'url-text';
-      urlText.textContent = url;
-      
-      // Controls
-      const controlsDiv = document.createElement('div');
-      
-      const upButton = UI.utils.createButton('↑', 'Move Up', () => this._moveUrl(index, 'up'));
-      upButton.disabled = index === 0;
-      
-      const downButton = UI.utils.createButton('↓', 'Move Down', () => this._moveUrl(index, 'down'));
-      downButton.disabled = index === AppState.orderedUrls.length - 1;
-      
-      const viewButton = UI.utils.createButton('📸', 'View Screenshot', () => this._viewScreenshot(url));
-      
-      controlsDiv.appendChild(upButton);
-      controlsDiv.appendChild(downButton);
-      controlsDiv.appendChild(viewButton);
-      
-      // Assemble item
-      itemDiv.appendChild(thumbnailImg);
-      itemDiv.appendChild(urlText);
-      itemDiv.appendChild(controlsDiv);
-      listContainer.appendChild(itemDiv);
-    });
-    
-    UI.elements.output.appendChild(listContainer);
-  }
-  
-  /**
-   * Move a URL up or down in the ordered list
-   * @param {number} index - Current index of the URL
-   * @param {string} direction - Direction to move ('up' or 'down')
-   * @private
-   */
-  _moveUrl(index, direction) {
-    if (direction === 'up' && index > 0) {
-      [AppState.orderedUrls[index - 1], AppState.orderedUrls[index]] = 
-        [AppState.orderedUrls[index], AppState.orderedUrls[index - 1]];
-    } else if (direction === 'down' && index < AppState.orderedUrls.length - 1) {
-      [AppState.orderedUrls[index + 1], AppState.orderedUrls[index]] = 
-        [AppState.orderedUrls[index], AppState.orderedUrls[index + 1]];
-    }
-    
-    // Find and remove the url-list-container if it exists
-    const existingList = document.querySelector('.url-list-container');
-    if (existingList) {
-      existingList.remove();
-    }
-    
-    // Re-render the list
-    this._renderUrlList();
-  }
-  
-  /**
-   * Show screenshot in a modal
-   * @param {string} url - URL of the screenshot to display
-   * @private
-   */
-  _viewScreenshot(url) {
-    const data = AppState.screenshots.get(url);
-    if (!data || !data.screenshot) {
-      alert(`No screenshot available for ${url}`);
-      return;
-    }
-    
-    UI.modals.viewScreenshotFromImage(
-      data.screenshot, 
-      url, 
-      data.width || 'unknown', 
-      data.height || 'unknown', 
-      data.timeTaken || '0'
-    );
   }
   
   /**

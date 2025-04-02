@@ -253,7 +253,7 @@ const ContextMenuActionsHelper = {
     
     /**
      * Generate comprehensive menu actions for the entire hierarchy
-     * This is similar to the original generateMenuActionsWithSubmenus but optimized
+     * This is similar to the original generateMenuActions but optimized
      * @param {number} waitTime - Time to wait after each click (ms)
      * @returns {Promise<Array>} - Promise resolving to array of menu action sequences
      */
@@ -264,133 +264,121 @@ const ContextMenuActionsHelper = {
     },
     
     /**
-     * Add context-aware UI controls
+     * Add context-aware UI controls (COMBINED and REFACTORED)
      */
     addUIControls() {
-      // Create a container for the helper buttons
-      const container = document.createElement('div');
-      container.className = 'context-menu-actions-buttons';
-      container.style.marginTop = '10px';
-      container.style.marginBottom = '10px';
-      container.style.display = 'flex';
-      container.style.gap = '10px';
-      
-      // Create "Load URL" button (reused from original)
-      const loadButton = document.createElement('button');
-      loadButton.className = 'btn btn-small';
-      loadButton.textContent = 'Load First URL';
-      loadButton.title = 'Load the first URL from the list into the iframe';
-      loadButton.onclick = () => {
-        const urlList = document.getElementById('urlList');
-        const urls = urlList.value.trim().split('\n');
-        if (urls.length > 0) {
-          const firstUrl = urls[0].trim();
-          if (firstUrl) {
+        // Create a container for the helper buttons
+        const container = document.createElement('div');
+        container.className = 'menu-actions-buttons';
+        container.style.marginTop = '10px';
+        container.style.marginBottom = '10px';
+        container.style.display = 'flex';
+        container.style.gap = '10px';
+
+        // Create "Load URL" button (reused from original - ONLY ONCE)
+        const loadButton = document.createElement('button');
+        loadButton.className = 'btn btn-small';
+        loadButton.textContent = 'Load First URL';
+        loadButton.title = 'Load the first URL from the list into the iframe';
+        loadButton.onclick = () => {
+            const urlList = document.getElementById('urlList');
+            const urls = urlList.value.trim().split('\n');
+            if (urls.length > 0) {
+                const firstUrl = urls[0].trim();
+                if (firstUrl) {
+                    const iframe = UI.elements.iframe;
+                    iframe.src = firstUrl;
+                    UI.progress.updateProgressMessage(`Loading ${firstUrl} in iframe...`);
+                }
+            }
+        };
+
+        // Create "Generate Context Actions" button
+        const generateContextButton = document.createElement('button');
+        generateContextButton.className = 'btn btn-small';
+        generateContextButton.textContent = 'Generate Context Actions';
+        generateContextButton.title = 'Generate actions based on current page context';
+        generateContextButton.onclick = () => {
             const iframe = UI.elements.iframe;
-            iframe.src = firstUrl;
-            UI.progress.updateProgressMessage(`Loading ${firstUrl} in iframe...`);
-          }
-        }
-      };
-      
-      // Create "Generate Context Actions" button
-      const generateContextButton = document.createElement('button');
-      generateContextButton.className = 'btn btn-small';
-      generateContextButton.textContent = 'Generate Context Actions';
-      generateContextButton.title = 'Generate actions based on current page context';
-      generateContextButton.onclick = () => {
-        const iframe = UI.elements.iframe;
-        if (!iframe.src || iframe.src === 'about:blank') {
-          alert('Please load a URL first using the "Load First URL" button');
-          return;
-        }
-        
-        // Disable button during generation
-        generateContextButton.disabled = true;
-        generateContextButton.textContent = 'Generating...';
-        
-        // Call the context-aware action generation method
-        this.generateContextAwareMenuActions(iframe.src)
-          .then(actions => {
-            if (actions.length > 0) {
-              document.getElementById('actionsField').value = JSON.stringify(actions, null, 2);
-              UI.utils.showStatus(`Generated ${actions.length} context-aware menu actions`, false);
-            } else {
-              alert('No menu items found. Try adjusting the URL or wait for the page to fully load.');
+            if (!iframe.src || iframe.src === 'about:blank') {
+                alert('Please load a URL first using the "Load First URL" button');
+                return;
             }
-          })
-          .catch(error => {
-            console.error('Error generating context menu actions:', error);
-            alert('Error generating context menu actions: ' + error.message);
-          })
-          .finally(() => {
-            // Re-enable button
-            generateContextButton.disabled = false;
-            generateContextButton.textContent = 'Generate Context Actions';
-          });
-      };
-      
-      // Add ALL actions button (original behavior)
-      const generateAllButton = document.createElement('button');
-      generateAllButton.className = 'btn btn-small';
-      generateAllButton.textContent = 'Generate All Actions';
-      generateAllButton.title = 'Generate actions for all menu items (original behavior)';
-      generateAllButton.onclick = () => {
-        const iframe = UI.elements.iframe;
-        if (!iframe.src || iframe.src === 'about:blank') {
-          alert('Please load a URL first using the "Load First URL" button');
-          return;
-        }
-        
-        // Disable button during generation
-        generateAllButton.disabled = true;
-        generateAllButton.textContent = 'Generating...';
-        
-        // Call the original action generation method
-        MenuActionsHelper.generateMenuActionsWithSubmenus()
-          .then(actions => {
-            if (actions.length > 0) {
-              document.getElementById('actionsField').value = JSON.stringify(actions, null, 2);
-              UI.utils.showStatus(`Generated actions for ${actions.length} menu items (including all submenus)`, false);
-            } else {
-              alert('No menu items found. Try adjusting the URL or wait for the page to fully load.');
+
+            // Disable button during generation
+            generateContextButton.disabled = true;
+            generateContextButton.textContent = 'Generating...';
+
+            // Call the context-aware action generation method
+            this.generateContextAwareMenuActions(iframe.src)
+                .then(actions => {
+                    if (actions.length > 0) {
+                        document.getElementById('actionsField').value = JSON.stringify(actions, null, 2);
+                        UI.utils.showStatus(`Generated ${actions.length} context-aware menu actions`, false);
+                    } else {
+                        alert('No menu items found. Try adjusting the URL or wait for the page to fully load.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error generating context menu actions:', error);
+                    alert('Error generating context menu actions: ' + error.message);
+                })
+                .finally(() => {
+                    // Re-enable button
+                    generateContextButton.disabled = false;
+                    generateContextButton.textContent = 'Generate Context Actions';
+                });
+        };
+
+        // Add ALL actions button (original behavior from MenuActionsHelper)
+        const generateAllButton = document.createElement('button');
+        generateAllButton.className = 'btn btn-small';
+        generateAllButton.textContent = 'Generate All Actions';
+        generateAllButton.title = 'Generate actions for all menu items (original behavior)';
+        generateAllButton.onclick = () => {
+            const iframe = UI.elements.iframe;
+            if (!iframe.src || iframe.src === 'about:blank') {
+                alert('Please load a URL first using the "Load First URL" button');
+                return;
             }
-          })
-          .catch(error => {
-            console.error('Error generating menu actions:', error);
-            alert('Error generating menu actions: ' + error.message);
-          })
-          .finally(() => {
-            // Re-enable button
-            generateAllButton.disabled = false;
-            generateAllButton.textContent = 'Generate All Actions';
-          });
-      };
-      
-      // Add buttons to container
-      container.appendChild(loadButton);
-      container.appendChild(generateContextButton);
-      container.appendChild(generateAllButton);
-      
-      // Add container to page
-      const actionsField = document.getElementById('actionsField');
-      if (actionsField) {
-        actionsField.parentNode.insertBefore(container, actionsField);
-      }
+
+            // Disable button during generation
+            generateAllButton.disabled = true;
+            generateAllButton.textContent = 'Generating...';
+
+            // Call the original action generation method (from MenuActionsHelper)
+            MenuActionsHelper.generateMenuActionsWithSubmenus()
+                .then(actions => {
+                    if (actions.length > 0) {
+                        document.getElementById('actionsField').value = JSON.stringify(actions, null, 2);
+                        UI.utils.showStatus(`Generated actions for ${actions.length} menu items (including submenus)`, false);
+                    } else {
+                        alert('No menu items found. Try adjusting the URL or wait for the page to fully load.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error generating menu actions:', error);
+                    alert('Error generating menu actions: ' + error.message);
+                })
+                .finally(() => {
+                    // Re-enable button
+                    generateAllButton.disabled = false;
+                    generateAllButton.textContent = 'Generate All Actions';
+                });
+        };
+
+        // Add buttons to container
+        container.appendChild(loadButton);
+        container.appendChild(generateContextButton);
+        container.appendChild(generateAllButton);
+
+        // Add container to page
+        const actionsField = document.getElementById('actionsField');
+        if (actionsField) {
+            actionsField.parentNode.insertBefore(container, actionsField);
+        }
     }
 };
-  
-// Initialize the UI controls when the DOM is loaded - moved to index.js since we're using modules now
-// document.addEventListener('DOMContentLoaded', () => {
-//   ContextMenuActionsHelper.addUIControls();
-//   
-//   // Optional: Replace the original MenuActionsHelper's UI with ours
-//   // First, check if the old UI exists and remove it
-//   const oldButtons = document.querySelector('.menu-actions-buttons');
-//   if (oldButtons) {
-//     oldButtons.remove();
-//   }
-// });
 
 // Add default export
 export default ContextMenuActionsHelper;
