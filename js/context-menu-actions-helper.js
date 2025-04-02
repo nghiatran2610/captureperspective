@@ -1,3 +1,7 @@
+// Import UI if it's not available globally
+import UI from './ui/index.js';
+import MenuActionsHelper from './menu-actions-helper.js';
+
 /**
  * Context-Aware Menu Actions Helper Module
  * Handles smart generation of menu navigation actions based on current URL context
@@ -284,7 +288,7 @@ const ContextMenuActionsHelper = {
           if (firstUrl) {
             const iframe = UI.elements.iframe;
             iframe.src = firstUrl;
-            UI.updateProgressMessage(`Loading ${firstUrl} in iframe...`);
+            UI.progress.updateProgressMessage(`Loading ${firstUrl} in iframe...`);
           }
         }
       };
@@ -310,7 +314,7 @@ const ContextMenuActionsHelper = {
           .then(actions => {
             if (actions.length > 0) {
               document.getElementById('actionsField').value = JSON.stringify(actions, null, 2);
-              UI.showStatus(`Generated ${actions.length} context-aware menu actions`, false);
+              UI.utils.showStatus(`Generated ${actions.length} context-aware menu actions`, false);
             } else {
               alert('No menu items found. Try adjusting the URL or wait for the page to fully load.');
             }
@@ -347,7 +351,7 @@ const ContextMenuActionsHelper = {
           .then(actions => {
             if (actions.length > 0) {
               document.getElementById('actionsField').value = JSON.stringify(actions, null, 2);
-              UI.showStatus(`Generated actions for ${actions.length} menu items (including all submenus)`, false);
+              UI.utils.showStatus(`Generated actions for ${actions.length} menu items (including all submenus)`, false);
             } else {
               alert('No menu items found. Try adjusting the URL or wait for the page to fully load.');
             }
@@ -374,16 +378,19 @@ const ContextMenuActionsHelper = {
         actionsField.parentNode.insertBefore(container, actionsField);
       }
     }
-  };
+};
   
-  // Initialize the UI controls when the DOM is loaded
-  document.addEventListener('DOMContentLoaded', () => {
-    ContextMenuActionsHelper.addUIControls();
-    
-    // Optional: Replace the original MenuActionsHelper's UI with ours
-    // First, check if the old UI exists and remove it
-    const oldButtons = document.querySelector('.menu-actions-buttons');
-    if (oldButtons) {
-      oldButtons.remove();
-    }
-  });
+// Initialize the UI controls when the DOM is loaded - moved to index.js since we're using modules now
+// document.addEventListener('DOMContentLoaded', () => {
+//   ContextMenuActionsHelper.addUIControls();
+//   
+//   // Optional: Replace the original MenuActionsHelper's UI with ours
+//   // First, check if the old UI exists and remove it
+//   const oldButtons = document.querySelector('.menu-actions-buttons');
+//   if (oldButtons) {
+//     oldButtons.remove();
+//   }
+// });
+
+// Add default export
+export default ContextMenuActionsHelper;

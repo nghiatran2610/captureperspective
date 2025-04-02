@@ -1,3 +1,6 @@
+// Import dependencies
+import UI from './ui/index.js';
+
 /**
  * Menu Actions Helper Module
  * Handles generation of menu navigation actions
@@ -255,7 +258,7 @@ const MenuActionsHelper = {
         if (firstUrl) {
           const iframe = UI.elements.iframe;
           iframe.src = firstUrl;
-          UI.updateProgressMessage(`Loading ${firstUrl} in iframe...`);
+          UI.progress.updateProgressMessage(`Loading ${firstUrl} in iframe...`);
         }
       }
     };
@@ -281,7 +284,7 @@ const MenuActionsHelper = {
         .then(actions => {
           if (actions.length > 0) {
             document.getElementById('actionsField').value = JSON.stringify(actions, null, 2);
-            UI.showStatus(`Generated actions for ${actions.length} menu items (including submenus)`, false);
+            UI.utils.showStatus(`Generated actions for ${actions.length} menu items (including submenus)`, false);
           } else {
             alert('No menu items found. Try adjusting the URL or wait for the page to fully load.');
           }
@@ -309,7 +312,10 @@ const MenuActionsHelper = {
   }
 };
 
-// Initialize the UI controls when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  MenuActionsHelper.addUIControls();
-});
+// Initialize the UI controls is now moved to index.js
+// document.addEventListener('DOMContentLoaded', () => {
+//   MenuActionsHelper.addUIControls();
+// });
+
+// Add default export
+export default MenuActionsHelper;

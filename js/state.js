@@ -46,3 +46,6 @@ const AppState = {
     this.failedUrls = this.failedUrls.filter(u => u !== url);
   }
 };
+
+// Add default export
+export default AppState;
