@@ -483,6 +483,17 @@ const ContextMenuActionsHelper = {
   /**
    * Add context-aware UI controls (COMBINED and REFACTORED)
    */
+  // In ContextMenuActionsHelper.js, modify the addUIControls method:
+
+  /**
+   * Add context-aware UI controls
+   */
+  /**
+   * Add context-aware UI controls
+   */
+  /**
+   * Add context-aware UI controls
+   */
   addUIControls() {
     // Create a container for the helper buttons
     const container = document.createElement("div");
@@ -492,65 +503,34 @@ const ContextMenuActionsHelper = {
     container.style.display = "flex";
     container.style.gap = "10px";
 
-    // Create "Load URL" button (reused from original - ONLY ONCE)
+    // Remove any existing buttons to avoid duplicates
+    const existingContainer = document.querySelector(".menu-actions-buttons");
+    if (existingContainer) {
+      existingContainer.remove();
+    }
+
+    // Create "Load First URL" button
     const loadButton = document.createElement("button");
+    loadButton.id = "loadFirstUrl"; // Make sure ID matches any references elsewhere
     loadButton.className = "btn btn-small";
     loadButton.textContent = "Load First URL";
     loadButton.title = "Load the first URL from the list into the iframe";
-    /**
-     * Enhanced loadButton.onclick function with 10s wait period
-     * This should replace the existing loadButton.onclick in context-menu-actions-helper.js
-     */
-    loadButton.onclick = async () => {
+    loadButton.onclick = () => {
       const urlList = document.getElementById("urlList");
       const urls = urlList.value.trim().split("\n");
       if (urls.length > 0) {
         const firstUrl = urls[0].trim();
         if (firstUrl) {
           const iframe = UI.elements.iframe;
-
-          // Show loading status
-          const progressElement = UI.elements.progress;
-          const originalText = progressElement.innerHTML;
-          progressElement.innerHTML = `Loading ${firstUrl} in iframe... (waiting 10s for complete load)`;
-
-          // Disable the button during loading
-          loadButton.disabled = true;
-          loadButton.textContent = "Loading...";
-
-          // Load the URL
           iframe.src = firstUrl;
-
-          // Wait for the iframe to load
-          await new Promise((resolve) => {
-            const handleLoad = () => {
-              iframe.removeEventListener("load", handleLoad);
-              resolve();
-            };
-            iframe.addEventListener("load", handleLoad);
-
-            // In case the load event doesn't fire, resolve anyway after a timeout
-            setTimeout(resolve, 5000);
-          });
-
-          // Show countdown for 10 seconds
-          for (let i = 10; i > 0; i--) {
-            progressElement.innerHTML = `Loading ${firstUrl} in iframe... (waiting ${i}s for complete load)`;
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          }
-
-          // Update status to show load is complete
-          progressElement.innerHTML = `${firstUrl} loaded. Ready for action generation.`;
-
-          // Re-enable the button
-          loadButton.disabled = false;
-          loadButton.textContent = "Load First URL";
+          UI.progress.updateProgressMessage(`Loading ${firstUrl} in iframe...`);
         }
       }
     };
 
     // Create "Generate Context Actions" button
     const generateContextButton = document.createElement("button");
+    generateContextButton.id = "generateContextActions"; // Make sure ID matches any references elsewhere
     generateContextButton.className = "btn btn-small";
     generateContextButton.textContent = "Generate Context Actions";
     generateContextButton.title =
@@ -605,85 +585,9 @@ const ContextMenuActionsHelper = {
         });
     };
 
-    // Add ALL actions button (original behavior from MenuActionsHelper)
-    const generateAllButton = document.createElement("button");
-    generateAllButton.className = "btn btn-small";
-    generateAllButton.textContent = "Generate All Actions";
-    generateAllButton.title =
-      "Generate actions for all menu items (original behavior)";
-    generateAllButton.onclick = () => {
-      const iframe = UI.elements.iframe;
-      if (!iframe.src || iframe.src === "about:blank") {
-        alert('Please load a URL first using the "Load First URL" button');
-        return;
-      }
-
-      // Disable button during generation
-      generateAllButton.disabled = true;
-      generateAllButton.textContent = "Generating...";
-
-      // Get the include toolbar buttons option
-      const includeToolbar = document.getElementById(
-        "includeToolbarButtons"
-      ).checked;
-
-      // Call the original action generation method (from MenuActionsHelper)
-      (includeToolbar
-        ? this.generateFullHierarchyActions(undefined, true)
-        : MenuActionsHelper.generateMenuActionsWithSubmenus()
-      )
-        .then((actions) => {
-          if (actions.length > 0) {
-            document.getElementById("actionsField").value = JSON.stringify(
-              actions,
-              null,
-              2
-            );
-            UI.utils.showStatus(
-              `Generated actions for ${actions.length} menu items (including submenus)`,
-              false
-            );
-          } else {
-            alert(
-              "No menu items found. Try adjusting the URL or wait for the page to fully load."
-            );
-          }
-        })
-        .catch((error) => {
-          console.error("Error generating menu actions:", error);
-          alert("Error generating menu actions: " + error.message);
-        })
-        .finally(() => {
-          // Re-enable button
-          generateAllButton.disabled = false;
-          generateAllButton.textContent = "Generate All Actions";
-        });
-    };
-
-    // Create checkbox for including toolbar buttons
-    const toolbarCheckboxContainer = document.createElement("div");
-    toolbarCheckboxContainer.style.display = "flex";
-    toolbarCheckboxContainer.style.alignItems = "center";
-    toolbarCheckboxContainer.style.marginLeft = "10px";
-
-    const toolbarCheckbox = document.createElement("input");
-    toolbarCheckbox.type = "checkbox";
-    toolbarCheckbox.id = "includeToolbarButtons";
-    toolbarCheckbox.style.marginRight = "5px";
-
-    const toolbarLabel = document.createElement("label");
-    toolbarLabel.htmlFor = "includeToolbarButtons";
-    toolbarLabel.textContent = "Include Toolbar Interactions";
-    toolbarLabel.style.fontSize = "14px";
-
-    toolbarCheckboxContainer.appendChild(toolbarCheckbox);
-    toolbarCheckboxContainer.appendChild(toolbarLabel);
-
     // Add buttons to container
     container.appendChild(loadButton);
     container.appendChild(generateContextButton);
-    container.appendChild(generateAllButton);
-    container.appendChild(toolbarCheckboxContainer);
 
     // Add container to page
     const actionsField = document.getElementById("actionsField");
