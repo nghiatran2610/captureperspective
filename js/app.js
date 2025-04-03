@@ -105,7 +105,7 @@ class App {
         // Modified event handler to avoid duplicate messages
         events.on(events.events.SCREENSHOT_TAKEN, (data) => {
             // Only show status if we're not using action sequences
-            // Will be handled by _processSequentialResults for sequences
+            // Will be handled by processImmediately for sequences
             if (!this.usingActionSequences) {
                 UI.utils.showStatus(
                     `✓ Screenshot captured: ${data.url} (${data.result.preset} - ${data.result.width}x${data.result.height}) (Time: ${data.result.timeTaken}s)`
@@ -249,15 +249,60 @@ class App {
                     // Take screenshots with or without actions
                     if (actionSequences && actionSequences.length > 0) {
                         try {
-                            // Take sequential screenshots with actions
-                            const results = await ScreenshotCapture.takeSequentialScreenshots(url, capturePreset, actionSequences);
-                            console.log(`Got ${results.length} results for ${url}`, results);
-                            
                             // Get timestamp once for all files in this sequence
                             const timestamp = URLProcessor.getTimestamp();
                             
-                            // Process the results with the new helper method
-                            this._processSequentialResults(results, i, url, namingPattern, urlRegex, timestamp);
+                            // Process handler for immediate result processing
+                            const processImmediately = (actionResult) => {
+                                const sequenceName = actionResult.sequenceName || 'Unknown';
+                                console.log(`Processing immediate result for ${url} - ${sequenceName}`, actionResult);
+                                
+                                // Generate filename with sequence info and timestamp
+                                const baseFileName = URLProcessor.generateFilename(url, i, namingPattern, urlRegex);
+                                const fileName = baseFileName.replace('.png', `_${sequenceName.replace(/\s+/g, '_')}_${timestamp}.png`);
+                                
+                                // Check if this is an error result
+                                if (actionResult.error) {
+                                    // Add to the live thumbnails display as an error thumbnail
+                                    UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName, false, false);
+                                    
+                                    // Show error status
+                                    UI.utils.showStatus(`✗ Failed for "${sequenceName}": ${actionResult.errorMessage || 'Mount error'}`, true);
+                                    return;
+                                }
+                                
+                                // This is a valid screenshot
+                                // Detect if this is a toolbar button action
+                                const isToolbarAction = sequenceName.includes('Button');
+                                
+                                // Add filename to result
+                                actionResult.fileName = fileName;
+                                
+                                // Add to the live thumbnails display with appropriate categorization
+                                const thumbnailAdded = UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName, false, isToolbarAction);
+                                console.log(`Thumbnail added for ${sequenceName}: ${!!thumbnailAdded}`);
+                                
+                                // Download the screenshot right away
+                                ScreenshotCapture.downloadScreenshot(actionResult.screenshot, fileName);
+                                
+                                // Show success message
+                                UI.utils.showStatus(`✓ Screenshot captured: ${sequenceName} (${actionResult.preset} - ${actionResult.width}x${actionResult.height}) (Time: ${actionResult.timeTaken}s)`, false);
+                                
+                                // Store valid result for AppState
+                                if (!result) {
+                                    result = actionResult;
+                                }
+                            };
+                            
+                            // Take sequential screenshots with immediate processing
+                            const results = await ScreenshotCapture.takeSequentialScreenshots(
+                                url, 
+                                capturePreset, 
+                                actionSequences, 
+                                processImmediately
+                            );
+                            
+                            console.log(`Got ${results.length} results for ${url}`, results);
                             
                             // Find the last valid result to store in AppState
                             const lastValidResult = results.filter(r => !r.error).pop();
@@ -290,6 +335,9 @@ class App {
                             // Add to the live thumbnails display
                             const thumbnailAdded = UI.thumbnails.addLiveThumbnail(result, fileName);
                             console.log(`Thumbnail added for ${url}: ${!!thumbnailAdded}`);
+                            
+                            // Download the screenshot
+                            ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
                             
                             // Don't show status here - will be handled by event handler
                             // to avoid duplicate messages
@@ -415,19 +463,68 @@ class App {
                     // Take screenshots with or without actions
                     if (actionSequences && actionSequences.length > 0) {
                         try {
-                            // Take sequential screenshots with actions
-                            const results = await ScreenshotCapture.takeSequentialScreenshots(url, capturePreset, actionSequences);
-                            
                             // Get timestamp once for all files in this sequence
                             const timestamp = URLProcessor.getTimestamp();
                             
-                            // Process the results with the helper method
-                            this._processSequentialResults(results, i, url, namingPattern, urlRegex, timestamp);
+                            // Process handler for immediate result processing
+                            const processImmediately = (actionResult) => {
+                                const sequenceName = actionResult.sequenceName || 'Unknown';
+                                console.log(`Processing immediate result for ${url} - ${sequenceName}`, actionResult);
+                                
+                                // Generate filename with sequence info and timestamp
+                                const baseFileName = URLProcessor.generateFilename(url, i, namingPattern, urlRegex);
+                                const fileName = baseFileName.replace('.png', `_${sequenceName.replace(/\s+/g, '_')}_${timestamp}.png`);
+                                
+                                // Check if this is an error result
+                                if (actionResult.error) {
+                                    // Add to the live thumbnails display as an error thumbnail
+                                    UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName, true, false);
+                                    
+                                    // Show error status
+                                    UI.utils.showStatus(`✗ Failed for "${sequenceName}": ${actionResult.errorMessage || 'Mount error'}`, true);
+                                    return;
+                                }
+                                
+                                // This is a valid screenshot
+                                // Detect if this is a toolbar button action
+                                const isToolbarAction = sequenceName.includes('Button');
+                                
+                                // Add filename to result
+                                actionResult.fileName = fileName;
+                                
+                                // Add to the live thumbnails display with appropriate categorization
+                                const thumbnailAdded = UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName, true, isToolbarAction);
+                                console.log(`Thumbnail added for ${sequenceName}: ${!!thumbnailAdded}`);
+                                
+                                // Download the screenshot right away
+                                ScreenshotCapture.downloadScreenshot(actionResult.screenshot, fileName);
+                                
+                                // Show success message
+                                UI.utils.showStatus(`✓ Screenshot captured: ${sequenceName} (${actionResult.preset} - ${actionResult.width}x${actionResult.height}) (Time: ${actionResult.timeTaken}s)`, false);
+                                
+                                // Store valid result for AppState
+                                if (!result) {
+                                    result = actionResult;
+                                }
+                            };
+                            
+                            // Take sequential screenshots with immediate processing
+                            const results = await ScreenshotCapture.takeSequentialScreenshots(
+                                url, 
+                                capturePreset, 
+                                actionSequences, 
+                                processImmediately
+                            );
+                            
+                            console.log(`Got ${results.length} results for ${url}`, results);
                             
                             // Find the last valid result to store in AppState
                             const lastValidResult = results.filter(r => !r.error).pop();
                             if (lastValidResult) {
                                 result = lastValidResult;
+                                console.log(`Valid result found for ${url}`, result);
+                            } else {
+                                console.warn(`No valid results found for ${url}`);
                             }
                         } catch (error) {
                             console.error(`Error capturing screenshots for ${url}:`, error);
@@ -450,6 +547,9 @@ class App {
 
                             // Add to the live thumbnails display
                             UI.thumbnails.addLiveThumbnail(result, fileName, null, true);
+                            
+                            // Download the screenshot right away
+                            ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
                             
                             // No need to show status here - will be handled by event
                         } catch (error) {

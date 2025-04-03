@@ -1,6 +1,6 @@
 // Import dependencies
-import UI from './ui/index.js';
-import MenuActionsHelper from './menu-actions-helper.js';
+import UI from "./ui/index.js";
+import MenuActionsHelper from "./menu-actions-helper.js";
 
 /**
  * Context-Aware Menu Actions Helper Module
@@ -57,7 +57,11 @@ const ContextMenuActionsHelper = {
    * @param {boolean} includeToolbarButtons - Whether to include actions for toolbar buttons
    * @returns {Promise<Array>} - Promise resolving to array of menu action sequences
    */
-  generateContextAwareMenuActions(currentUrl, waitTime = 2000, includeToolbarButtons = false) {
+  generateContextAwareMenuActions(
+    currentUrl,
+    waitTime = 2000,
+    includeToolbarButtons = false
+  ) {
     return new Promise(async (resolve, reject) => {
       try {
         const iframe = UI.elements.iframe;
@@ -80,7 +84,10 @@ const ContextMenuActionsHelper = {
           );
         } else {
           // For project-level URLs, we'll generate a more comprehensive menu action set
-          actionSequences = await this.generateFullHierarchyActions(waitTime, includeToolbarButtons);
+          actionSequences = await this.generateFullHierarchyActions(
+            waitTime,
+            includeToolbarButtons
+          );
         }
 
         resolve(actionSequences);
@@ -99,32 +106,39 @@ const ContextMenuActionsHelper = {
     return [
       {
         name: "Layout Button",
-        selector: ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(1)"
+        selector:
+          ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(1)",
       },
       {
         name: "Settings Button",
-        selector: ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(2)"
+        selector:
+          ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(2)",
       },
       {
         name: "System Button",
-        selector: ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(3)"
+        selector:
+          ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(3)",
       },
       {
         name: "Graph Button",
-        selector: ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(5)"
+        selector:
+          ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(5)",
       },
       {
         name: "Alert Button",
-        selector: ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(6)"
+        selector:
+          ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(6)",
       },
       {
         name: "Expand Button",
-        selector: ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(8)"
+        selector:
+          ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(8)",
       },
       {
         name: "Collapse Button",
-        selector: ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(9)"
-      }
+        selector:
+          ".flex-container.responsive-container.ia_container--primary.view > button:nth-child(9)",
+      },
     ];
   },
 
@@ -138,25 +152,25 @@ const ContextMenuActionsHelper = {
   generateToolbarButtonActions(baseActions, pageName, waitTime) {
     const toolbarActions = [];
     const buttons = this.getToolbarButtonSelectors();
-    
+
     // For each button, create an action sequence
-    buttons.forEach(button => {
+    buttons.forEach((button) => {
       // Create a deep copy of base actions
       const actionsWithButton = JSON.parse(JSON.stringify(baseActions));
-      
+
       // Add button click action
       actionsWithButton.push(
         { type: "click", selector: button.selector },
         { type: "wait", duration: waitTime }
       );
-      
+
       // Create the action sequence
       toolbarActions.push({
         name: `${pageName} - ${button.name}`,
-        actions: actionsWithButton
+        actions: actionsWithButton,
       });
     });
-    
+
     return toolbarActions;
   },
 
@@ -167,7 +181,11 @@ const ContextMenuActionsHelper = {
    * @param {boolean} includeToolbarButtons - Whether to include actions for toolbar buttons
    * @returns {Promise<Array>} - Promise resolving to array of menu action sequences
    */
-  async generateActionsForCurrentContext(urlContext, waitTime, includeToolbarButtons = false) {
+  async generateActionsForCurrentContext(
+    urlContext,
+    waitTime,
+    includeToolbarButtons = false
+  ) {
     const iframe = UI.elements.iframe;
     const actions = [];
 
@@ -194,9 +212,9 @@ const ContextMenuActionsHelper = {
             { type: "wait", duration: waitTime },
           ],
         };
-        
+
         actions.push(moduleAction);
-        
+
         // Add toolbar button actions for the module page if requested
         if (includeToolbarButtons) {
           const moduleToolbarActions = this.generateToolbarButtonActions(
@@ -266,9 +284,9 @@ const ContextMenuActionsHelper = {
                   { type: "wait", duration: waitTime },
                 ],
               };
-              
+
               actions.push(submenuAction);
-              
+
               // Add toolbar button actions for this submenu page if requested
               if (includeToolbarButtons) {
                 const submenuToolbarActions = this.generateToolbarButtonActions(
@@ -336,9 +354,9 @@ const ContextMenuActionsHelper = {
               { type: "wait", duration: waitTime },
             ],
           };
-          
+
           actions.push(menuAction);
-          
+
           // Add toolbar button actions for this main menu page if requested
           if (includeToolbarButtons) {
             const menuToolbarActions = this.generateToolbarButtonActions(
@@ -353,7 +371,7 @@ const ContextMenuActionsHelper = {
 
     return actions;
   },
-  
+
   /**
    * Look for page-specific elements that can be interacted with
    * @param {Document} document - The iframe content document
@@ -435,16 +453,18 @@ const ContextMenuActionsHelper = {
   async generateFullHierarchyActions(waitTime, includeToolbarButtons = false) {
     // This can reuse most of the code from MenuActionsHelper.generateMenuActionsWithSubmenus
     // We'll adapt it for better performance
-    const baseActions = await MenuActionsHelper.generateMenuActionsWithSubmenus(waitTime);
-    
+    const baseActions = await MenuActionsHelper.generateMenuActionsWithSubmenus(
+      waitTime
+    );
+
     // If we don't need toolbar buttons, just return the base actions
     if (!includeToolbarButtons) {
       return baseActions;
     }
-    
+
     // If we do need toolbar buttons, add them for each page
-    const allActions = [...baseActions];  // Start with the original actions
-    
+    const allActions = [...baseActions]; // Start with the original actions
+
     for (const action of baseActions) {
       // Generate toolbar actions for this page
       const toolbarActions = this.generateToolbarButtonActions(
@@ -452,11 +472,11 @@ const ContextMenuActionsHelper = {
         action.name,
         waitTime
       );
-      
+
       // Add them to our results
       allActions.push(...toolbarActions);
     }
-    
+
     return allActions;
   },
 
@@ -477,15 +497,54 @@ const ContextMenuActionsHelper = {
     loadButton.className = "btn btn-small";
     loadButton.textContent = "Load First URL";
     loadButton.title = "Load the first URL from the list into the iframe";
-    loadButton.onclick = () => {
+    /**
+     * Enhanced loadButton.onclick function with 10s wait period
+     * This should replace the existing loadButton.onclick in context-menu-actions-helper.js
+     */
+    loadButton.onclick = async () => {
       const urlList = document.getElementById("urlList");
       const urls = urlList.value.trim().split("\n");
       if (urls.length > 0) {
         const firstUrl = urls[0].trim();
         if (firstUrl) {
           const iframe = UI.elements.iframe;
+
+          // Show loading status
+          const progressElement = UI.elements.progress;
+          const originalText = progressElement.innerHTML;
+          progressElement.innerHTML = `Loading ${firstUrl} in iframe... (waiting 10s for complete load)`;
+
+          // Disable the button during loading
+          loadButton.disabled = true;
+          loadButton.textContent = "Loading...";
+
+          // Load the URL
           iframe.src = firstUrl;
-          UI.progress.updateProgressMessage(`Loading ${firstUrl} in iframe...`);
+
+          // Wait for the iframe to load
+          await new Promise((resolve) => {
+            const handleLoad = () => {
+              iframe.removeEventListener("load", handleLoad);
+              resolve();
+            };
+            iframe.addEventListener("load", handleLoad);
+
+            // In case the load event doesn't fire, resolve anyway after a timeout
+            setTimeout(resolve, 5000);
+          });
+
+          // Show countdown for 10 seconds
+          for (let i = 10; i > 0; i--) {
+            progressElement.innerHTML = `Loading ${firstUrl} in iframe... (waiting ${i}s for complete load)`;
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+
+          // Update status to show load is complete
+          progressElement.innerHTML = `${firstUrl} loaded. Ready for action generation.`;
+
+          // Re-enable the button
+          loadButton.disabled = false;
+          loadButton.textContent = "Load First URL";
         }
       }
     };
@@ -508,10 +567,16 @@ const ContextMenuActionsHelper = {
       generateContextButton.textContent = "Generating...";
 
       // Get the include toolbar buttons option
-      const includeToolbar = document.getElementById("includeToolbarButtons").checked;
+      const includeToolbar = document.getElementById(
+        "includeToolbarButtons"
+      ).checked;
 
       // Call the context-aware action generation method
-      this.generateContextAwareMenuActions(iframe.src, undefined, includeToolbar)
+      this.generateContextAwareMenuActions(
+        iframe.src,
+        undefined,
+        includeToolbar
+      )
         .then((actions) => {
           if (actions.length > 0) {
             document.getElementById("actionsField").value = JSON.stringify(
@@ -558,10 +623,15 @@ const ContextMenuActionsHelper = {
       generateAllButton.textContent = "Generating...";
 
       // Get the include toolbar buttons option
-      const includeToolbar = document.getElementById("includeToolbarButtons").checked;
+      const includeToolbar = document.getElementById(
+        "includeToolbarButtons"
+      ).checked;
 
       // Call the original action generation method (from MenuActionsHelper)
-      (includeToolbar ? this.generateFullHierarchyActions(undefined, true) : MenuActionsHelper.generateMenuActionsWithSubmenus())
+      (includeToolbar
+        ? this.generateFullHierarchyActions(undefined, true)
+        : MenuActionsHelper.generateMenuActionsWithSubmenus()
+      )
         .then((actions) => {
           if (actions.length > 0) {
             document.getElementById("actionsField").value = JSON.stringify(
@@ -589,23 +659,23 @@ const ContextMenuActionsHelper = {
           generateAllButton.textContent = "Generate All Actions";
         });
     };
-    
+
     // Create checkbox for including toolbar buttons
     const toolbarCheckboxContainer = document.createElement("div");
     toolbarCheckboxContainer.style.display = "flex";
     toolbarCheckboxContainer.style.alignItems = "center";
     toolbarCheckboxContainer.style.marginLeft = "10px";
-    
+
     const toolbarCheckbox = document.createElement("input");
     toolbarCheckbox.type = "checkbox";
     toolbarCheckbox.id = "includeToolbarButtons";
     toolbarCheckbox.style.marginRight = "5px";
-    
+
     const toolbarLabel = document.createElement("label");
     toolbarLabel.htmlFor = "includeToolbarButtons";
     toolbarLabel.textContent = "Include Toolbar Interactions";
     toolbarLabel.style.fontSize = "14px";
-    
+
     toolbarCheckboxContainer.appendChild(toolbarCheckbox);
     toolbarCheckboxContainer.appendChild(toolbarLabel);
 
