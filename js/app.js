@@ -282,8 +282,8 @@ class App {
                                 const thumbnailAdded = UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName, false, isToolbarAction);
                                 console.log(`Thumbnail added for ${sequenceName}: ${!!thumbnailAdded}`);
                                 
-                                // Download the screenshot right away
-                                ScreenshotCapture.downloadScreenshot(actionResult.screenshot, fileName);
+                                // No automatic download
+                                // ScreenshotCapture.downloadScreenshot(actionResult.screenshot, fileName);
                                 
                                 // Show success message
                                 UI.utils.showStatus(`✓ Screenshot captured: ${sequenceName} (${actionResult.preset} - ${actionResult.width}x${actionResult.height}) (Time: ${actionResult.timeTaken}s)`, false);
@@ -336,8 +336,8 @@ class App {
                             const thumbnailAdded = UI.thumbnails.addLiveThumbnail(result, fileName);
                             console.log(`Thumbnail added for ${url}: ${!!thumbnailAdded}`);
                             
-                            // Download the screenshot
-                            ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
+                            // No automatic download
+                            // ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
                             
                             // Don't show status here - will be handled by event handler
                             // to avoid duplicate messages
@@ -496,8 +496,8 @@ class App {
                                 const thumbnailAdded = UI.thumbnails.addLiveThumbnail(actionResult, fileName, sequenceName, true, isToolbarAction);
                                 console.log(`Thumbnail added for ${sequenceName}: ${!!thumbnailAdded}`);
                                 
-                                // Download the screenshot right away
-                                ScreenshotCapture.downloadScreenshot(actionResult.screenshot, fileName);
+                                // No automatic download
+                                // ScreenshotCapture.downloadScreenshot(actionResult.screenshot, fileName);
                                 
                                 // Show success message
                                 UI.utils.showStatus(`✓ Screenshot captured: ${sequenceName} (${actionResult.preset} - ${actionResult.width}x${actionResult.height}) (Time: ${actionResult.timeTaken}s)`, false);
@@ -548,8 +548,8 @@ class App {
                             // Add to the live thumbnails display
                             UI.thumbnails.addLiveThumbnail(result, fileName, null, true);
                             
-                            // Download the screenshot right away
-                            ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
+                            // No automatic download
+                            // ScreenshotCapture.downloadScreenshot(result.screenshot, fileName);
                             
                             // No need to show status here - will be handled by event
                         } catch (error) {
