@@ -30,11 +30,11 @@ http://localhost:8088/data/perspective/client/Screenshot
           </select>
         </label>
       </div>
-      
+
       <div class="advanced-toggle">
         <button id="toggleAdvanced" class="btn-link">Advanced Options ▼</button>
       </div>
-      
+
       <div id="advancedOptions" class="advanced-section">
         <div class="input-row">
           <label title="Maximum time to wait before capturing the screenshot">
@@ -42,24 +42,51 @@ http://localhost:8088/data/perspective/client/Screenshot
             <input type="number" id="waitTime" value="5" min="1" max="120" />
           </label>
         </div>
+        <div class="toolbar-options">
+          <div class="checkbox-container">
+            <input type="checkbox" id="includeToolbarButtons" />
+            <label for="includeToolbarButtons">
+              Include toolbar button interactions (generates additional
+              screenshots)
+            </label>
+          </div>
+          <div class="help-text">
+            <small
+              >When enabled, additional screenshots will be taken after clicking
+              each toolbar button on every page</small
+            >
+          </div>
+        </div>
         <div class="input-row">
-          <label title="Actions to perform before capturing (JSON format)" style="display: block; width: 100%;">
+          <label
+            title="Actions to perform before capturing (JSON format)"
+            style="display: block; width: 100%"
+          >
             <span class="optional-label">Actions (Optional):</span>
-            <textarea id="actionsField" placeholder="Enter menu navigation actions in JSON format (optional)" rows="8" style="width: 100%;"></textarea>
+            <textarea
+              id="actionsField"
+              placeholder="Enter menu navigation actions in JSON format (optional)"
+              rows="8"
+              style="width: 100%"
+            ></textarea>
           </label>
           <div class="help-text">
-            <small>Leave empty for single page capture, or add menu navigation actions for multi-page capture.</small>
+            <small
+              >Leave empty for single page capture, or add menu navigation
+              actions for multi-page capture.</small
+            >
           </div>
         </div>
       </div>
-      
+
       <!-- Removed Naming Pattern, Custom Text, and URL Regex inputs -->
-      
     </div>
 
     <div class="btn-container">
       <button id="captureBtn" class="btn">Capture Screenshots</button>
-      <button id="retryFailedBtn" class="btn" disabled>Retry Failed URLs</button>
+      <button id="retryFailedBtn" class="btn" disabled>
+        Retry Failed URLs
+      </button>
     </div>
 
     <div id="progress" class="status-message"></div>
