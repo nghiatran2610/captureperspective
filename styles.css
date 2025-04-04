@@ -1108,18 +1108,21 @@ body.advanced-mode #captureBtn.initially-hidden {
 }
 
 /* Context Actions Section Styling */
-/* Context Actions Section Styling */
+/* Enhanced styling for the context actions header and buttons */
 .context-actions-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eaeaea;
 }
 
 .context-actions-label {
   font-weight: 600;
-  color: var(--text-color-light);
+  color: #333;
   font-size: 15px;
+  margin-right: auto;
 }
 
 .context-actions-buttons {
@@ -1130,44 +1133,83 @@ body.advanced-mode #captureBtn.initially-hidden {
 .action-btn {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  border-radius: 4px;
-  border: 1px solid #ddd;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
   background-color: #f8f9fa;
   cursor: pointer;
   transition: all 0.2s ease;
   font-weight: 500;
   font-size: 14px;
+  min-width: 90px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .action-icon {
   margin-right: 6px;
+  font-size: 16px;
 }
 
+/* Generate button styling */
 .generate-btn {
-  background-color: #2980b9;
+  background-color: #0d6efd;
   color: white;
-  border-color: #2980b9;
+  border-color: #0d6efd;
 }
 
 .generate-btn:hover {
-  background-color: #3498db;
-  border-color: #3498db;
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
 }
 
-.load-btn,
+/* Load button styling */
+.load-btn {
+  background-color: #ffc107;
+  color: #212529;
+  border-color: #ffc107;
+}
+
+.load-btn:hover:not([disabled]) {
+  background-color: #ffca2c;
+  border-color: #ffc720;
+}
+
+/* Save button styling */
 .save-btn {
-  background-color: #f8f9fa;
-  color: #adb5bd;
-  border-color: #ddd;
+  background-color: #198754;
+  color: white;
+  border-color: #198754;
+}
+
+.save-btn:hover:not([disabled]) {
+  background-color: #157347;
+  border-color: #146c43;
+}
+
+/* Disabled button styling */
+.action-btn:disabled {
+  opacity: 0.65;
   cursor: not-allowed;
-  opacity: 0.7;
+  box-shadow: none;
 }
 
 .action-btn:not([disabled]):active {
   transform: translateY(1px);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
 }
 
+/* Selected item badge styling */
+#menu-selection-badge {
+  padding: 5px 10px;
+  background-color: #e9f5ff;
+  color: #0d6efd;
+  border-radius: 15px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid #d0e7ff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
 /* Status area styling */
 .generation-status {
   margin-bottom: 12px;
@@ -1224,4 +1266,29 @@ body.advanced-mode #captureBtn.initially-hidden {
   margin-left: 10px;
   font-size: 13px;
   align-self: center;
+}
+
+.action-item-messages {
+  margin-top: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 12px;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+
+.action-message {
+  padding: 3px 6px;
+  margin-bottom: 2px;
+  border-radius: 3px;
+}
+
+.action-message.success {
+  background-color: #f0f9ff;
+  color: #0c5460;
+}
+
+.action-message.error {
+  background-color: #fff0f0;
+  color: #721c24;
 }

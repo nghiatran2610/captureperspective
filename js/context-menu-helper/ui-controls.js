@@ -4,6 +4,7 @@ import UI from "../ui/index.js";
 import { waitForIframeLoad } from "./element-utils.js";
 import { generateContextAwareMenuActions } from "./action-generator.js";
 import { emit } from "../events.js"; // Import emit
+import { findMenuElements } from "./element-utils.js";
 
 // --- createMenuSelectionDialog function ---
 function createMenuSelectionDialog(menuItems) {
@@ -164,16 +165,19 @@ async function processMenuItemWithFreshState(url, menuItem, includeToolbar) {
   // Wait for dynamic content to potentially load after iframe reports loaded
   await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second wait
 
-  // Log status in the main UI if possible
-  if (UI.utils && UI.utils.showStatus) {
-    UI.utils.showStatus(`Generating actions for ${menuItem}...`, false);
-  } else {
-    console.log(`Generating actions for ${menuItem}...`);
+  // Instead of showing in main status area, add to the messages container
+  const messagesContainer = document.getElementById("actionItemMessages");
+  if (messagesContainer) {
+    const messageEl = document.createElement("div");
+    messageEl.className = "action-message";
+    messageEl.textContent = `Processing: ${menuItem}`;
+    messagesContainer.appendChild(messageEl);
+    // Scroll to bottom to show latest message
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
   try {
     // Generate actions for this menu item using the imported function
-    // It needs the current URL, optional wait time, toolbar flag, and the specific menu item
     const actions = await generateContextAwareMenuActions(
       iframe.src, // Use the currently loaded URL in the iframe
       undefined, // Use default wait time from action-generator
@@ -181,18 +185,34 @@ async function processMenuItemWithFreshState(url, menuItem, includeToolbar) {
       menuItem // Pass the specific menu item
     );
 
+    // Update the message to show success
+    if (messagesContainer) {
+      const messageEls = messagesContainer.querySelectorAll(".action-message");
+      const lastMessage = messageEls[messageEls.length - 1];
+      if (lastMessage) {
+        lastMessage.textContent = `✓ Generated ${
+          actions ? actions.length : 0
+        } actions for ${menuItem}`;
+        lastMessage.classList.add("success");
+      }
+    }
+
     return actions || []; // Return empty array if null/undefined
   } catch (error) {
     console.error(`Error generating actions for ${menuItem}:`, error);
-    if (UI.utils && UI.utils.showStatus) {
-      UI.utils.showStatus(
-        `Error generating actions for ${menuItem}: ${error.message}`,
-        true
-      );
+
+    // Update the message to show error
+    if (messagesContainer) {
+      const messageEls = messagesContainer.querySelectorAll(".action-message");
+      const lastMessage = messageEls[messageEls.length - 1];
+      if (lastMessage) {
+        lastMessage.textContent = `✗ Error for ${menuItem}: ${error.message}`;
+        lastMessage.classList.add("error");
+      }
     }
+
     return []; // Return empty array on error
   }
-  // No finally block needed here to restore URL, as the main loop does that
 }
 // --- End processMenuItemWithFreshState ---
 
@@ -315,16 +335,16 @@ export function addUIControls() {
   // Find the target element to add UI controls
   const actionsLabel = UI.elements.actionsLabel;
   if (!actionsLabel) {
-    console.warn('No actionsLabel element found for UI controls');
+    console.warn("No actionsLabel element found for UI controls");
     return;
   }
 
   const parentNode = actionsLabel.parentNode;
   if (!parentNode) {
-    console.warn('No parent node found for actionsLabel');
+    console.warn("No parent node found for actionsLabel");
     return;
   }
-  
+
   // Create the context actions header container
   const contextActionsHeader = document.createElement("div");
   contextActionsHeader.className = "context-actions-header";
@@ -341,7 +361,8 @@ export function addUIControls() {
   const generateContextButton = document.createElement("button");
   generateContextButton.id = "generateContextActions";
   generateContextButton.className = "action-btn generate-btn";
-  generateContextButton.title = "Load first URL if needed, then select menu items to generate actions.";
+  generateContextButton.title =
+    "Load first URL if needed, then select menu items to generate actions.";
 
   // Create the icon and text spans for the generate button
   const generateIconSpan = document.createElement("span");
@@ -427,8 +448,7 @@ export function addUIControls() {
 
     try {
       toggleActionElements(false); // Hide button container during generation
-      statusDiv.style.display = "block"; // Show status div
-      statusDiv.className = "generation-status active"; // Add active class for styling
+      statusDiv.style.display = "none"; // Keep status div hidden
       actionsField.style.display = "none"; // Hide textarea
       statusDiv.innerHTML = "Initializing..."; // Initial message
 
@@ -468,9 +488,7 @@ export function addUIControls() {
       statusDiv.innerHTML = "Loading menu items..."; // Update status
 
       await waitForIframeLoad(iframe);
-      const mainMenuElements = iframe.contentDocument.querySelectorAll(
-        ".menu-wrapper.wrapper-root > .menu-option"
-      );
+      const mainMenuElements = findMenuElements(iframe.contentDocument);
       const mainMenuItems = Array.from(mainMenuElements)
         .map((item) => item.getAttribute("data-label"))
         .filter((label) => label);
@@ -496,7 +514,9 @@ export function addUIControls() {
 
       // Append badge to context-actions-header
       const selectionBadge = createSelectionBadge(selectedItems);
-      const contextHeaderElement = document.querySelector(".context-actions-header");
+      const contextHeaderElement = document.querySelector(
+        ".context-actions-header"
+      );
       if (contextHeaderElement) {
         contextHeaderElement.appendChild(selectionBadge);
       }
@@ -509,25 +529,23 @@ export function addUIControls() {
       // Update button for generation phase
       generateIconSpan.textContent = "🔄";
       generateTextSpan.textContent = `Generating (0/${selectedItems.length})`;
-      
+
       let allActions = [];
 
       for (let i = 0; i < selectedItems.length; i++) {
         const menuItem = selectedItems[i];
         // Update button text with progress
-        generateTextSpan.textContent = `Generating (${i + 1}/${selectedItems.length})`;
-
-        // Update status IN-PLACE using #actionsGenerationStatus
+        generateTextSpan.textContent = `Generating (${i + 1}/${
+          selectedItems.length
+        })`;
         const percentage = Math.round(((i + 1) / selectedItems.length) * 100);
         statusDiv.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <span><strong>Processing:</strong> ${menuItem} (${i + 1}/${selectedItems.length})</span>
             <span style="font-weight: bold;">${percentage}%</span>
           </div>
           <div class="status-progress-bar-container">
             <div class="status-progress-bar" style="width: ${percentage}%;"></div>
           </div>`;
-
         const actions = await processMenuItemWithFreshState(
           originalUrl,
           menuItem,
@@ -546,10 +564,7 @@ export function addUIControls() {
       if (allActions.length > 0) {
         actionsField.value = JSON.stringify(allActions, null, 2);
         emit("CONTEXT_ACTIONS_GENERATED");
-        UI.utils.showStatus(
-          `Generated ${allActions.length} context-aware menu actions for ${selectedItems.length} menu items`,
-          false
-        );
+        // Success message removed
       } else {
         actionsField.value = "";
         emit("CONTEXT_ACTIONS_GENERATED"); // Emit even if empty
@@ -576,7 +591,7 @@ export function addUIControls() {
       generateContextButton.disabled = false;
       generateIconSpan.textContent = "⚙️"; // Reset icon
       generateTextSpan.textContent = "Generate"; // Reset text
-      
+
       // Hide status div and show textarea again
       if (statusDiv) {
         setTimeout(() => {
@@ -590,11 +605,11 @@ export function addUIControls() {
   };
 
   // Placeholder listeners for Load/Save buttons
-  loadContextButton.addEventListener('click', () => {
+  loadContextButton.addEventListener("click", () => {
     console.log("Load functionality not yet implemented");
   });
 
-  saveContextButton.addEventListener('click', () => {
+  saveContextButton.addEventListener("click", () => {
     console.log("Save functionality not yet implemented");
   });
 }
