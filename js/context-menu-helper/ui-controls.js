@@ -182,6 +182,158 @@ async function processMenuItemWithFreshState(url, menuItem, includeToolbar) {
 }
 
 /**
+ * Create a badge to display selected menu items
+ * @param {Array} selectedItems - Array of selected menu items
+ * @returns {HTMLElement} - Badge element
+ */
+function createSelectionBadge(selectedItems) {
+  const badge = document.createElement('div');
+  badge.id = 'menu-selection-badge';
+  badge.style.display = 'inline-block';
+  badge.style.padding = '5px 10px';
+  badge.style.backgroundColor = '#e9f5ff';
+  badge.style.color = '#0066cc';
+  badge.style.borderRadius = '15px';
+  badge.style.fontSize = '14px';
+  badge.style.fontWeight = 'normal';
+  badge.style.marginLeft = '10px';
+  badge.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+  badge.style.border = '1px solid #cce4ff';
+
+  if (selectedItems.length === 1) {
+    badge.textContent = selectedItems[0];
+  } else if (selectedItems.length > 1) {
+    badge.textContent = `${selectedItems.length} menus selected`;
+    
+    // Add tooltip with all selected menu names
+    badge.title = selectedItems.join(', ');
+    
+    // Add click handler to show/hide the tooltip list
+    badge.style.cursor = 'pointer';
+    badge.addEventListener('click', () => {
+      toggleSelectionList(selectedItems);
+    });
+  }
+  
+  return badge;
+}
+
+/**
+ * Create or toggle the dropdown list of selected items
+ * @param {Array} selectedItems - Array of selected menu items
+ */
+function toggleSelectionList(selectedItems) {
+  let listContainer = document.getElementById('selection-list-container');
+  
+  // If list exists, toggle its visibility
+  if (listContainer) {
+    if (listContainer.style.display === 'none') {
+      listContainer.style.display = 'block';
+    } else {
+      listContainer.style.display = 'none';
+    }
+    return;
+  }
+  
+  // Create the list container
+  listContainer = document.createElement('div');
+  listContainer.id = 'selection-list-container';
+  listContainer.style.position = 'absolute';
+  listContainer.style.zIndex = '1000';
+  listContainer.style.backgroundColor = 'white';
+  listContainer.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+  listContainer.style.borderRadius = '4px';
+  listContainer.style.padding = '5px 0';
+  listContainer.style.marginTop = '5px';
+  listContainer.style.maxWidth = '300px';
+  listContainer.style.maxHeight = '300px';
+  listContainer.style.overflowY = 'auto';
+  
+  // Position it near the badge
+  const badge = document.getElementById('menu-selection-badge');
+  const badgeRect = badge.getBoundingClientRect();
+  listContainer.style.left = `${badgeRect.left}px`;
+  listContainer.style.top = `${badgeRect.bottom + window.scrollY + 5}px`;
+  
+  // Add a header
+  const header = document.createElement('div');
+  header.textContent = 'Selected Menus:';
+  header.style.padding = '5px 10px';
+  header.style.fontWeight = 'bold';
+  header.style.borderBottom = '1px solid #eee';
+  listContainer.appendChild(header);
+  
+  // Add each selected item
+  selectedItems.forEach((item, index) => {
+    const itemElement = document.createElement('div');
+    itemElement.textContent = item;
+    itemElement.style.padding = '5px 15px';
+    itemElement.style.borderBottom = index < selectedItems.length - 1 ? '1px solid #f5f5f5' : 'none';
+    listContainer.appendChild(itemElement);
+  });
+  
+  // Add close button
+  const closeButton = document.createElement('div');
+  closeButton.textContent = '✕';
+  closeButton.style.position = 'absolute';
+  closeButton.style.top = '5px';
+  closeButton.style.right = '8px';
+  closeButton.style.cursor = 'pointer';
+  closeButton.style.color = '#999';
+  closeButton.style.fontSize = '12px';
+  closeButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    listContainer.style.display = 'none';
+  });
+  listContainer.appendChild(closeButton);
+  
+  // Add click outside listener to close
+  document.addEventListener('click', (e) => {
+    if (listContainer && !listContainer.contains(e.target) && e.target !== badge) {
+      listContainer.style.display = 'none';
+    }
+  });
+  
+  document.body.appendChild(listContainer);
+}
+
+/**
+ * Hide or show the actions field and capture button
+ * @param {boolean} visible - Whether to show the elements
+ */
+function toggleActionElements(visible) {
+  const actionsField = document.getElementById("actionsField");
+  const captureBtn = document.getElementById("captureBtn");
+  const retryFailedBtn = document.getElementById("retryFailedBtn");
+  
+  if (actionsField) {
+    if (visible) {
+      actionsField.style.display = "";
+    } else {
+      actionsField.style.display = "none";
+    }
+  }
+  
+  if (captureBtn) {
+    const captureBtnContainer = captureBtn.closest('.btn-container') || captureBtn.parentNode;
+    
+    if (visible) {
+      captureBtnContainer.style.display = "";
+    } else {
+      captureBtnContainer.style.display = "none";
+    }
+  }
+  
+  if (retryFailedBtn) {
+    if (visible) {
+      retryFailedBtn.style.display = "";
+    } else {
+      retryFailedBtn.style.display = "none";
+    }
+  }
+}
+
+/**
  * Add context-aware UI controls.
  * Uses checkbox selection for menu items instead of prompt.
  * Toolbar interactions default to enabled.
@@ -193,6 +345,7 @@ export function addUIControls() {
   container.style.marginBottom = "10px";
   container.style.display = "flex";
   container.style.gap = "10px";
+  container.style.alignItems = "center";
 
   // Remove any existing container
   const existingContainer = document.querySelector(".menu-actions-buttons");
@@ -208,8 +361,26 @@ export function addUIControls() {
   generateContextButton.title =
     "Load first URL if needed, then select menu items to generate actions.";
 
+  // Initially hide the actions field and capture button
+  toggleActionElements(false);
+
   generateContextButton.onclick = async () => {
     try {
+      // Initially hide actions field and buttons until we have results
+      toggleActionElements(false);
+      
+      // Remove any existing selection badge
+      const existingBadge = document.getElementById('menu-selection-badge');
+      if (existingBadge) {
+        existingBadge.remove();
+      }
+      
+      // Remove any existing selection list
+      const existingList = document.getElementById('selection-list-container');
+      if (existingList) {
+        existingList.remove();
+      }
+      
       const iframe = UI.elements.iframe;
       // If no URL is loaded, automatically load the first URL from the list.
       if (!iframe.src || iframe.src === "about:blank") {
@@ -224,12 +395,10 @@ export function addUIControls() {
           return;
         }
         const firstUrl = urls[0].trim();
-        UI.elements.progress.innerHTML = `Automatically loading first URL: ${firstUrl}...`;
         iframe.src = firstUrl;
         await waitForIframeLoad(iframe);
         // Wait an extra 5 seconds for dynamic content
         await new Promise((resolve) => setTimeout(resolve, 5000));
-        UI.elements.progress.innerHTML = `${firstUrl} loaded. Ready for action generation.`;
       }
       
       // Store the original URL
@@ -265,6 +434,10 @@ export function addUIControls() {
         return;
       }
       
+      // Add visual indicator of selected items
+      const selectionBadge = createSelectionBadge(selectedItems);
+      container.appendChild(selectionBadge);
+      
       // Get the includeToolbarButtons value; default to true if not found.
       const toolbarCheckbox = document.getElementById(
         "includeToolbarButtons"
@@ -282,9 +455,36 @@ export function addUIControls() {
       generateContextButton.textContent = `Generating Actions (0/${selectedItems.length})...`;
       let allActions = [];
       
+      // Create a status container for progress
+      const statusContainer = document.createElement('div');
+      statusContainer.id = 'generation-status-container';
+      statusContainer.style.marginTop = '10px';
+      statusContainer.style.padding = '8px';
+      statusContainer.style.backgroundColor = '#f8f9fa';
+      statusContainer.style.borderRadius = '4px';
+      statusContainer.style.border = '1px solid #e9ecef';
+      
+      // Insert the status container after the container
+      container.parentNode.insertBefore(statusContainer, container.nextSibling);
+      
       for (let i = 0; i < selectedItems.length; i++) {
         const menuItem = selectedItems[i];
         generateContextButton.textContent = `Generating Actions (${i+1}/${selectedItems.length})...`;
+        
+        // Update status
+        statusContainer.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <strong>Processing:</strong> ${menuItem} (${i+1}/${selectedItems.length})
+            </div>
+            <div style="background-color: #e2f3ff; padding: 2px 8px; border-radius: 10px; font-size: 12px;">
+              ${Math.round((i+1) / selectedItems.length * 100)}%
+            </div>
+          </div>
+          <div style="height: 4px; background-color: #dee2e6; border-radius: 2px; margin-top: 8px;">
+            <div style="height: 100%; width: ${(i+1) / selectedItems.length * 100}%; background-color: #0d6efd; border-radius: 2px;"></div>
+          </div>
+        `;
         
         // Process each menu item with a fresh iframe state
         const actions = await processMenuItemWithFreshState(originalUrl, menuItem, includeToolbar);
@@ -294,9 +494,19 @@ export function addUIControls() {
         }
       }
       
+      // Remove status container
+      if (statusContainer.parentNode) {
+        statusContainer.parentNode.removeChild(statusContainer);
+      }
+      
       // Update the actions field with all generated actions
       if (allActions.length > 0) {
+        // Show the actions field and capture button
+        toggleActionElements(true);
+        
+        // Update the actions field value
         actionsField.value = JSON.stringify(allActions, null, 2);
+        
         UI.utils.showStatus(
           `Generated ${allActions.length} context-aware menu actions for ${selectedItems.length} menu items`,
           false
