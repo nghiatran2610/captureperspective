@@ -13,7 +13,7 @@
     <h1>Local Documentation Screenshot Tool</h1>
 
     <div class="card mode-selection">
-      <h2>Select Mode</h2>
+       <h2>Select Mode</h2>
       <div class="input-row">
         <label>
           <input
@@ -41,7 +41,7 @@
           rows="5"
         ></textarea>
         <div class="input-row screen-size-row">
-          <label>
+           <label>
             Screen Size:
             <select id="capturePreset">
               <option value="fullHD" selected>Full HD (1920x1080)</option>
@@ -53,14 +53,15 @@
         </div>
 
         <div id="advancedOptions" class="advanced-section">
-          <h3>Advanced Options</h3> <div class="input-row">
-            <label title="Maximum time to wait before capturing the screenshot">
+          <h3>Advanced Options</h3>
+          <div class="input-row">
+             <label title="Maximum time to wait before capturing the screenshot">
               Max Wait Time (sec):
               <input type="number" id="waitTime" value="5" min="1" max="120" />
             </label>
           </div>
           <div class="toolbar-options">
-            <div class="checkbox-container">
+             <div class="checkbox-container">
               <input type="checkbox" id="includeToolbarButtons" checked />
               <label for="includeToolbarButtons">
                 Include toolbar button interactions (generates additional
@@ -79,22 +80,23 @@
             <label
               title="Actions to perform before capturing (JSON format)"
               style="display: block; width: 100%"
-            >
+              id="actionsLabel" >
               Context Actions (JSON format):
-              <textarea
-                id="actionsField"
-                placeholder="Generate or enter menu navigation actions in JSON format"
-                rows="8"
-                style="width: 100%"
-              ></textarea>
-            </label>
+              </label>
+            <div id="actionsGenerationStatus" class="generation-status"></div>
+            <textarea
+              id="actionsField"
+              placeholder="Generate or enter menu navigation actions in JSON format"
+              rows="8"
+              style="width: 100%"
+            ></textarea>
           </div>
         </div>
       </div>
 
       <div class="btn-container" id="buttonContainer">
-        <button id="captureBtn" class="btn">Capture Screenshots</button>
-        <button id="retryFailedBtn" class="btn" disabled>
+         <button id="captureBtn" class="btn">Capture Screenshots</button>
+         <button id="retryFailedBtn" class="btn" disabled>
           Retry Failed URLs
         </button>
       </div>
@@ -105,14 +107,12 @@
         <div class="progress-container">
         <div id="progressBar" class="progress-bar"></div>
         </div>
-
         <div class="card stats" id="stats">
-        <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
-        <p><strong>Processed:</strong> <span id="processedCount">0</span></p>
-        <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
-        <p><strong>Total Time Taken:</strong> <span id="totalTime">0s</span></p>
+            <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
+            <p><strong>Processed:</strong> <span id="processedCount">0</span></p>
+            <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
+            <p><strong>Total Time Taken:</strong> <span id="totalTime">0s</span></p>
         </div>
-
         <div id="output" class="card"></div>
     </div>
 

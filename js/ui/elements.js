@@ -4,16 +4,18 @@ export const elements = {
   // Mode Selection
   modeAdvanced: document.getElementById('modeAdvanced'),
   modeSimple: document.getElementById('modeSimple'),
-  captureForm: document.getElementById('captureForm'), // Main form container
-  progressOutput: document.getElementById('progressOutput'), // Container for progress/stats/output
+  captureForm: document.getElementById('captureForm'),
+  progressOutput: document.getElementById('progressOutput'),
   urlInputTitle: document.getElementById('urlInputTitle'),
-  buttonContainer: document.getElementById('buttonContainer'), // Container for buttons
+  buttonContainer: document.getElementById('buttonContainer'),
 
   // Existing elements
   urlList: document.getElementById('urlList'),
   capturePreset: document.getElementById('capturePreset'),
   waitTime: document.getElementById('waitTime'),
   actionsField: document.getElementById('actionsField'),
+  actionsLabel: document.getElementById('actionsLabel'), // ID for the label
+  actionsGenerationStatus: document.getElementById('actionsGenerationStatus'), // <-- ADDED
   advancedOptions: document.getElementById('advancedOptions'),
   captureBtn: document.getElementById('captureBtn'),
   retryFailedBtn: document.getElementById('retryFailedBtn'),
@@ -21,17 +23,17 @@ export const elements = {
   progressBar: document.getElementById('progressBar'),
   output: document.getElementById('output'),
   iframe: document.getElementById('screenshotIframe'),
-  stats: document.getElementById('stats'), // Container for stats
+  stats: document.getElementById('stats'),
   totalCount: document.getElementById('totalCount'),
   processedCount: document.getElementById('processedCount'),
   failedCount: document.getElementById('failedCount'),
   totalTime: document.getElementById('totalTime'),
-  liveThumbnails: null, // Will be created dynamically
+  liveThumbnails: null,
   includeToolbarButtons: document.getElementById('includeToolbarButtons')
-};;
+};
 
-// Add default export if not already present
 export default elements;
+
 // ui/progress.js - Progress reporting functionality
 export const progress = {
   /**
