@@ -1292,3 +1292,21 @@ body.advanced-mode #captureBtn.initially-hidden {
   background-color: #fff0f0;
   color: #721c24;
 }
+
+/* Style for the help text below the label */
+#urlHelpText {
+  color: #777;
+  font-size: 0.85em;
+  margin-top: -15px;
+  margin-bottom: 10px;
+  font-style: italic;
+}
+
+/* Optional: Add a subtle emphasis if desired */
+#urlHelpText.advanced-mode {
+  border-left: 3px solid #2980b9;
+  padding-left: 8px;
+  color: #666;
+  background-color: #f8f9fa;
+  padding: 4px 8px;
+}

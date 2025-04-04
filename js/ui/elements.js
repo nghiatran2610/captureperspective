@@ -29,7 +29,10 @@ export const elements = {
   failedCount: document.getElementById('failedCount'),
   totalTime: document.getElementById('totalTime'),
   liveThumbnails: null,
-  includeToolbarButtons: document.getElementById('includeToolbarButtons')
+  includeToolbarButtons: document.getElementById('includeToolbarButtons'),
+  urlHelpText: document.getElementById('urlHelpText')
+
+
 };
 
 export default elements;
