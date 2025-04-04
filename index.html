@@ -12,95 +12,112 @@
   <body>
     <h1>Local Documentation Screenshot Tool</h1>
 
-    <div class="card">
-      <h2>Enter URLs to Capture</h2>
-      <textarea id="urlList" placeholder="Enter URLs (one per line)">
-http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Overview
-http://localhost:8088/data/perspective/client/RF_Main_STG/Refrigeration/Refrig4/Details
-http://localhost:8088/data/perspective/client/Screenshot
-      </textarea>
+    <div class="card mode-selection">
+      <h2>Select Mode</h2>
       <div class="input-row">
         <label>
-          Screen Size:
-          <select id="capturePreset">
-            <option value="fullHD" selected>Full HD (1920x1080)</option>
-            <option value="mobile">Mobile (375x812)</option>
-            <option value="tablet">Tablet (768x1024)</option>
-            <option value="fullPage">Full Page (Auto Height)</option>
-          </select>
+          <input
+            type="radio"
+            name="mode"
+            value="advanced"
+            id="modeAdvanced"
+            checked
+          />
+          Advanced Mode (Single URL, Context Actions)
+        </label>
+        <label>
+          <input type="radio" name="mode" value="simple" id="modeSimple" />
+          Simple Mode (Multiple URLs, Basic Capture)
         </label>
       </div>
+    </div>
 
-      <div class="advanced-toggle">
-        <button id="toggleAdvanced" class="btn-link">Advanced Options ▼</button>
-      </div>
-
-      <div id="advancedOptions" class="advanced-section">
-        <div class="input-row">
-          <label title="Maximum time to wait before capturing the screenshot">
-            Max Wait Time (sec):
-            <input type="number" id="waitTime" value="5" min="1" max="120" />
+    <div id="captureForm" style="display: none">
+      <div class="card">
+        <h2 id="urlInputTitle">Enter URL(s) to Capture</h2>
+        <textarea
+          id="urlList"
+          placeholder="Enter URLs (one per line)"
+          rows="5"
+        ></textarea>
+        <div class="input-row screen-size-row">
+          <label>
+            Screen Size:
+            <select id="capturePreset">
+              <option value="fullHD" selected>Full HD (1920x1080)</option>
+              <option value="mobile">Mobile (375x812)</option>
+              <option value="tablet">Tablet (768x1024)</option>
+              <option value="fullPage">Full Page (Auto Height)</option>
+            </select>
           </label>
         </div>
-        <div class="toolbar-options">
-          <div class="checkbox-container">
-            <input type="checkbox" id="includeToolbarButtons" checked />
-            <label for="includeToolbarButtons">
-              Include toolbar button interactions (generates additional
-              screenshots)
+
+        <div id="advancedOptions" class="advanced-section">
+          <h3>Advanced Options</h3> <div class="input-row">
+            <label title="Maximum time to wait before capturing the screenshot">
+              Max Wait Time (sec):
+              <input type="number" id="waitTime" value="5" min="1" max="120" />
             </label>
           </div>
-          <div class="help-text">
-            <small>
-              When enabled, additional screenshots will be taken after clicking
-              each toolbar button on every page
-            </small>
+          <div class="toolbar-options">
+            <div class="checkbox-container">
+              <input type="checkbox" id="includeToolbarButtons" checked />
+              <label for="includeToolbarButtons">
+                Include toolbar button interactions (generates additional
+                screenshots)
+              </label>
+            </div>
+            <div class="help-text">
+              <small>
+                When enabled, additional screenshots will be taken after
+                clicking each toolbar button on every page
+              </small>
+            </div>
           </div>
-        </div>
 
-        <div class="input-row">
-          <label
-            title="Actions to perform before capturing (JSON format)"
-            style="display: block; width: 100%"
-          >
-            <span class="optional-label">Actions (Optional):</span>
-            <textarea
-              id="actionsField"
-              placeholder="Enter menu navigation actions in JSON format (optional)"
-              rows="8"
-              style="width: 100%"
-            ></textarea>
-          </label>
-    
+          <div class="input-row">
+            <label
+              title="Actions to perform before capturing (JSON format)"
+              style="display: block; width: 100%"
+            >
+              Context Actions (JSON format):
+              <textarea
+                id="actionsField"
+                placeholder="Generate or enter menu navigation actions in JSON format"
+                rows="8"
+                style="width: 100%"
+              ></textarea>
+            </label>
+          </div>
         </div>
       </div>
 
-      <!-- Removed Naming Pattern, Custom Text, and URL Regex inputs -->
+      <div class="btn-container" id="buttonContainer">
+        <button id="captureBtn" class="btn">Capture Screenshots</button>
+        <button id="retryFailedBtn" class="btn" disabled>
+          Retry Failed URLs
+        </button>
+      </div>
     </div>
 
-    <div class="btn-container">
-      <button id="captureBtn" class="btn">Capture Screenshots</button>
-      <button id="retryFailedBtn" class="btn" disabled>
-        Retry Failed URLs
-      </button>
+    <div id="progressOutput" style="display: none">
+        <div id="progress" class="status-message"></div>
+        <div class="progress-container">
+        <div id="progressBar" class="progress-bar"></div>
+        </div>
+
+        <div class="card stats" id="stats">
+        <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
+        <p><strong>Processed:</strong> <span id="processedCount">0</span></p>
+        <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
+        <p><strong>Total Time Taken:</strong> <span id="totalTime">0s</span></p>
+        </div>
+
+        <div id="output" class="card"></div>
     </div>
 
-    <div id="progress" class="status-message"></div>
-    <div class="progress-container">
-      <div id="progressBar" class="progress-bar"></div>
-    </div>
-
-    <div class="card stats" id="stats">
-      <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
-      <p><strong>Processed:</strong> <span id="processedCount">0</span></p>
-      <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
-      <p><strong>Total Time Taken:</strong> <span id="totalTime">0s</span></p>
-    </div>
-
-    <div id="output" class="card"></div>
     <iframe id="screenshotIframe"></iframe>
 
-    <!-- Load JavaScript module entry point -->
     <script type="module" src="js/index.js"></script>
   </body>
 </html>

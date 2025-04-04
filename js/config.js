@@ -2,7 +2,7 @@
 export const config = {
     // UI related settings
     ui: {
-      defaultWaitTime: 5,
+      defaultWaitTime: 7,
       defaultNamingPattern: '{url}_{custom}',
       defaultCustomText: 'Screenshot',
       defaultUrlRegex: 'client/([^/]+)/([^/]+)/([^/]+)/([^/]+)',

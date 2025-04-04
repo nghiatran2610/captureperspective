@@ -454,7 +454,7 @@ textarea {
   flex-direction: column;
   background-color: white;
   border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   margin-bottom: 10px;
 }
@@ -507,14 +507,14 @@ textarea {
   background-color: #f9f9f9;
   padding: 8px;
   border-radius: 5px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .thumbnail-container:hover {
   transform: translateY(-3px);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .thumbnail-container img {
@@ -545,7 +545,7 @@ textarea {
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .thumbnail-filename {
@@ -593,7 +593,7 @@ textarea {
 .download-all-container .btn:hover {
   background-color: #219653;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .download-all-container .btn:active {
@@ -640,7 +640,7 @@ textarea {
   flex-direction: column;
   background-color: white;
   border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   overflow: hidden;
   margin-bottom: 10px;
 }
@@ -695,14 +695,14 @@ textarea {
   background-color: #f9f9f9;
   padding: 8px;
   border-radius: 5px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .thumbnail-container:hover {
   transform: translateY(-3px);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .thumbnail-container img {
@@ -733,7 +733,7 @@ textarea {
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .thumbnail-filename {
@@ -828,7 +828,7 @@ textarea {
 .combine-all-pdf-btn:hover {
   background-color: #6b46c1;
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Error thumbnail styling */
@@ -846,7 +846,7 @@ textarea {
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   z-index: 10;
 }
 
@@ -871,7 +871,7 @@ textarea {
 /* Make sure error thumbnails don't have hover effects */
 .thumbnail-container.error-thumbnail:hover {
   transform: none;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .thumbnail-container.error-thumbnail img:hover {
@@ -884,4 +884,69 @@ textarea {
   color: #666;
   margin-top: 3px;
   font-style: italic;
+}
+
+/* Add these styles to your existing styles.css */
+
+/* Add/Modify these styles in your existing styles.css */
+
+/* Mode Selection (Keep previous styles) */
+.mode-selection {
+  margin-bottom: var(--spacing-xl);
+}
+.mode-selection .input-row {
+  justify-content: center;
+}
+.mode-selection label {
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+.mode-selection input[type="radio"] {
+  margin-right: var(--spacing-md);
+}
+.mode-selection label:has(input:checked) {
+  background-color: #e9f5ff;
+  border-color: var(--primary-color);
+}
+
+/* Visibility Control */
+.hidden {
+  display: none !important;
+}
+
+/* Specific adjustments for simple mode */
+body.simple-mode #advancedOptions {
+  /* Hide advanced options section */
+  display: none;
+}
+
+/* Specific adjustments for advanced mode */
+body.advanced-mode #urlList {
+  height: 50px; /* Make textarea smaller for single URL */
+}
+body.advanced-mode #advancedOptions {
+  /* Ensure advanced options are visible */
+  display: block;
+  border-top: 1px solid #eee; /* Optional: keep visual separation */
+  padding-top: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Initial state for Capture button in advanced mode */
+body.advanced-mode #captureBtn.initially-hidden {
+  display: none;
+}
+
+/* Add styling for the Advanced Options heading */
+#advancedOptions h3 {
+  font-size: 1.2em;
+  color: var(--text-color-light);
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid #eee;
 }
