@@ -1310,3 +1310,118 @@ body.advanced-mode #captureBtn.initially-hidden {
   background-color: #f8f9fa;
   padding: 4px 8px;
 }
+
+/* Improved Live Thumbnails Container */
+.live-thumbnails-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 15px 0;
+  background-color: #f5f7fa;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e1e5ea;
+}
+
+/* Make the title more compact */
+.thumbnails-header {
+  margin: 0 0 10px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e1e5ea;
+}
+
+.thumbnails-header h3 {
+  margin: 0;
+  font-size: 1.2em;
+}
+
+/* Compact empty containers */
+.live-thumbnails-container:empty,
+.live-thumbnails-container:has(> .thumbnails-header:only-child),
+.live-thumbnails-container:has(> .thumbnails-header + .thumbnails-content:empty) {
+  padding-bottom: 5px;
+  margin-bottom: 5px;
+}
+
+/* Thumbnails content area */
+.thumbnails-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Position the Combine PDF button at the bottom */
+.combine-all-pdf-container {
+  margin-top: 15px;
+  border-top: 1px solid #e1e5ea;
+  padding-top: 15px;
+  display: none; /* Hide by default, show when screenshots are available */
+  justify-content: center;
+}
+
+/* Thumbnail categories styling enhancements */
+.thumbnail-category {
+  margin-bottom: 8px; /* Reduce space between categories */
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.category-header {
+  padding: 8px 12px; /* Slightly more compact headers */
+  background-color: #edf2f7;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.category-content {
+  padding: 10px; /* Reduce padding in the content area */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  background-color: white;
+}
+
+/* Enhanced combine PDF button */
+.combine-all-pdf-btn {
+  background-color: #805ad5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.combine-all-pdf-btn:hover {
+  background-color: #6b46c1;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.combine-all-pdf-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Thumbnail container enhancements */
+.thumbnail-container {
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.thumbnail-container:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.advanced-mode .stats {
+  display: none !important;
+}
+
+/* And show it in simple mode */
+body.simple-mode .stats {
+  display: flex !important;
+}

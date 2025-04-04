@@ -58,6 +58,21 @@ class App {
       "input",
       this._handleActionsInput
     );
+
+    // Add a direct input listener to check for content changes
+    if (UI.elements.actionsField) {
+      events.addDOMEventListener(
+        UI.elements.actionsField,
+        "input",
+        this._handleActionsInput
+      );
+
+      // Also check for paste events
+      events.addDOMEventListener(UI.elements.actionsField, "paste", () => {
+        // Use setTimeout to ensure we check after the paste content is applied
+        setTimeout(() => this._handleActionsInput(), 0);
+      });
+    }
   }
 
   _initializeUI() {
@@ -107,12 +122,15 @@ class App {
     return "";
   }
 
+  // Add this to the _updateUIMode method in app.js
+
   _updateUIMode() {
     const body = document.body;
     const urlList = UI.elements.urlList;
     const advancedOptions = UI.elements.advancedOptions;
     const captureBtn = UI.elements.captureBtn;
     const urlHelpText = UI.elements.urlHelpText;
+    const statsSection = UI.elements.stats; // Get reference to stats section
 
     UI.elements.captureForm.style.display = "";
     UI.elements.progressOutput.style.display = "";
@@ -126,6 +144,9 @@ class App {
       UI.elements.urlInputTitle.textContent = "Enter URLs to Capture";
       advancedOptions.style.display = "none";
       captureBtn.classList.remove("initially-hidden");
+
+      // Show stats in simple mode
+      if (statsSection) statsSection.style.display = "";
 
       if (urlHelpText) urlHelpText.style.display = "none";
     } else {
@@ -143,6 +164,9 @@ class App {
       advancedOptions.style.display = "block";
       captureBtn.classList.add("initially-hidden");
 
+      // Hide stats in advanced mode
+      if (statsSection) statsSection.style.display = "none";
+
       if (urlHelpText) urlHelpText.style.display = "block";
     }
     UI.utils.resetUI();
@@ -155,26 +179,25 @@ class App {
   }
 
   _handleActionsInput() {
-    // Called on manual input into actions field
+    // Simply check the capture button state whenever the content changes
     if (this.currentMode === "advanced") {
       this._checkCaptureButtonState();
     }
   }
-
   _checkCaptureButtonState() {
     const captureBtn = UI.elements.captureBtn;
-    const buttonContainer = UI.elements.buttonContainer; // Get the container
-    if (!captureBtn || !buttonContainer) return; // Check both elements
+    const buttonContainer = UI.elements.buttonContainer;
+    if (!captureBtn || !buttonContainer) return;
 
     if (this.currentMode === "simple") {
       // --- Simple Mode ---
       // Ensure the container is visible
-      buttonContainer.style.display = ""; // Use '' to reset to default
-      buttonContainer.classList.remove("hidden"); // Remove hidden class if used
+      buttonContainer.style.display = "";
+      buttonContainer.classList.remove("hidden");
 
       // Ensure the capture button itself is enabled and visible
       captureBtn.disabled = false;
-      captureBtn.style.display = ""; // Use '' to reset display
+      captureBtn.style.display = "";
       captureBtn.classList.remove("initially-hidden");
     } else {
       // --- Advanced Mode ---
@@ -182,6 +205,7 @@ class App {
         ? UI.elements.actionsField.value.trim()
         : "";
       let isValidJson = false;
+
       if (actionsText) {
         try {
           const parsed = JSON.parse(actionsText);
@@ -200,15 +224,13 @@ class App {
         buttonContainer.style.display = "";
         buttonContainer.classList.remove("hidden");
         captureBtn.disabled = false;
-        captureBtn.style.display = ""; // Ensure button visible within container
+        captureBtn.style.display = "";
         captureBtn.classList.remove("initially-hidden");
       } else {
         // Hide the entire container
         buttonContainer.style.display = "none";
-        buttonContainer.classList.add("hidden"); // Add class if needed for CSS
-        // (Button's state doesn't matter as much if container is hidden, but set for consistency)
+        buttonContainer.classList.add("hidden");
         captureBtn.disabled = true;
-        // Keep initially-hidden class logic tied to the button if needed by CSS
         captureBtn.classList.add("initially-hidden");
       }
     }
