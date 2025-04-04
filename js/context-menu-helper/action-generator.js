@@ -7,16 +7,18 @@ import { parseUrlContext, constructPageUrl, convertDisplayNameToUrlSegment } fro
 
 /**
  * Generate context-aware menu actions based on current URL context.
- * Always prompts the user to select a main menu item.
+ * Now accepts a specific menuItem parameter to skip the prompt.
  * @param {string} currentUrl - The current URL.
  * @param {number} [waitTime=2000] - Wait time after each click.
  * @param {boolean} [includeToolbarButtons=true] - Whether to include toolbar actions (default true).
+ * @param {string} [specificMenuItem=null] - Optional specific menu item to use (instead of prompting)
  * @returns {Promise<Array>} - Array of action sequences.
  */
 export function generateContextAwareMenuActions(
   currentUrl,
   waitTime = 2000,
-  includeToolbarButtons = true
+  includeToolbarButtons = true,
+  specificMenuItem = null
 ) {
   return new Promise(async (resolve, reject) => {
     try {
@@ -37,15 +39,23 @@ export function generateContextAwareMenuActions(
         UI.utils.showStatus("No main menu items found.", true);
         return resolve([]);
       }
-      // Always prompt for main menu selection
-      const userSelection = prompt(
-        "Select a main menu item from the following list:\n" +
-          mainMenuItems.join("\n")
-      );
+      
+      // Use the provided menu item if specified, otherwise prompt the user
+      let userSelection = specificMenuItem;
+      
+      if (!userSelection) {
+        // Fall back to the original prompt behavior for backward compatibility
+        userSelection = prompt(
+          "Select a main menu item from the following list:\n" +
+            mainMenuItems.join("\n")
+        );
+      }
+      
       if (!userSelection || !mainMenuItems.includes(userSelection)) {
         UI.utils.showStatus("Invalid selection. No actions generated.", true);
         return resolve([]);
       }
+      
       const urlContext = parseUrlContext(currentUrl);
       const actionSequences = await generateActionsForSelectedMainMenu(
         userSelection,
@@ -434,17 +444,32 @@ export async function processSubmenuItem(
             `Found ${buttonSelectors.length} toolbar buttons for ${moduleLabel} - ${subLabel}`
           );
           buttonSelectors.forEach((button) => {
-            const actionsWithButton = JSON.parse(
-              JSON.stringify(submenuAction.actions)
-            );
-            actionsWithButton.push(
-              { type: "click", selector: button.selector },
-              { type: "wait", duration: waitTime }
-            );
-            actions.push({
-              name: `${moduleLabel} - ${subLabel} - ${button.name}`,
-              actions: actionsWithButton,
-            });
+            // Create a named action sequence for this button
+            const actionName = `${moduleLabel} - ${subLabel} - ${button.name}`;
+            
+            // For disabled buttons, just add the name without actions
+            if (button.disabled || button.skipActions) {
+              actions.push({
+                name: actionName,
+                actions: [
+                  // Just include the navigation to the page, but no button click
+                  ...JSON.parse(JSON.stringify(submenuAction.actions))
+                ]
+              });
+            } else {
+              // For enabled buttons, include the button click
+              const actionsWithButton = JSON.parse(
+                JSON.stringify(submenuAction.actions)
+              );
+              actionsWithButton.push(
+                { type: "click", selector: button.selector },
+                { type: "wait", duration: waitTime }
+              );
+              actions.push({
+                name: actionName,
+                actions: actionsWithButton,
+              });
+            }
           });
         } else {
           console.log(
