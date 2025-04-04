@@ -64,6 +64,12 @@ export function addUIControls() {
       );
       const includeToolbar = toolbarCheckbox ? toolbarCheckbox.checked : true;
 
+      // Clear the existing actions field before generating new actions
+      const actionsField = document.getElementById("actionsField");
+      if (actionsField) {
+        actionsField.value = "";
+      }
+
       const actions = await generateContextAwareMenuActions(
         iframe.src,
         undefined,
