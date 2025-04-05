@@ -111,68 +111,7 @@ export async function generateActionsForCurrentContext(
       );
       if (moduleMenuItem) {
         console.log(`Found module menu item for ${urlContext.module}`);
-        const moduleAction = {
-          name: urlContext.module,
-          actions: [
-            {
-              type: "click",
-              selector: `.menu-option[data-label="${urlContext.module}"]`,
-            },
-            { type: "wait", duration: waitTime },
-          ],
-        };
-        actions.push(moduleAction);
-        if (includeToolbarButtons) {
-          try {
-            const originalUrl = iframe.contentWindow.location.href;
-            moduleMenuItem.click();
-            await new Promise((r) => setTimeout(r, waitTime));
-            await waitForIframeLoad(iframe);
-            const moduleUrl = iframe.contentWindow.location.href;
-            console.log(`Successfully navigated to module URL: ${moduleUrl}`);
-            const toolbar = await waitForToolbar(iframe);
-            if (toolbar) {
-              console.log(
-                `Found toolbar for module ${urlContext.module} at URL: ${moduleUrl}`
-              );
-              const buttonSelectors = getToolbarButtonSelectors(iframe);
-              if (buttonSelectors && buttonSelectors.length > 0) {
-                buttonSelectors.forEach((button) => {
-                  const actionsWithButton = JSON.parse(
-                    JSON.stringify(moduleAction.actions)
-                  );
-                  actionsWithButton.push(
-                    { type: "click", selector: button.selector },
-                    { type: "wait", duration: waitTime }
-                  );
-                  actions.push({
-                    name: `${urlContext.module} - ${button.name}`,
-                    actions: actionsWithButton,
-                  });
-                });
-              } else {
-                console.log(
-                  `No toolbar buttons found for module ${urlContext.module} at URL: ${moduleUrl}`
-                );
-              }
-            } else {
-              console.log(
-                `No toolbar found for module ${urlContext.module} at URL: ${moduleUrl}`
-              );
-            }
-            if (originalUrl !== moduleUrl) {
-              console.log(`Navigating back to original URL: ${originalUrl}`);
-              iframe.src = originalUrl;
-              await new Promise((r) => setTimeout(r, waitTime));
-              await waitForIframeLoad(iframe);
-            }
-          } catch (toolbarError) {
-            console.warn(
-              `Error generating toolbar actions for ${urlContext.module}:`,
-              toolbarError
-            );
-          }
-        }
+
         const hasSubmenu =
           moduleMenuItem.querySelector(
             '.nav-icon svg[data-icon*="chevron_right"]'
