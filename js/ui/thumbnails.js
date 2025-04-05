@@ -15,23 +15,25 @@ export const thumbnails = {
     // Create header with more compact styling
     const headerSection = document.createElement("div");
     headerSection.className = "thumbnails-header";
-    
+
     const title = document.createElement("h3");
     title.textContent = "Live Thumbnails";
     headerSection.appendChild(title);
-    
+
     // Create content area that will hold the thumbnails
     const contentSection = document.createElement("div");
     contentSection.className = "thumbnails-content";
     contentSection.id = "thumbnailsContent";
-    
+
     // Create footer for the PDF button (initially hidden)
     const footerSection = document.createElement("div");
     footerSection.className = "combine-all-pdf-container";
-    
+
     const combinePdfBtn = document.createElement("button");
     combinePdfBtn.className = "btn combine-all-pdf-btn";
     combinePdfBtn.textContent = "Combine All Screenshots to PDF";
+    combinePdfBtn.disabled = true; // Add this line to disable the button initially
+
     combinePdfBtn.addEventListener("click", () => {
       // Get all categories
       const allCategories = document.querySelectorAll(".thumbnail-category");
@@ -42,9 +44,9 @@ export const thumbnails = {
       // Combine all screenshots from all categories
       this.combineAllToPDF(allCategories);
     });
-    
+
     footerSection.appendChild(combinePdfBtn);
-    
+
     // Assemble the container
     container.appendChild(headerSection);
     container.appendChild(contentSection);
@@ -204,9 +206,11 @@ export const thumbnails = {
     countElement.textContent = `(${newCount})`;
 
     // Show the Combine All PDF button now that we have content
-    const pdfContainer = elements.liveThumbnails.querySelector('.combine-all-pdf-container');
+    const pdfContainer = elements.liveThumbnails.querySelector(
+      ".combine-all-pdf-container"
+    );
     if (pdfContainer) {
-      pdfContainer.style.display = 'flex';
+      pdfContainer.style.display = "flex";
     }
 
     return thumbnailContainer;
@@ -223,7 +227,8 @@ export const thumbnails = {
       this.createLiveThumbnailsContainer();
     }
 
-    const contentSection = elements.thumbnailsContent || elements.liveThumbnails;
+    const contentSection =
+      elements.thumbnailsContent || elements.liveThumbnails;
 
     const categoryId = `category-${
       parentName ? `${parentName}-` : ""
@@ -336,18 +341,20 @@ export const thumbnails = {
     if (!elements.liveThumbnails) {
       this.createLiveThumbnailsContainer();
     }
-    
+
     // If the button already exists, don't create another one
-    if (elements.liveThumbnails.querySelector('.combine-all-pdf-container')) {
+    if (elements.liveThumbnails.querySelector(".combine-all-pdf-container")) {
       return;
     }
-    
+
     const combinePdfContainer = document.createElement("div");
     combinePdfContainer.className = "combine-all-pdf-container";
 
     const combinePdfBtn = document.createElement("button");
     combinePdfBtn.className = "btn combine-all-pdf-btn";
     combinePdfBtn.textContent = "Combine All Screenshots to PDF";
+    combinePdfBtn.disabled = true; // Add this line to disable the button initially
+
     combinePdfBtn.addEventListener("click", () => {
       // Get all categories
       const allCategories = document.querySelectorAll(".thumbnail-category");

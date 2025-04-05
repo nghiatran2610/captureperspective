@@ -500,6 +500,12 @@ class App {
       UI.progress.updateProgressMessage(
         `Completed processing ${urlList.length} URLs (Success: ${AppState.screenshots.size}, Failed: ${AppState.failedUrls.length}, Time: ${totalTimeTaken}s)`
       );
+
+      // Enable PDF button now that all actions are complete
+      const combineAllPdfBtn = document.getElementById("combineAllPdfBtn");
+      if (combineAllPdfBtn) {
+        combineAllPdfBtn.disabled = false;
+      }
     } catch (error) {
       // Catch setup errors
       handleError(error, { logToConsole: true, showToUser: true });
