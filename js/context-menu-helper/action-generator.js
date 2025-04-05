@@ -1,9 +1,16 @@
 // action-generator.js - Functions for generating action sequences
 
-import UI from '../ui/index.js';
-import { waitForIframeLoad, waitForSubmenu } from './element-utils.js';
-import { waitForToolbar, getToolbarButtonSelectors } from './toolbar-detector.js';
-import { parseUrlContext, constructPageUrl, convertDisplayNameToUrlSegment } from './url-context-parser.js';
+import UI from "../ui/index.js";
+import { waitForIframeLoad, waitForSubmenu } from "./element-utils.js";
+import {
+  waitForToolbar,
+  getToolbarButtonSelectors,
+} from "./toolbar-detector.js";
+import {
+  parseUrlContext,
+  constructPageUrl,
+  convertDisplayNameToUrlSegment,
+} from "./url-context-parser.js";
 
 /**
  * Generate context-aware menu actions based on current URL context.
@@ -39,10 +46,10 @@ export function generateContextAwareMenuActions(
         UI.utils.showStatus("No main menu items found.", true);
         return resolve([]);
       }
-      
+
       // Use the provided menu item if specified, otherwise prompt the user
       let userSelection = specificMenuItem;
-      
+
       if (!userSelection) {
         // Fall back to the original prompt behavior for backward compatibility
         userSelection = prompt(
@@ -50,12 +57,12 @@ export function generateContextAwareMenuActions(
             mainMenuItems.join("\n")
         );
       }
-      
+
       if (!userSelection || !mainMenuItems.includes(userSelection)) {
         UI.utils.showStatus("Invalid selection. No actions generated.", true);
         return resolve([]);
       }
-      
+
       const urlContext = parseUrlContext(currentUrl);
       const actionSequences = await generateActionsForSelectedMainMenu(
         userSelection,
@@ -257,8 +264,7 @@ export async function generateActionsForCurrentContext(
               );
               const toolbar = await waitForToolbar(iframe);
               if (toolbar) {
-                const buttonSelectors =
-                  getToolbarButtonSelectors(iframe);
+                const buttonSelectors = getToolbarButtonSelectors(iframe);
                 if (buttonSelectors && buttonSelectors.length > 0) {
                   buttonSelectors.forEach((button) => {
                     const actionsWithButton = JSON.parse(
@@ -394,9 +400,7 @@ export async function processSubmenuItem(
 
           // Check if we need to use a constructed URL instead
           if (
-            !submenuUrl.includes(
-              convertDisplayNameToUrlSegment(moduleLabel)
-            )
+            !submenuUrl.includes(convertDisplayNameToUrlSegment(moduleLabel))
           ) {
             // Construct the expected URL
             const constructedUrl = constructPageUrl(
@@ -446,15 +450,15 @@ export async function processSubmenuItem(
           buttonSelectors.forEach((button) => {
             // Create a named action sequence for this button
             const actionName = `${moduleLabel} - ${subLabel} - ${button.name}`;
-            
+
             // For disabled buttons, just add the name without actions
             if (button.disabled || button.skipActions) {
               actions.push({
                 name: actionName,
                 actions: [
                   // Just include the navigation to the page, but no button click
-                  ...JSON.parse(JSON.stringify(submenuAction.actions))
-                ]
+                  ...JSON.parse(JSON.stringify(submenuAction.actions)),
+                ],
               });
             } else {
               // For enabled buttons, include the button click
@@ -463,7 +467,7 @@ export async function processSubmenuItem(
               );
               actionsWithButton.push(
                 { type: "click", selector: button.selector },
-                { type: "wait", duration: waitTime }
+                { type: "wait", duration: 2000 } // Fixed duration of 2000ms for all toolbar buttons
               );
               actions.push({
                 name: actionName,
@@ -514,10 +518,7 @@ export async function generateActionsForSelectedMainMenu(
     `.menu-option[data-label="${selectedModule}"]`
   );
   if (!mainMenuItem) {
-    UI.utils.showStatus(
-      `Main menu item "${selectedModule}" not found.`,
-      true
-    );
+    UI.utils.showStatus(`Main menu item "${selectedModule}" not found.`, true);
     return [];
   }
   mainMenuItem.click();
@@ -542,5 +543,5 @@ export default {
   generateContextAwareMenuActions,
   generateActionsForCurrentContext,
   generateActionsForSelectedMainMenu,
-  processSubmenuItem
+  processSubmenuItem,
 };

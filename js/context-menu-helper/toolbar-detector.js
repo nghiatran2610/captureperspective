@@ -1,6 +1,6 @@
 // js/context-menu-helper/toolbar-detector.js
 
-import { getElementXPath } from './element-utils.js';
+import { getElementXPath } from "./element-utils.js";
 
 /**
  * Wait for a toolbar to load using only the fixed XPath.
@@ -29,7 +29,9 @@ export async function waitForToolbar(iframe, maxAttempts = 10, interval = 500) {
 
       if (toolbarContainer) {
         // Check if it contains EITHER buttons OR the specific div class
-        const clickableElements = toolbarContainer.querySelectorAll('button, div.psc-core\\/button_primary'); // Escape '/'
+        const clickableElements = toolbarContainer.querySelectorAll(
+          "button, div.psc-core\\/button_primary"
+        ); // Escape '/'
         if (clickableElements.length > 0) {
           console.log(
             `Toolbar container found using fixed XPath with ${
@@ -69,7 +71,7 @@ export function getToolbarButtonSelectors(iframe) {
       "Getting toolbar clickable elements for URL:",
       iframe.contentWindow.location.href
     );
-    const fixedXPath = // XPath for the container
+    const fixedXPath =
       '//*[@id="app-container"]/div/div[3]/div[2]/div[2]/div[1]/div[1]/div/div[1]/div';
     const toolbarContainer = iframe.contentDocument.evaluate(
       fixedXPath,
@@ -81,10 +83,11 @@ export function getToolbarButtonSelectors(iframe) {
 
     let clickableElements = [];
     if (toolbarContainer) {
-       // Select both buttons and the specific div class within the container
-       // Note: Escaping '/' for CSS selector: psc-core\/button_primary
-       clickableElements = toolbarContainer.querySelectorAll('button, div.psc-core\\/button_primary');
-       console.log(
+      // Select both buttons and the specific div class within the container
+      clickableElements = toolbarContainer.querySelectorAll(
+        "button, div.psc-core\\/button_primary"
+      );
+      console.log(
         `Found toolbar container with ${clickableElements.length} potential clickable elements (buttons/divs) using fixed XPath`
       );
     } else {
@@ -93,121 +96,124 @@ export function getToolbarButtonSelectors(iframe) {
     }
 
     if (clickableElements.length === 0) {
-      console.log("No clickable elements (buttons or specific divs) found in toolbar container.");
+      console.log(
+        "No clickable elements (buttons or specific divs) found in toolbar container."
+      );
       return [];
     }
 
     // --- Naming Logic (adjust as needed based on actual content) ---
     const iconToName = {
       "material/zoom_out_map": "Layout",
-      "material/trending_up": "Trends",
+      "material/trending_up": "Trends", // Make sure this is correctly mapped
+      "material/tune": "Settings", // Make sure this is correctly mapped
       "material/article": "Document",
       "material/report": "Report",
       "material/unfold_less": "Collapse",
       "material/unfold_more": "Expand",
-      "material/alarm": "Alarm", // Found in the div example
+      "material/alarm": "Alarm",
       "material/list": "List",
       "material/view_module": "View Module",
-      "material/location_searching": "Location", // Example icon
-      "material/link": "Link", // Example icon
-      "material/merge_type": "Merge", // Example icon
+      "material/location_searching": "Location",
+      "material/link": "Link",
+      "material/merge_type": "Merge",
       // Add more mappings if needed
     };
     // --- End Naming Logic ---
 
-
     const elementList = [];
+    // Log all elements for debugging
+    console.log(
+      `Found ${clickableElements.length} potential elements in toolbar`
+    );
+
     Array.from(clickableElements).forEach((el, index) => {
+      const iconEl = el.querySelector("svg");
+      const iconData = iconEl?.getAttribute("data-icon") || "";
+      console.log(
+        `Element ${index} icon: ${iconData}, disabled: ${el.hasAttribute(
+          "disabled"
+        )}, class: ${el.className}`
+      );
+
       let isDisabled = false;
       let isHidden = false;
       let elementName = `Element ${index + 1}`; // Default name
-      let selector = '';
+      let selector = "";
       let elementType = el.tagName.toLowerCase(); // 'button' or 'div'
 
       // --- Check Disabled State ---
-      if (elementType === 'button') {
-          isDisabled = el.hasAttribute('disabled');
-      } else if (elementType === 'div') {
-          // Check if the div itself or a parent has a 'disabled' class pattern
-          // This might need adjustment based on how disabled divs are styled
-          isDisabled = el.classList.contains('disabled') || el.closest('.disabled') !== null || el.classList.contains('ia_button--primary--disabled');
+      if (elementType === "button") {
+        isDisabled =
+          el.hasAttribute("disabled") ||
+          el.classList.contains("disabled") ||
+          el.classList.contains("ia_button--primary--disabled");
+      } else if (elementType === "div") {
+        isDisabled =
+          el.classList.contains("disabled") ||
+          el.closest(".disabled") !== null ||
+          el.classList.contains("ia_button--primary--disabled");
       }
-      // Skip disabled elements entirely if desired, or handle them differently
-      // if (isDisabled) return; // Option: Skip disabled ones
 
-      // --- Check Visibility ---
-      // Use offsetParent check for basic visibility
-      if (el.offsetParent === null) {
-          isHidden = true; // Element or its parent is likely display:none
+      // --- Improved Visibility Check ---
+      // Check direct style properties (more reliable than computed style)
+      isHidden =
+        el.style.display === "none" || el.style.visibility === "hidden";
+
+      // Skip hidden elements
+      if (isHidden) {
+        console.log(`Skipping hidden element ${index}`);
+        return; // Skip this element in the forEach
       }
-      // More robust check (can be slow if run many times)
-      // let parent = el;
-      // while (parent && parent !== iframe.contentDocument.body) {
-      //   const style = window.getComputedStyle(parent);
-      //   if (style.visibility === "hidden" || style.display === "none") {
-      //     isHidden = true;
-      //     break;
-      //   }
-      //   parent = parent.parentElement;
-      // }
-       if (isHidden) return; // Skip hidden elements
-
 
       // --- Determine Element Name ---
-      const iconEl = el.querySelector('svg');
-      const iconData = iconEl?.getAttribute('data-icon') || '';
-      const textEl = el.querySelector('.text'); // Common class for text in buttons
-      const labelEl = el.querySelector('.ia_labelComponent span'); // Specific label in the example div
+      const textEl = el.querySelector(".text"); // Common class for text in buttons
+      const labelEl = el.querySelector(".ia_labelComponent span"); // Specific label in the example div
 
       if (iconData && iconToName[iconData]) {
         elementName = iconToName[iconData];
       } else if (textEl && textEl.textContent.trim()) {
         elementName = textEl.textContent.trim();
       } else if (labelEl && labelEl.textContent.trim()) {
-          // If name from icon/text wasn't found, try the label span from the div example
-          elementName = `Label ${labelEl.textContent.trim()}`;
-      } else if (el.getAttribute('aria-label')) {
-          elementName = el.getAttribute('aria-label');
+        elementName = `Label ${labelEl.textContent.trim()}`;
+      } else if (el.getAttribute("aria-label")) {
+        elementName = el.getAttribute("aria-label");
       }
-      // Add "Button" or "Control" suffix for clarity?
-      elementName += (elementType === 'button' ? ' Button' : ' Control');
+
+      // Add "Button" or "Control" suffix for clarity
+      elementName += elementType === "button" ? " Button" : " Control";
 
       // --- Determine Selector ---
-      if (el.id) {
+      // Prefer data-component-path when available as it's typically more stable
+      if (el.hasAttribute("data-component-path")) {
+        selector = `[data-component-path="${el.getAttribute(
+          "data-component-path"
+        )}"]`;
+      } else if (el.id) {
         selector = `#${el.id}`;
-      } else if (el.hasAttribute('data-component-path')) {
-         // Prefer data-component-path if available and unique enough
-         selector = `[data-component-path="${el.getAttribute('data-component-path')}"]`;
-      } else if (el.hasAttribute('data-component')) {
-        // Fallback to data-component + nth-of-type (less reliable if structure changes)
-        const componentType = el.getAttribute('data-component');
-        // Find siblings of the same type *within the same parent* for nth-of-type
-        let siblingIndex = 1;
-        let sibling = el.previousElementSibling;
-        while(sibling) {
-            if(sibling.tagName === el.tagName && sibling.getAttribute('data-component') === componentType) {
-                siblingIndex++;
-            }
-            sibling = sibling.previousElementSibling;
-        }
-        selector = `${elementType}[data-component="${componentType}"]:nth-of-type(${siblingIndex})`;
-
       } else {
         // Ultimate fallback: XPath
         selector = getElementXPath(el, iframe.contentDocument);
       }
 
+      console.log(
+        `Adding element to list: ${elementName}, disabled: ${isDisabled}, selector: ${selector}`
+      );
+
       elementList.push({
         name: elementName,
         selector: selector,
-        disabled: isDisabled, // Include disabled state
-        type: elementType
+        disabled: isDisabled,
+        skipActions: isDisabled, // Skip actions for disabled buttons
+        type: elementType,
       });
     });
 
-    console.log("Detected clickable toolbar elements:", elementList);
+    console.log(
+      "Final detected clickable toolbar elements:",
+      elementList.map((e) => e.name).join(", ")
+    );
     return elementList;
-
   } catch (error) {
     console.warn("Error getting toolbar element selectors:", error);
     return [];
@@ -216,5 +222,5 @@ export function getToolbarButtonSelectors(iframe) {
 
 export default {
   waitForToolbar,
-  getToolbarButtonSelectors
+  getToolbarButtonSelectors,
 };
