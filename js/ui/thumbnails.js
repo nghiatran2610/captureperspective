@@ -32,7 +32,6 @@ export const thumbnails = {
     const combinePdfBtn = document.createElement("button");
     combinePdfBtn.className = "btn combine-all-pdf-btn";
     combinePdfBtn.textContent = "Combine All Screenshots to PDF";
-    combinePdfBtn.disabled = true; // Add this line to disable the button initially
 
     combinePdfBtn.addEventListener("click", () => {
       // Get all categories
@@ -353,7 +352,6 @@ export const thumbnails = {
     const combinePdfBtn = document.createElement("button");
     combinePdfBtn.className = "btn combine-all-pdf-btn";
     combinePdfBtn.textContent = "Combine All Screenshots to PDF";
-    combinePdfBtn.disabled = true; // Add this line to disable the button initially
 
     combinePdfBtn.addEventListener("click", () => {
       // Get all categories
