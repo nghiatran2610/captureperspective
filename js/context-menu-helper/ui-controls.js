@@ -215,33 +215,76 @@ async function processMenuItemWithFreshState(url, menuItem, includeToolbar) {
   }
 }
 // --- End processMenuItemWithFreshState ---
+// Replace the createSelectionBadge function with this new function
+function createSelectionBadges(selectedItems) {
+  // Create a container to hold all the badges
+  const badgesContainer = document.createElement("div");
+  badgesContainer.id = "menu-selection-badges";
 
-// --- createSelectionBadge and toggleSelectionList ---
-function createSelectionBadge(selectedItems) {
-  const badge = document.createElement("div");
-  badge.id = "menu-selection-badge";
-  badge.style.display = "inline-block";
-  badge.style.padding = "5px 10px";
-  badge.style.backgroundColor = "#e9f5ff";
-  badge.style.color = "#0066cc";
-  badge.style.borderRadius = "15px";
-  badge.style.fontSize = "14px";
-  badge.style.fontWeight = "normal";
-  badge.style.marginLeft = "10px";
-  badge.style.boxShadow = "0 1px 2px rgba(0,0,0,0.1)";
-  badge.style.border = "1px solid #cce4ff";
+  // If there are many items, consider adding a count indicator
+  const showCount = selectedItems.length > 5;
+  const maxBadgesToShow = showCount ? 4 : selectedItems.length;
 
-  if (selectedItems.length === 1) {
-    badge.textContent = selectedItems[0];
-  } else if (selectedItems.length > 1) {
-    badge.textContent = `${selectedItems.length} menus selected`;
-    badge.title = selectedItems.join(", ");
-    badge.style.cursor = "pointer";
-    badge.addEventListener("click", () => {
-      toggleSelectionList(selectedItems);
-    });
+  // Create individual badges for each selected item (up to the maximum)
+  for (let i = 0; i < Math.min(maxBadgesToShow, selectedItems.length); i++) {
+    const badge = document.createElement("div");
+    badge.className = "menu-selection-badge";
+    badge.title = selectedItems[i]; // Add tooltip for truncated text
+    badge.textContent = selectedItems[i];
+    badgesContainer.appendChild(badge);
   }
-  return badge;
+
+  // If we have more items than max, add a +N badge
+  if (showCount) {
+    const remainingCount = selectedItems.length - maxBadgesToShow;
+    const countBadge = document.createElement("div");
+    countBadge.className = "menu-selection-badge count-badge";
+    countBadge.textContent = `+${remainingCount}`;
+    countBadge.title = selectedItems.slice(maxBadgesToShow).join(", ");
+
+    // Make the count badge clickable to show all items
+    countBadge.style.cursor = "pointer";
+    countBadge.addEventListener("click", () => {
+      // Show all badges temporarily when clicked
+      badgesContainer.innerHTML = ""; // Clear existing badges
+
+      // Add all badges
+      selectedItems.forEach((item) => {
+        const fullBadge = document.createElement("div");
+        fullBadge.className = "menu-selection-badge";
+        fullBadge.title = item;
+        fullBadge.textContent = item;
+        badgesContainer.appendChild(fullBadge);
+      });
+
+      // Add a "collapse" button
+      const collapseBadge = document.createElement("div");
+      collapseBadge.className = "menu-selection-badge collapse-badge";
+      collapseBadge.textContent = "Collapse";
+      collapseBadge.style.backgroundColor = "#f0f0f0";
+      collapseBadge.style.color = "#666";
+      collapseBadge.style.cursor = "pointer";
+      collapseBadge.addEventListener("click", () => {
+        // Recreate the badges with limited view
+        const headerElement = document.querySelector(".context-actions-header");
+        if (headerElement) {
+          const newBadges = createSelectionBadges(selectedItems);
+          const existingBadges = headerElement.querySelector(
+            "#menu-selection-badges"
+          );
+          if (existingBadges) {
+            headerElement.replaceChild(newBadges, existingBadges);
+          }
+        }
+      });
+
+      badgesContainer.appendChild(collapseBadge);
+    });
+
+    badgesContainer.appendChild(countBadge);
+  }
+
+  return badgesContainer;
 }
 
 function toggleSelectionList(selectedItems) {
@@ -451,11 +494,17 @@ export function addUIControls() {
       statusDiv.style.display = "none"; // Keep status div hidden
       actionsField.style.display = "none"; // Hide textarea
       statusDiv.innerHTML = "Initializing..."; // Initial message
-
-      const existingBadge = document.getElementById("menu-selection-badge");
-      if (existingBadge) existingBadge.remove();
+      // Clean up any existing selection list dropdown
       const existingList = document.getElementById("selection-list-container");
-      if (existingList) existingList.remove();
+      if (existingList) {
+        existingList.remove();
+      }
+
+      // Also remove any existing badges
+      const existingBadges = document.querySelector("#menu-selection-badges");
+      if (existingBadges) {
+        existingBadges.remove();
+      }
 
       const iframe = UI.elements.iframe;
       if (!iframe.src || iframe.src === "about:blank") {
@@ -512,15 +561,21 @@ export function addUIControls() {
         throw new Error("Menu selection cancelled."); // Use error to trigger finally block cleanup
       }
 
-      // Append badge to context-actions-header
-      const selectionBadge = createSelectionBadge(selectedItems);
+      // Append individual badges to context-actions-header
+      const selectionBadges = createSelectionBadges(selectedItems);
       const contextHeaderElement = document.querySelector(
         ".context-actions-header"
       );
       if (contextHeaderElement) {
-        contextHeaderElement.appendChild(selectionBadge);
+        // Remove any existing badges first
+        const existingBadgesContainer = contextHeaderElement.querySelector(
+          "#menu-selection-badges"
+        );
+        if (existingBadgesContainer) {
+          existingBadgesContainer.remove();
+        }
+        contextHeaderElement.appendChild(selectionBadges);
       }
-
       const toolbarCheckbox = document.getElementById("includeToolbarButtons");
       const includeToolbar = toolbarCheckbox ? toolbarCheckbox.checked : true;
 

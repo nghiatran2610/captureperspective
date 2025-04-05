@@ -1425,3 +1425,80 @@ body.advanced-mode .stats {
 body.simple-mode .stats {
   display: flex !important;
 }
+
+
+/* Enhanced badge container styling */
+#menu-selection-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: 10px;
+  align-self: center;
+  max-width: 70%; /* Limit width to prevent taking over the entire header */
+  overflow-x: auto; /* Allow horizontal scrolling if needed */
+  padding: 4px;
+  -ms-overflow-style: none; /* Hide scrollbar in IE/Edge */
+  scrollbar-width: none; /* Hide scrollbar in Firefox */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+#menu-selection-badges::-webkit-scrollbar {
+  display: none;
+}
+
+/* Individual badge styling */
+.menu-selection-badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  background-color: #e9f5ff;
+  color: #0066cc;
+  border-radius: 15px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap; /* Prevent text wrapping */
+  border: 1px solid #cce4ff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  align-items: center;
+  height: 24px; /* Fixed height for uniformity */
+  min-width: 20px; /* Ensure minimal width */
+  text-overflow: ellipsis;
+  max-width: 150px; /* Limit max width of individual badges */
+  overflow: hidden;
+}
+
+/* Count badge styling */
+.count-badge {
+  background-color: #f0f7ff;
+  color: #0066cc;
+  font-weight: 600;
+  border: 1px dashed #99c2ff;
+  cursor: pointer;
+}
+
+.count-badge:hover {
+  background-color: #d9e9ff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Collapse badge */
+.collapse-badge {
+  background-color: #f0f0f0;
+  color: #666;
+  font-weight: 600;
+  border: 1px solid #ddd;
+}
+
+.collapse-badge:hover {
+  background-color: #e0e0e0;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+  #menu-selection-badges {
+    max-width: 60%;
+  }
+  
+  .menu-selection-badge {
+    max-width: 100px;
+  }
+}
