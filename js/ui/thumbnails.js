@@ -8,6 +8,9 @@ export const thumbnails = {
    * @returns {HTMLElement} - The created container
    */
   createLiveThumbnailsContainer() {
+    // Store current scroll position
+    const scrollPosition = window.scrollY;
+    
     const container = document.createElement("div");
     container.id = "liveThumbnails";
     container.className = "live-thumbnails-container";
@@ -58,6 +61,14 @@ export const thumbnails = {
     elements.liveThumbnails = container;
     elements.thumbnailsContent = contentSection;
 
+    // Restore scroll position
+    setTimeout(() => {
+      window.scrollTo({
+        top: scrollPosition,
+        behavior: 'auto'
+      });
+    }, 0);
+
     return container;
   },
 
@@ -77,6 +88,9 @@ export const thumbnails = {
     isRetry = false,
     isToolbarAction = false
   ) {
+    // Store current scroll position
+    const scrollPosition = window.scrollY;
+
     if (!elements.liveThumbnails) {
       this.createLiveThumbnailsContainer();
     }
@@ -212,6 +226,14 @@ export const thumbnails = {
       pdfContainer.style.display = "flex";
     }
 
+    // Restore scroll position
+    setTimeout(() => {
+      window.scrollTo({
+        top: scrollPosition,
+        behavior: 'auto'
+      });
+    }, 0);
+
     return thumbnailContainer;
   },
 
@@ -222,6 +244,9 @@ export const thumbnails = {
    * @returns {HTMLElement} - The category container
    */
   getCategoryContainer(categoryName, parentName = null) {
+    // Store current scroll position
+    const scrollPosition = window.scrollY;
+
     if (!elements.liveThumbnails) {
       this.createLiveThumbnailsContainer();
     }
@@ -285,6 +310,14 @@ export const thumbnails = {
       contentSection.appendChild(categoryContainer);
     }
 
+    // Restore scroll position
+    setTimeout(() => {
+      window.scrollTo({
+        top: scrollPosition,
+        behavior: 'auto'
+      });
+    }, 0);
+
     return categoryContainer;
   },
 
@@ -335,6 +368,9 @@ export const thumbnails = {
    * Add a "Combine All to PDF" button to the thumbnails container
    */
   addCombineAllToPDFButton() {
+    // Store current scroll position
+    const scrollPosition = window.scrollY;
+    
     // This function is now redundant since we create the button in createLiveThumbnailsContainer
     // But keep it for backward compatibility
     if (!elements.liveThumbnails) {
@@ -367,6 +403,14 @@ export const thumbnails = {
 
     combinePdfContainer.appendChild(combinePdfBtn);
     elements.liveThumbnails.appendChild(combinePdfContainer);
+    
+    // Restore scroll position
+    setTimeout(() => {
+      window.scrollTo({
+        top: scrollPosition,
+        behavior: 'auto'
+      });
+    }, 0);
   },
 
   /**
@@ -576,6 +620,9 @@ export const thumbnails = {
    * @param {NodeList} categoryContainers - All category containers
    */
   generateAllCategoriesPDF(categoryContainers) {
+    // Store current scroll position
+    const scrollPosition = window.scrollY;
+    
     // Show status message
     utils.showStatus(
       "Generating comprehensive PDF with all screenshots...",
@@ -692,6 +739,14 @@ export const thumbnails = {
           `Comprehensive PDF generated with ${pageCount} pages`,
           false
         );
+        
+        // Restore scroll position
+        setTimeout(() => {
+          window.scrollTo({
+            top: scrollPosition,
+            behavior: 'auto'
+          });
+        }, 0);
       })
       .catch((error) => {
         console.error("Error generating comprehensive PDF:", error);
