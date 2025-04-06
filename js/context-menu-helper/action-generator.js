@@ -295,7 +295,6 @@ export async function processSubmenuItem(
         { type: "wait", duration: waitTime },
       ],
     };
-    actions.push(submenuAction);
 
     if (includeToolbarButtons) {
       try {

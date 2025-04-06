@@ -105,8 +105,8 @@ export function getToolbarButtonSelectors(iframe) {
     // --- Naming Logic (adjust as needed based on actual content) ---
     const iconToName = {
       "material/zoom_out_map": "Layout",
-      "material/trending_up": "Trends", // Make sure this is correctly mapped
-      "material/tune": "Settings", // Make sure this is correctly mapped
+      "material/trending_up": "Trends",
+      "material/tune": "Settings",
       "material/article": "Document",
       "material/report": "Report",
       "material/unfold_less": "Collapse",
@@ -156,13 +156,27 @@ export function getToolbarButtonSelectors(iframe) {
       }
 
       // --- Improved Visibility Check ---
-      // Check direct style properties (more reliable than computed style)
+      // Check direct style properties for the element
       isHidden =
         el.style.display === "none" || el.style.visibility === "hidden";
 
+      // Also check parent elements for visibility: hidden
+      if (!isHidden) {
+        let parent = el.parentElement;
+        while (parent && !isHidden) {
+          if (parent.style.visibility === "hidden") {
+            isHidden = true;
+            console.log(`Element ${index} has a parent with visibility:hidden`);
+          }
+          parent = parent.parentElement;
+        }
+      }
+
       // Skip hidden elements
       if (isHidden) {
-        console.log(`Skipping hidden element ${index}`);
+        console.log(
+          `Skipping hidden element ${index}: ${iconData || elementName}`
+        );
         return; // Skip this element in the forEach
       }
 
