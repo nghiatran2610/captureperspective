@@ -556,10 +556,8 @@ export function addUIControls() {
       actionsField.value = ""; // Clear field on error
       emit("CONTEXT_ACTIONS_GENERATED"); // Still emit to update button state (likely hide capture button)
     } finally {
-      // Around line 514 in the previous version
       // --- UI Cleanup ---
       generateContextButton.disabled = false; // Re-enable button
-      // Use querySelector inside the finally block to ensure elements are referenced correctly
       const finalGenerateButtonIcon =
         generateContextButton.querySelector(".action-icon");
       const finalGenerateButtonText =
@@ -573,18 +571,14 @@ export function addUIControls() {
 
       // Optionally hide status/messages after a delay
       setTimeout(() => {
-        // ** FIX START **
-        // Check if elements exist before accessing properties
-        if (statusDiv) {
-          statusDiv.style.display = "none";
+        // Hide the main status div (e.g., "Generation complete...")
+        const finalStatusDiv = document.getElementById(
+          "actionsGenerationStatus"
+        ); // Re-fetch element
+        if (finalStatusDiv) {
+          finalStatusDiv.style.display = "none";
         }
-        const finalMessagesContainer =
-          document.getElementById("actionItemMessages"); // Re-fetch in case it was removed
-        if (finalMessagesContainer) {
-          finalMessagesContainer.style.display = "none"; // Hide item messages too
-        }
-        // ** FIX END **
-      }, 5000); // Hide after 5 seconds
+      }, 5000); // Hide main status after 5 seconds
     }
   };
 
