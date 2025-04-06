@@ -405,7 +405,7 @@ export function addUIControls() {
   generateContextButton.id = "generateContextActions";
   generateContextButton.className = "action-btn generate-btn";
   generateContextButton.title =
-    "Load first URL if needed, then select menu items to generate actions.";
+    "";
 
   // Create the icon and text spans for the generate button
   const generateIconSpan = document.createElement("span");

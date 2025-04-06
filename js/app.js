@@ -84,6 +84,22 @@ class App {
     }
     UI.elements.captureForm.style.display = "none";
     UI.elements.progressOutput.style.display = "none";
+
+    // Disable the "Full Page (Auto Height)" option
+    if (UI.elements.capturePreset) {
+      const fullPageOption = Array.from(UI.elements.capturePreset.options).find(
+        (option) => option.value === "fullPage"
+      );
+
+      if (fullPageOption) {
+        fullPageOption.disabled = true;
+
+        // If fullPage is currently selected, change to another preset
+        if (UI.elements.capturePreset.value === "fullPage") {
+          UI.elements.capturePreset.value = "fullHD"; // Default to Full HD
+        }
+      }
+    }
   }
 
   _handleModeChange(event) {
@@ -149,6 +165,12 @@ class App {
       if (statsSection) statsSection.style.display = "";
 
       if (urlHelpText) urlHelpText.style.display = "none";
+
+      // Remove any input event listener for single URL enforcement
+      if (urlList._singleUrlListener) {
+        urlList.removeEventListener("input", urlList._singleUrlListener);
+        delete urlList._singleUrlListener;
+      }
     } else {
       // Advanced mode
       body.classList.remove("simple-mode");
@@ -168,6 +190,38 @@ class App {
       if (statsSection) statsSection.style.display = "none";
 
       if (urlHelpText) urlHelpText.style.display = "block";
+
+      // Add input event listener to enforce single URL
+      if (!urlList._singleUrlListener) {
+        urlList._singleUrlListener = function () {
+          // Get the text content
+          const text = this.value;
+
+          // If there's a newline character, keep only the first line
+          if (text.includes("\n")) {
+            const firstLine = text.split("\n")[0].trim();
+            this.value = firstLine;
+
+            // Show a brief message
+            const warningMsg = document.createElement("div");
+            warningMsg.className = "help-text";
+            warningMsg.style.color = "#e74c3c";
+            warningMsg.textContent = "Advanced mode only allows a single URL";
+
+            // Insert the warning after the URL input
+            this.parentNode.insertBefore(warningMsg, this.nextSibling);
+
+            // Remove the warning after a short delay
+            setTimeout(() => {
+              if (warningMsg.parentNode) {
+                warningMsg.parentNode.removeChild(warningMsg);
+              }
+            }, 3000);
+          }
+        };
+
+        urlList.addEventListener("input", urlList._singleUrlListener);
+      }
     }
     UI.utils.resetUI();
 
