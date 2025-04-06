@@ -27,7 +27,7 @@ export async function waitForIframeLoad(iframe) {
 /**
  * Wait for submenu items to load in the iframe.
  * @param {HTMLIFrameElement} iframe - The iframe element.
- * @param {number} [maxAttempts=10] - Maximum attempts.
+ * @param {number} [maxAttempts=4] - Maximum attempts.
  * @param {number} [interval=500] - Interval in ms.
  * @returns {Promise<Array>} - Array of submenu elements.
  */

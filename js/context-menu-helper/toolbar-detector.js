@@ -6,11 +6,11 @@ import { getElementXPath } from "./element-utils.js";
  * Wait for a toolbar to load using only the fixed XPath.
  * Looks for buttons OR specific divs acting as buttons.
  * @param {HTMLIFrameElement} iframe - The iframe element.
- * @param {number} [maxAttempts=10] - Maximum attempts.
+ * @param {number} [maxAttempts=4] - Maximum attempts.
  * @param {number} [interval=500] - Interval in ms.
  * @returns {Promise<Element|null>} - The toolbar element, or null.
  */
-export async function waitForToolbar(iframe, maxAttempts = 10, interval = 500) {
+export async function waitForToolbar(iframe, maxAttempts = 3, interval = 500) {
   const fixedXPath =
     '//*[@id="app-container"]/div/div[3]/div[2]/div[2]/div[1]/div[1]/div/div[1]/div'; // Keep using the fixed XPath for the container
   console.log(

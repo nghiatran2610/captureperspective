@@ -295,6 +295,8 @@ export async function processSubmenuItem(
         { type: "wait", duration: waitTime },
       ],
     };
+    //the initial state screenshot
+    actions.push(submenuAction);
 
     if (includeToolbarButtons) {
       try {
