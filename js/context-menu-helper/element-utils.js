@@ -44,7 +44,7 @@ export async function waitForIframeLoad(iframe) {
           setTimeout(() => {
               console.log("Resolving waitForIframeLoad after delay.");
               resolve();
-          }, 1500); // Increased delay slightly
+          }, 6000); // Increased delay slightly
       };
       iframe.addEventListener("load", handleLoad);
       // Already loaded case
@@ -58,7 +58,7 @@ export async function waitForIframeLoad(iframe) {
           setTimeout(() => {
               console.log("Resolving waitForIframeLoad for already complete iframe after delay.");
               resolve();
-          }, 1500); // Increased delay slightly
+          }, 6000); // Increased delay slightly
       }
   });
 }
