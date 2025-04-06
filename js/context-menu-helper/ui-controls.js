@@ -1,13 +1,14 @@
 // js/context-menu-helper/ui-controls.js
 
 import UI from "../ui/index.js";
-import { waitForIframeLoad } from "./element-utils.js";
+import { waitForIframeLoad, findMenuElements } from "./element-utils.js"; // Import findMenuElements
 import { generateContextAwareMenuActions } from "./action-generator.js";
-import { emit } from "../events.js"; // Import emit
-import { findMenuElements } from "./element-utils.js";
+import { emit } from "../events.js";
 
 // --- createMenuSelectionDialog function ---
-function createMenuSelectionDialog(menuItems) {
+// Creates a modal dialog for selecting menu items based on their text.
+function createMenuSelectionDialog(menuItemsWithText) {
+  // Accepts array of {element, text}
   return new Promise((resolve) => {
     // Create modal backdrop
     const backdrop = document.createElement("div");
@@ -34,7 +35,7 @@ function createMenuSelectionDialog(menuItems) {
 
     // Create modal header
     const header = document.createElement("h3");
-    header.textContent = "Select Menu Items";
+    header.textContent = "Select Menu Items to Generate Actions"; // More descriptive title
     header.style.marginTop = "0";
     header.style.marginBottom = "15px";
 
@@ -66,21 +67,22 @@ function createMenuSelectionDialog(menuItems) {
     selectAllContainer.appendChild(selectAllLabel);
     checkboxContainer.appendChild(selectAllContainer);
 
-    // Create a checkbox for each menu item
+    // Create a checkbox for each menu item using its text
     const checkboxes = [];
-    menuItems.forEach((item, index) => {
+    menuItemsWithText.forEach((item, index) => {
+      // Iterate through {element, text} objects
       const itemContainer = document.createElement("div");
       itemContainer.style.marginBottom = "8px";
 
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.id = `menu-item-${index}`;
-      checkbox.value = item;
+      checkbox.value = item.text; // Store the text as the value
       checkboxes.push(checkbox);
 
       const label = document.createElement("label");
       label.htmlFor = `menu-item-${index}`;
-      label.textContent = item;
+      label.textContent = item.text; // Display the text
       label.style.marginLeft = "5px";
 
       itemContainer.appendChild(checkbox);
@@ -101,6 +103,7 @@ function createMenuSelectionDialog(menuItems) {
     buttonContainer.style.display = "flex";
     buttonContainer.style.justifyContent = "flex-end";
     buttonContainer.style.gap = "10px";
+    buttonContainer.style.marginTop = "15px"; // Add margin
 
     // Create cancel button
     const cancelButton = document.createElement("button");
@@ -108,29 +111,30 @@ function createMenuSelectionDialog(menuItems) {
     cancelButton.className = "btn btn-small";
     cancelButton.style.backgroundColor = "#f2f2f2";
     cancelButton.style.color = "#333";
+    cancelButton.style.border = "1px solid #ccc"; // Add border
 
     // Create generate button
     const generateButton = document.createElement("button");
     generateButton.textContent = "Generate Actions";
-    generateButton.className = "btn btn-small";
+    generateButton.className = "btn btn-small"; // Use primary button style from styles.css if available
 
     // Add event listeners to buttons
     cancelButton.addEventListener("click", () => {
       if (backdrop.parentNode) {
         document.body.removeChild(backdrop);
       }
-      resolve([]);
+      resolve([]); // Resolve with empty array on cancel
     });
 
     generateButton.addEventListener("click", () => {
-      const selectedItems = checkboxes
+      const selectedItemsTexts = checkboxes // Get the text values of selected items
         .filter((checkbox) => checkbox.checked)
         .map((checkbox) => checkbox.value);
 
       if (backdrop.parentNode) {
         document.body.removeChild(backdrop);
       }
-      resolve(selectedItems);
+      resolve(selectedItemsTexts); // Resolve with array of selected texts
     });
 
     // Assemble modal
@@ -149,524 +153,450 @@ function createMenuSelectionDialog(menuItems) {
 
 // --- processMenuItemWithFreshState function definition ---
 /**
- * Process one menu item at a time with a fresh iframe state
- * @param {string} url - URL to load
- * @param {string} menuItem - Menu item to process
- * @param {boolean} includeToolbar - Whether to include toolbar buttons
- * @returns {Promise<Array>} - Array of action sequences
+ * Process one menu item (identified by text) at a time with a fresh iframe state.
+ * @param {string} url - URL to load initially.
+ * @param {string} menuItemText - Text of the menu item to process.
+ * @param {boolean} includeToolbar - Whether to include toolbar buttons.
+ * @returns {Promise<Array>} - Array of action sequences for this item.
  */
-async function processMenuItemWithFreshState(url, menuItem, includeToolbar) {
+async function processMenuItemWithFreshState(
+  url,
+  menuItemText,
+  includeToolbar
+) {
   const iframe = UI.elements.iframe;
-
-  // Load the URL fresh to reset any state from previous processing
-  iframe.src = url;
-  await waitForIframeLoad(iframe);
-
-  // Wait for dynamic content to potentially load after iframe reports loaded
-  await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second wait
-
-  // Instead of showing in main status area, add to the messages container
   const messagesContainer = document.getElementById("actionItemMessages");
+  let messageEl = null;
+
+  // Add status message
   if (messagesContainer) {
-    const messageEl = document.createElement("div");
+    messageEl = document.createElement("div");
     messageEl.className = "action-message";
-    messageEl.textContent = `Processing: ${menuItem}`;
+    messageEl.textContent = `Processing: ${menuItemText}...`;
     messagesContainer.appendChild(messageEl);
-    // Scroll to bottom to show latest message
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    messagesContainer.scrollTop = messagesContainer.scrollHeight; // Scroll to show
   }
 
   try {
-    // Generate actions for this menu item using the imported function
+    // Load the URL fresh to reset any state from previous processing
+    console.log(`Reloading iframe with ${url} for item: "${menuItemText}"`);
+    iframe.src = url; // Ensure src is set before awaiting load
+    await waitForIframeLoad(iframe);
+    console.log(`Iframe loaded for item: "${menuItemText}"`);
+
+    // Generate actions for this specific menu item text
     const actions = await generateContextAwareMenuActions(
-      iframe.src, // Use the currently loaded URL in the iframe
-      undefined, // Use default wait time from action-generator
+      iframe.contentWindow.location.href, // Use the actual URL loaded
+      undefined, // Use default wait time
       includeToolbar,
-      menuItem // Pass the specific menu item
+      menuItemText // Pass the specific menu item text
     );
 
-    // Update the message to show success
-    if (messagesContainer) {
-      const messageEls = messagesContainer.querySelectorAll(".action-message");
-      const lastMessage = messageEls[messageEls.length - 1];
-      if (lastMessage) {
-        lastMessage.textContent = `✓ Generated ${
-          actions ? actions.length : 0
-        } actions for ${menuItem}`;
-        lastMessage.classList.add("success");
-      }
+    // Update status message to success
+    if (messageEl) {
+      messageEl.textContent = `✓ Generated ${
+        actions ? actions.length : 0
+      } actions for ${menuItemText}`;
+      messageEl.classList.add("success");
     }
-
+    console.log(
+      `Successfully generated ${
+        actions?.length || 0
+      } actions for "${menuItemText}"`
+    );
     return actions || []; // Return empty array if null/undefined
   } catch (error) {
-    console.error(`Error generating actions for ${menuItem}:`, error);
-
-    // Update the message to show error
-    if (messagesContainer) {
-      const messageEls = messagesContainer.querySelectorAll(".action-message");
-      const lastMessage = messageEls[messageEls.length - 1];
-      if (lastMessage) {
-        lastMessage.textContent = `✗ Error for ${menuItem}: ${error.message}`;
-        lastMessage.classList.add("error");
-      }
+    console.error(`Error generating actions for ${menuItemText}:`, error);
+    // Update status message to error
+    if (messageEl) {
+      // Check if the error indicates the item wasn't found
+      const itemNotFoundError = error.message.includes(
+        "not found in main menu"
+      );
+      messageEl.textContent = itemNotFoundError
+        ? `✗ Menu item "${menuItemText}" not found.`
+        : `✗ Error for ${menuItemText}`; // Keep error concise: ${error.message}
+      messageEl.classList.add("error");
     }
-
     return []; // Return empty array on error
+  } finally {
+    // Ensure iframe is ready for the next iteration if possible
+    // Optionally navigate back to main menu or reload original URL if needed,
+    // but the current loop structure reloads the original URL anyway.
+    console.log(`Finished processing item: "${menuItemText}"`);
   }
 }
 // --- End processMenuItemWithFreshState ---
-// Replace the createSelectionBadge function with this new function
-function createSelectionBadges(selectedItems) {
-  // Create a container to hold all the badges
+
+// --- createSelectionBadges function ---
+// Creates badges for selected items, limiting display if many items are selected.
+function createSelectionBadges(selectedItemsTexts) {
   const badgesContainer = document.createElement("div");
-  badgesContainer.id = "menu-selection-badges";
+  badgesContainer.id = "menu-selection-badges"; // Use the ID targeted by CSS
 
-  // If there are many items, consider adding a count indicator
-  const showCount = selectedItems.length > 5;
-  const maxBadgesToShow = showCount ? 4 : selectedItems.length;
+  const maxBadgesToShow = 5; // Show up to 5 badges initially
+  const showCountBadge = selectedItemsTexts.length > maxBadgesToShow;
 
-  // Create individual badges for each selected item (up to the maximum)
-  for (let i = 0; i < Math.min(maxBadgesToShow, selectedItems.length); i++) {
-    const badge = document.createElement("div");
-    badge.className = "menu-selection-badge";
-    badge.title = selectedItems[i]; // Add tooltip for truncated text
-    badge.textContent = selectedItems[i];
-    badgesContainer.appendChild(badge);
-  }
+  // Function to render badges (either limited or full list)
+  const renderBadges = (showAll = false) => {
+    badgesContainer.innerHTML = ""; // Clear previous badges
+    const limit = showAll ? selectedItemsTexts.length : maxBadgesToShow;
 
-  // If we have more items than max, add a +N badge
-  if (showCount) {
-    const remainingCount = selectedItems.length - maxBadgesToShow;
-    const countBadge = document.createElement("div");
-    countBadge.className = "menu-selection-badge count-badge";
-    countBadge.textContent = `+${remainingCount}`;
-    countBadge.title = selectedItems.slice(maxBadgesToShow).join(", ");
+    for (let i = 0; i < Math.min(limit, selectedItemsTexts.length); i++) {
+      const badge = document.createElement("div");
+      badge.className = "menu-selection-badge";
+      badge.title = selectedItemsTexts[i]; // Tooltip for full text
+      // Truncate long text in the badge itself
+      badge.textContent =
+        selectedItemsTexts[i].length > 20
+          ? selectedItemsTexts[i].substring(0, 18) + "..."
+          : selectedItemsTexts[i];
+      badgesContainer.appendChild(badge);
+    }
 
-    // Make the count badge clickable to show all items
-    countBadge.style.cursor = "pointer";
-    countBadge.addEventListener("click", () => {
-      // Show all badges temporarily when clicked
-      badgesContainer.innerHTML = ""; // Clear existing badges
-
-      // Add all badges
-      selectedItems.forEach((item) => {
-        const fullBadge = document.createElement("div");
-        fullBadge.className = "menu-selection-badge";
-        fullBadge.title = item;
-        fullBadge.textContent = item;
-        badgesContainer.appendChild(fullBadge);
+    if (!showAll && showCountBadge) {
+      const remainingCount = selectedItemsTexts.length - maxBadgesToShow;
+      const countBadge = document.createElement("div");
+      countBadge.className = "menu-selection-badge count-badge";
+      countBadge.textContent = `+${remainingCount}`;
+      countBadge.title = `Click to see all ${selectedItemsTexts.length} selected items`; // Tooltip for count badge
+      countBadge.style.cursor = "pointer";
+      countBadge.addEventListener("click", (e) => {
+        e.stopPropagation(); // Prevent accidental clicks elsewhere
+        renderBadges(true); // Re-render showing all badges
       });
-
-      // Add a "collapse" button
+      badgesContainer.appendChild(countBadge);
+    } else if (showAll) {
+      // Add a "Collapse" badge when showing all
       const collapseBadge = document.createElement("div");
       collapseBadge.className = "menu-selection-badge collapse-badge";
       collapseBadge.textContent = "Collapse";
-      collapseBadge.style.backgroundColor = "#f0f0f0";
-      collapseBadge.style.color = "#666";
+      collapseBadge.title = "Show fewer badges";
       collapseBadge.style.cursor = "pointer";
-      collapseBadge.addEventListener("click", () => {
-        // Recreate the badges with limited view
-        const headerElement = document.querySelector(".context-actions-header");
-        if (headerElement) {
-          const newBadges = createSelectionBadges(selectedItems);
-          const existingBadges = headerElement.querySelector(
-            "#menu-selection-badges"
-          );
-          if (existingBadges) {
-            headerElement.replaceChild(newBadges, existingBadges);
-          }
-        }
+      collapseBadge.addEventListener("click", (e) => {
+        e.stopPropagation();
+        renderBadges(false); // Re-render showing limited badges
       });
-
       badgesContainer.appendChild(collapseBadge);
-    });
-
-    badgesContainer.appendChild(countBadge);
-  }
-
-  return badgesContainer;
-}
-
-function toggleSelectionList(selectedItems) {
-  let listContainer = document.getElementById("selection-list-container");
-  if (listContainer) {
-    listContainer.style.display =
-      listContainer.style.display === "none" ? "block" : "none";
-    return;
-  }
-  listContainer = document.createElement("div");
-  listContainer.id = "selection-list-container";
-  listContainer.style.position = "absolute";
-  listContainer.style.zIndex = "1000";
-  listContainer.style.backgroundColor = "white";
-  listContainer.style.boxShadow = "0 2px 10px rgba(0,0,0,0.2)";
-  listContainer.style.borderRadius = "4px";
-  listContainer.style.padding = "5px 0";
-  listContainer.style.marginTop = "5px";
-  listContainer.style.maxWidth = "300px";
-  listContainer.style.maxHeight = "300px";
-  listContainer.style.overflowY = "auto";
-  const badge = document.getElementById("menu-selection-badge");
-  if (!badge) return; // Exit if badge not found
-  const badgeRect = badge.getBoundingClientRect();
-  listContainer.style.left = `${badgeRect.left}px`;
-  listContainer.style.top = `${badgeRect.bottom + window.scrollY + 5}px`;
-  const header = document.createElement("div");
-  header.textContent = "Selected Menus:";
-  header.style.padding = "5px 10px";
-  header.style.fontWeight = "bold";
-  header.style.borderBottom = "1px solid #eee";
-  listContainer.appendChild(header);
-  selectedItems.forEach((item, index) => {
-    const itemElement = document.createElement("div");
-    itemElement.textContent = item;
-    itemElement.style.padding = "5px 15px";
-    itemElement.style.borderBottom =
-      index < selectedItems.length - 1 ? "1px solid #f5f5f5" : "none";
-    listContainer.appendChild(itemElement);
-  });
-  const closeButton = document.createElement("div");
-  closeButton.textContent = "✕";
-  closeButton.style.position = "absolute";
-  closeButton.style.top = "5px";
-  closeButton.style.right = "8px";
-  closeButton.style.cursor = "pointer";
-  closeButton.style.color = "#999";
-  closeButton.style.fontSize = "12px";
-  closeButton.addEventListener("click", (e) => {
-    e.stopPropagation();
-    listContainer.style.display = "none";
-  });
-  listContainer.appendChild(closeButton);
-
-  // Define the click outside handler separately to remove it later
-  const clickOutsideHandler = (e) => {
-    if (
-      listContainer &&
-      listContainer.style.display !== "none" &&
-      !listContainer.contains(e.target) &&
-      e.target !== badge
-    ) {
-      listContainer.style.display = "none";
-      // Remove the listener after it's used
-      document.removeEventListener("click", clickOutsideHandler);
     }
   };
-  // Add the listener
-  document.addEventListener("click", clickOutsideHandler);
 
-  document.body.appendChild(listContainer);
+  renderBadges(false); // Initial render (limited view)
+  return badgesContainer;
 }
-// --- End createSelectionBadge and toggleSelectionList ---
+// --- End createSelectionBadges ---
 
 // --- toggleActionElements function ---
+// Shows or hides the main capture/retry button container.
 function toggleActionElements(visible) {
-  const buttonContainer = document.getElementById("buttonContainer"); // Target container
+  const buttonContainer = document.getElementById("buttonContainer");
+  const captureBtn = document.getElementById("captureBtn");
+  const retryBtn = document.getElementById("retryFailedBtn");
+
   if (buttonContainer) {
-    buttonContainer.style.display = visible ? "" : "none";
-    if (visible) {
-      buttonContainer.classList.remove("hidden");
-    } else {
-      buttonContainer.classList.add("hidden");
-    }
+    buttonContainer.style.display = visible ? "" : "none"; // Show/hide container
+    buttonContainer.classList.toggle("hidden", !visible);
+    // Explicitly show/hide buttons within if needed, though container display should suffice
+    if (captureBtn) captureBtn.style.display = visible ? "" : "none";
+    if (retryBtn) retryBtn.style.display = visible ? "" : "none"; // Assuming retry follows same visibility
   }
 }
 // --- End toggleActionElements ---
 
 // --- The main function to add UI controls ---
+// Adds the "Generate", "Load", "Save" buttons and handles the generation process.
 export function addUIControls() {
-  // Find the target element to add UI controls
-  const actionsLabel = UI.elements.actionsLabel;
+  const actionsLabel = UI.elements.actionsLabel; // Original label element
   if (!actionsLabel) {
-    console.warn("No actionsLabel element found for UI controls");
+    console.warn("Cannot add UI controls: 'actionsLabel' element not found.");
     return;
   }
-
   const parentNode = actionsLabel.parentNode;
   if (!parentNode) {
-    console.warn("No parent node found for actionsLabel");
+    console.warn(
+      "Cannot add UI controls: Parent node of 'actionsLabel' not found."
+    );
+    return;
+  }
+  // Avoid adding controls multiple times
+  if (document.getElementById("generateContextActions")) {
+    console.log("UI controls already added.");
     return;
   }
 
-  // Create the context actions header container
+  // --- Create Header Structure ---
   const contextActionsHeader = document.createElement("div");
   contextActionsHeader.className = "context-actions-header";
 
-  // Create the label (reuse existing label)
-  const contextActionsLabel = actionsLabel.cloneNode(true);
+  const contextActionsLabel = document.createElement("label"); // Create a new label
   contextActionsLabel.className = "context-actions-label";
+  contextActionsLabel.htmlFor = UI.elements.actionsField?.id || ""; // Link to the textarea
+  contextActionsLabel.textContent = "Context Actions (JSON format):"; // Set text explicitly
+  contextActionsLabel.title =
+    actionsLabel.title ||
+    "Generate or enter menu navigation actions in JSON format"; // Copy title
 
-  // Create the buttons container
   const contextActionsButtons = document.createElement("div");
   contextActionsButtons.className = "context-actions-buttons";
 
-  // Create the generate button
+  // --- Create Buttons ---
+  // Generate Button
   const generateContextButton = document.createElement("button");
   generateContextButton.id = "generateContextActions";
   generateContextButton.className = "action-btn generate-btn";
   generateContextButton.title =
-    "";
+    "Generate actions based on menu items in the loaded URL";
+  generateContextButton.innerHTML = `<span class="action-icon">⚙️</span><span class="action-text">Generate</span>`;
 
-  // Create the icon and text spans for the generate button
-  const generateIconSpan = document.createElement("span");
-  generateIconSpan.className = "action-icon";
-  generateIconSpan.textContent = "⚙️";
-
-  const generateTextSpan = document.createElement("span");
-  generateTextSpan.className = "action-text";
-  generateTextSpan.textContent = "Generate";
-
-  // Add the icon and text to the generate button
-  generateContextButton.appendChild(generateIconSpan);
-  generateContextButton.appendChild(generateTextSpan);
-
-  // Create the load button (disabled)
+  // Load Button (Disabled)
   const loadContextButton = document.createElement("button");
   loadContextButton.id = "loadContextActions";
   loadContextButton.className = "action-btn load-btn";
   loadContextButton.disabled = true;
   loadContextButton.title = "Load saved JSON actions (coming soon)";
+  loadContextButton.innerHTML = `<span class="action-icon">📂</span><span class="action-text">Load</span>`;
 
-  // Create the icon and text spans for the load button
-  const loadIconSpan = document.createElement("span");
-  loadIconSpan.className = "action-icon";
-  loadIconSpan.textContent = "📂";
-
-  const loadTextSpan = document.createElement("span");
-  loadTextSpan.className = "action-text";
-  loadTextSpan.textContent = "Load";
-
-  // Add the icon and text to the load button
-  loadContextButton.appendChild(loadIconSpan);
-  loadContextButton.appendChild(loadTextSpan);
-
-  // Create the save button (disabled)
+  // Save Button (Disabled)
   const saveContextButton = document.createElement("button");
   saveContextButton.id = "saveContextActions";
   saveContextButton.className = "action-btn save-btn";
   saveContextButton.disabled = true;
   saveContextButton.title = "Save current JSON actions (coming soon)";
+  saveContextButton.innerHTML = `<span class="action-icon">💾</span><span class="action-text">Save</span>`;
 
-  // Create the icon and text spans for the save button
-  const saveIconSpan = document.createElement("span");
-  saveIconSpan.className = "action-icon";
-  saveIconSpan.textContent = "💾";
-
-  const saveTextSpan = document.createElement("span");
-  saveTextSpan.className = "action-text";
-  saveTextSpan.textContent = "Save";
-
-  // Add the icon and text to the save button
-  saveContextButton.appendChild(saveIconSpan);
-  saveContextButton.appendChild(saveTextSpan);
-
-  // Add all buttons to the buttons container
   contextActionsButtons.appendChild(generateContextButton);
   contextActionsButtons.appendChild(loadContextButton);
   contextActionsButtons.appendChild(saveContextButton);
 
-  // Add the label and buttons to the header
-  contextActionsHeader.appendChild(contextActionsLabel);
+  contextActionsHeader.appendChild(contextActionsLabel); // Add the new label
   contextActionsHeader.appendChild(contextActionsButtons);
 
-  // Replace the existing label with our new header
-  parentNode.replaceChild(contextActionsHeader, actionsLabel);
-
-  // Initial state - check if advanced mode is on
-  const isAdvancedInitial = document.getElementById("modeAdvanced")?.checked;
-  if (isAdvancedInitial) {
-    toggleActionElements(false); // Initially hide button container in advanced mode
+  // --- Insert Header ---
+  // Insert the new header *before* the original label's position, then remove original label
+  parentNode.insertBefore(contextActionsHeader, actionsLabel);
+  // Note: actionsLabel itself might be removed if not needed elsewhere,
+  // or kept if other code references it. Assuming it's safe to remove based on structure.
+  // If removing causes issues, hide it instead: actionsLabel.style.display = 'none';
+  // Let's try removing it:
+  try {
+    // parentNode.removeChild(actionsLabel); // Remove the original label node
+    actionsLabel.style.display = "none"; // Safer: just hide the original label
+    console.log("Original actionsLabel hidden.");
+  } catch (e) {
+    console.warn("Could not remove or hide original actionsLabel:", e);
   }
 
-  // Add click event handler for Generate Context Actions button
-  generateContextButton.onclick = async () => {
-    // Get references to elements needed within the handler
-    const actionsField = UI.elements.actionsField; // Textarea
-    const statusDiv = UI.elements.actionsGenerationStatus; // Status div
+  // --- Initial State & Event Listener ---
+  const isAdvancedInitial = document.getElementById("modeAdvanced")?.checked;
+  if (isAdvancedInitial) {
+    toggleActionElements(false); // Hide capture button initially in advanced mode
+  }
 
-    if (!actionsField || !statusDiv) {
-      console.error("Actions field or status div not found!");
-      return; // Exit if essential elements are missing
+  generateContextButton.onclick = async () => {
+    const actionsField = UI.elements.actionsField;
+    const statusDiv = UI.elements.actionsGenerationStatus;
+    const messagesContainer = document.getElementById("actionItemMessages"); // Get messages container
+
+    if (!actionsField || !statusDiv || !messagesContainer) {
+      console.error(
+        "Required elements for generation not found (actionsField, statusDiv, or actionItemMessages)!"
+      );
+      alert("UI Error: Cannot start generation. Required elements missing.");
+      return;
     }
 
+    const generateButtonIcon =
+      generateContextButton.querySelector(".action-icon");
+    const generateButtonText =
+      generateContextButton.querySelector(".action-text");
+
     try {
-      toggleActionElements(false); // Hide button container during generation
-      statusDiv.style.display = "none"; // Keep status div hidden
-      actionsField.style.display = "none"; // Hide textarea
-      statusDiv.innerHTML = "Initializing..."; // Initial message
-      // Clean up any existing selection list dropdown
-      const existingList = document.getElementById("selection-list-container");
-      if (existingList) {
-        existingList.remove();
-      }
-
-      // Also remove any existing badges
-      const existingBadges = document.querySelector("#menu-selection-badges");
-      if (existingBadges) {
-        existingBadges.remove();
-      }
-
-      const iframe = UI.elements.iframe;
-      if (!iframe.src || iframe.src === "about:blank") {
-        const urlListElement = document.getElementById("urlList");
-        const urlListValue = urlListElement ? urlListElement.value : "";
-        const urls = urlListValue
-          .trim()
-          .split("\n")
-          .filter((url) => url.trim() !== "");
-        if (urls.length === 0) {
-          alert("Please enter at least one URL in the URL list first.");
-          statusDiv.style.display = "none";
-          actionsField.style.display = "";
-          return;
-        } // Show textarea again on error
-        const firstUrl = urls[0].trim();
-        statusDiv.innerHTML = "Loading initial URL...";
-        iframe.src = firstUrl;
-        await waitForIframeLoad(iframe);
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      }
-
-      const originalUrl = iframe.src;
-
+      // --- UI Setup for Generation ---
       generateContextButton.disabled = true;
-      // Update button appearance during loading
-      generateIconSpan.textContent = "⏳";
-      generateTextSpan.textContent = "Loading...";
+      if (generateButtonIcon) generateButtonIcon.textContent = "⏳";
+      if (generateButtonText) generateButtonText.textContent = "Loading...";
+      toggleActionElements(false); // Hide capture button
+      actionsField.value = ""; // Clear previous actions
+      actionsField.style.display = "none"; // Hide textarea
+      statusDiv.innerHTML = "Initializing generation..."; // Show initial status
+      statusDiv.className = "generation-status active"; // Make status visible and neutral
+      statusDiv.style.display = "block";
+      messagesContainer.innerHTML = ""; // Clear previous item messages
+      messagesContainer.style.display = "block"; // Show item messages container
 
-      statusDiv.innerHTML = "Loading menu items..."; // Update status
+      // Clean up any existing selection badges/lists
+      document.getElementById("selection-list-container")?.remove();
+      document.querySelector("#menu-selection-badges")?.remove();
 
-      await waitForIframeLoad(iframe);
-      const mainMenuElements = findMenuElements(iframe.contentDocument);
-      const mainMenuItems = Array.from(mainMenuElements)
-        .map((item) => item.getAttribute("data-label"))
-        .filter((label) => label);
+      // --- Load Iframe if Necessary ---
+      const iframe = UI.elements.iframe;
+      const urlListElement = document.getElementById("urlList");
+      const urlListValue = urlListElement ? urlListElement.value : "";
+      const urls = urlListValue
+        .trim()
+        .split("\n")
+        .filter((url) => url.trim() !== "");
+      const targetUrl = urls.length > 0 ? urls[0].trim() : iframe.src;
 
-      if (mainMenuItems.length === 0) {
-        UI.utils.showStatus(
-          "No main menu items found in the loaded URL.",
-          true
-        ); // Show error in main status area
-        throw new Error("No main menu items found."); // Throw error to cleanup UI in finally block
-      }
-
-      // Update button for selection phase
-      generateIconSpan.textContent = "📋";
-      generateTextSpan.textContent = "Selecting...";
-      statusDiv.innerHTML = "Waiting for menu selection..."; // Update status
-      const selectedItems = await createMenuSelectionDialog(mainMenuItems);
-
-      if (selectedItems.length === 0) {
-        // User cancelled - Cleanup UI
-        throw new Error("Menu selection cancelled."); // Use error to trigger finally block cleanup
-      }
-
-      // Append individual badges to context-actions-header
-      const selectionBadges = createSelectionBadges(selectedItems);
-      const contextHeaderElement = document.querySelector(
-        ".context-actions-header"
-      );
-      if (contextHeaderElement) {
-        // Remove any existing badges first
-        const existingBadgesContainer = contextHeaderElement.querySelector(
-          "#menu-selection-badges"
+      if (!targetUrl || targetUrl === "about:blank") {
+        throw new Error(
+          "Please enter a valid URL in the URL input field first."
         );
-        if (existingBadgesContainer) {
-          existingBadgesContainer.remove();
-        }
-        contextHeaderElement.appendChild(selectionBadges);
       }
+
+      // Load or ensure the target URL is loaded
+      if (
+        iframe.src !== targetUrl ||
+        iframe.contentDocument?.readyState !== "complete"
+      ) {
+        if (generateButtonText)
+          generateButtonText.textContent = "Loading URL...";
+        statusDiv.innerHTML = "Loading target URL in iframe...";
+        iframe.src = targetUrl;
+        await waitForIframeLoad(iframe); // Wait for load
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // Extra wait after load
+      }
+      const originalUrl = iframe.contentWindow.location.href; // Get URL after loading
+
+      // --- Get Menu Items ---
+      if (generateButtonText)
+        generateButtonText.textContent = "Finding Menus...";
+      statusDiv.innerHTML = "Searching for menu items in iframe...";
+      const menuItemsWithText = findMenuElements(iframe.contentDocument); // Use updated function
+
+      if (menuItemsWithText.length === 0) {
+        throw new Error(
+          "No menu items found in the loaded URL. Check the page structure or wait longer."
+        );
+      }
+      console.log(
+        `Found ${menuItemsWithText.length} menu items:`,
+        menuItemsWithText.map((i) => i.text)
+      );
+
+      // --- User Selection ---
+      if (generateButtonText) generateButtonText.textContent = "Selecting...";
+      statusDiv.innerHTML = "Waiting for menu item selection...";
+      const selectedItemsTexts = await createMenuSelectionDialog(
+        menuItemsWithText
+      );
+
+      if (selectedItemsTexts.length === 0) {
+        throw new Error("Menu selection cancelled by user.");
+      }
+
+      // --- Display Selection & Prepare for Generation ---
+      const selectionBadges = createSelectionBadges(selectedItemsTexts);
+      contextActionsHeader.appendChild(selectionBadges); // Add badges to header
+
       const toolbarCheckbox = document.getElementById("includeToolbarButtons");
       const includeToolbar = toolbarCheckbox ? toolbarCheckbox.checked : true;
 
-      actionsField.value = ""; // Clear textarea content before generating
+      if (generateButtonText)
+        generateButtonText.textContent = `Generating (0/${selectedItemsTexts.length})`;
+      statusDiv.innerHTML = `Starting generation for ${selectedItemsTexts.length} items...`;
 
-      // Update button for generation phase
-      generateIconSpan.textContent = "🔄";
-      generateTextSpan.textContent = `Generating (0/${selectedItems.length})`;
-
+      // --- Process Each Selected Item ---
       let allActions = [];
+      for (let i = 0; i < selectedItemsTexts.length; i++) {
+        const menuItemText = selectedItemsTexts[i];
+        const progressPercentage = Math.round(
+          ((i + 1) / selectedItemsTexts.length) * 100
+        );
 
-      for (let i = 0; i < selectedItems.length; i++) {
-        const menuItem = selectedItems[i];
-        // Update button text with progress
-        generateTextSpan.textContent = `Generating (${i + 1}/${
-          selectedItems.length
-        })`;
-        const percentage = Math.round(((i + 1) / selectedItems.length) * 100);
+        // Update progress indicator
+        if (generateButtonText)
+          generateButtonText.textContent = `Generating (${i + 1}/${
+            selectedItemsTexts.length
+          })`;
         statusDiv.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <span style="font-weight: bold;">${percentage}%</span>
-          </div>
-          <div class="status-progress-bar-container">
-            <div class="status-progress-bar" style="width: ${percentage}%;"></div>
-          </div>`;
-        const actions = await processMenuItemWithFreshState(
-          originalUrl,
-          menuItem,
+                    <div style="font-weight:bold; margin-bottom: 5px;">Processing item ${
+                      i + 1
+                    } of ${
+          selectedItemsTexts.length
+        } (${progressPercentage}%)</div>
+                    <div class="status-progress-bar-container">
+                        <div class="status-progress-bar" style="width: ${progressPercentage}%;"></div>
+                    </div>`;
+
+        // Process the item (this function now handles iframe reload internally)
+        const actionsForItem = await processMenuItemWithFreshState(
+          originalUrl, // Pass the base URL to reload each time
+          menuItemText,
           includeToolbar
         );
 
-        if (actions && actions.length > 0) {
-          allActions = allActions.concat(actions);
+        if (actionsForItem && actionsForItem.length > 0) {
+          allActions = allActions.concat(actionsForItem);
         }
+        // Small delay between processing items to avoid overwhelming the browser/target
+        await new Promise((r) => setTimeout(r, 250));
       }
 
-      // Generation Complete
-      statusDiv.innerHTML = `Generated ${allActions.length} actions. Finalizing...`; // Brief final message
-      statusDiv.className = "generation-status active success";
+      // --- Finalize ---
+      statusDiv.innerHTML = `Generation complete. Found ${allActions.length} total actions.`;
+      statusDiv.className = "generation-status active success"; // Mark as success
 
       if (allActions.length > 0) {
-        actionsField.value = JSON.stringify(allActions, null, 2);
-        emit("CONTEXT_ACTIONS_GENERATED");
-        // Success message removed
+        // Sort actions alphabetically by name for better readability
+        allActions.sort((a, b) => a.name.localeCompare(b.name));
+        actionsField.value = JSON.stringify(allActions, null, 2); // Pretty print JSON
+        console.log("Generated JSON:", actionsField.value);
       } else {
-        actionsField.value = "";
-        emit("CONTEXT_ACTIONS_GENERATED"); // Emit even if empty
-        UI.utils.showStatus(
-          "No actions were generated. Try adjusting the URL or wait for the page to fully load.",
-          true
-        );
+        actionsField.value = "[]"; // Output empty array if no actions generated
+        // Update status to warning if nothing was generated but selection was made
+        statusDiv.innerHTML = `No actions generated for the selected items. Check console logs.`;
+        statusDiv.className = "generation-status active warning";
       }
-
-      if (iframe.src !== originalUrl) {
-        iframe.src = originalUrl;
-        await waitForIframeLoad(iframe);
-      }
+      emit("CONTEXT_ACTIONS_GENERATED"); // Emit event to update main capture button state
     } catch (error) {
       console.error("Error during context action generation:", error);
-      // Don't show alert for cancellation
-      if (error.message !== "Menu selection cancelled.") {
-        alert("Error generating context menu actions: " + error.message);
-      }
-      actionsField.value = ""; // Clear actions field on error/cancel
-      emit("CONTEXT_ACTIONS_GENERATED"); // Emit to ensure button state is checked (and likely hidden)
+      statusDiv.innerHTML = `Error: ${error.message}`;
+      statusDiv.className = "generation-status active error"; // Mark as error
+      actionsField.value = ""; // Clear field on error
+      emit("CONTEXT_ACTIONS_GENERATED"); // Still emit to update button state (likely hide capture button)
     } finally {
-      // --- Cleanup UI ---
-      generateContextButton.disabled = false;
-      generateIconSpan.textContent = "⚙️"; // Reset icon
-      generateTextSpan.textContent = "Generate"; // Reset text
+      // Around line 514 in the previous version
+      // --- UI Cleanup ---
+      generateContextButton.disabled = false; // Re-enable button
+      // Use querySelector inside the finally block to ensure elements are referenced correctly
+      const finalGenerateButtonIcon =
+        generateContextButton.querySelector(".action-icon");
+      const finalGenerateButtonText =
+        generateContextButton.querySelector(".action-text");
 
-      // Hide status div and show textarea again
-      if (statusDiv) {
-        setTimeout(() => {
+      if (finalGenerateButtonIcon) finalGenerateButtonIcon.textContent = "⚙️"; // Reset icon
+      if (finalGenerateButtonText)
+        finalGenerateButtonText.textContent = "Generate"; // Reset text
+
+      if (actionsField) actionsField.style.display = ""; // Show textarea again
+
+      // Optionally hide status/messages after a delay
+      setTimeout(() => {
+        // ** FIX START **
+        // Check if elements exist before accessing properties
+        if (statusDiv) {
           statusDiv.style.display = "none";
-          statusDiv.className = "generation-status"; // Remove active class
-        }, 2000); // Give user time to see final status
-      }
-      if (actionsField) actionsField.style.display = "";
-      // Button container visibility is handled by the emitted event + _checkCaptureButtonState
+        }
+        const finalMessagesContainer =
+          document.getElementById("actionItemMessages"); // Re-fetch in case it was removed
+        if (finalMessagesContainer) {
+          finalMessagesContainer.style.display = "none"; // Hide item messages too
+        }
+        // ** FIX END **
+      }, 5000); // Hide after 5 seconds
     }
   };
 
-  // Placeholder listeners for Load/Save buttons
-  loadContextButton.addEventListener("click", () => {
-    console.log("Load functionality not yet implemented");
-  });
+  // Placeholder listeners for Load/Save
+  loadContextButton.addEventListener("click", () =>
+    alert("Load functionality not yet implemented.")
+  );
+  saveContextButton.addEventListener("click", () =>
+    alert("Save functionality not yet implemented.")
+  );
 
-  saveContextButton.addEventListener("click", () => {
-    console.log("Save functionality not yet implemented");
-  });
+  console.log("Context menu helper UI controls added.");
 }
 
 export default {

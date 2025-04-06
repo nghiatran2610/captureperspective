@@ -1,487 +1,415 @@
-// action-generator.js - Functions for generating action sequences
+// js/context-menu-helper/action-generator.js - Functions for generating action sequences
 
 import UI from "../ui/index.js";
-import { waitForIframeLoad, waitForSubmenu } from "./element-utils.js";
+// ** FIX START: Use default import and prefix calls below **
+import elementUtils from "./element-utils.js";
+// ** FIX END **
 import {
-  waitForToolbar,
-  getToolbarButtonSelectors,
+    waitForToolbar,
+    getToolbarButtonSelectors,
 } from "./toolbar-detector.js";
 import {
-  parseUrlContext,
-  constructPageUrl,
-  convertDisplayNameToUrlSegment,
+    parseUrlContext,
+    constructPageUrl, // Keep this if needed for toolbar URL correction
 } from "./url-context-parser.js";
 
 /**
- * Generate context-aware menu actions based on current URL context.
- * Now accepts a specific menuItem parameter to skip the prompt.
- * @param {string} currentUrl - The current URL.
+ * Generate context-aware menu actions based on the text content of a specific menu item.
+ * @param {string} currentUrl - The current URL (used for context, less critical now).
  * @param {number} [waitTime=2000] - Wait time after each click.
- * @param {boolean} [includeToolbarButtons=true] - Whether to include toolbar actions (default true).
- * @param {string} [specificMenuItem=null] - Optional specific menu item to use (instead of prompting)
+ * @param {boolean} [includeToolbarButtons=true] - Whether to include toolbar actions.
+ * @param {string} specificMenuItemText - The text of the specific menu item to process.
  * @returns {Promise<Array>} - Array of action sequences.
  */
 export function generateContextAwareMenuActions(
-  currentUrl,
-  waitTime = 2000,
-  includeToolbarButtons = true,
-  specificMenuItem = null
+    currentUrl, // Keep for context parsing if needed elsewhere, but not for finding the item
+    waitTime = 2000,
+    includeToolbarButtons = true,
+    specificMenuItemText // Changed parameter name
 ) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const iframe = UI.elements.iframe;
-      if (!iframe.contentDocument) {
-        UI.utils.showStatus("Error: Iframe document not accessible.", true);
-        return reject("iframe not loaded or accessible");
-      }
-      await waitForIframeLoad(iframe);
+    return new Promise(async (resolve, reject) => {
+        try {
+            console.log(`Generating actions for menu item text: "${specificMenuItemText}"`);
+            const iframe = UI.elements.iframe;
+            if (!iframe.contentDocument) {
+                UI.utils.showStatus("Error: Iframe document not accessible.", true);
+                return reject("iframe not loaded or accessible");
+            }
+            await elementUtils.waitForIframeLoad(iframe); // Use prefix
 
-      const mainMenuElements = iframe.contentDocument.querySelectorAll(
-        ".menu-wrapper.wrapper-root > .menu-option"
-      );
-      const mainMenuItems = Array.from(mainMenuElements)
-        .map((item) => item.getAttribute("data-label"))
-        .filter((label) => label);
-      if (mainMenuItems.length === 0) {
-        UI.utils.showStatus("No main menu items found.", true);
-        return resolve([]);
-      }
+            const urlContext = parseUrlContext(currentUrl); // Parse context for potential use (e.g., toolbar URL correction)
 
-      // Use the provided menu item if specified, otherwise prompt the user
-      let userSelection = specificMenuItem;
+            // Find the specific main menu item by its text
+            const mainMenuElements = elementUtils.findMenuElements(iframe.contentDocument); // Use prefix
+            const targetMenuItem = mainMenuElements.find(item => item.text === specificMenuItemText);
 
-      if (!userSelection) {
-        // Fall back to the original prompt behavior for backward compatibility
-        userSelection = prompt(
-          "Select a main menu item from the following list:\n" +
-            mainMenuItems.join("\n")
-        );
-      }
+            if (!targetMenuItem) {
+                 UI.utils.showStatus(`Menu item "${specificMenuItemText}" not found in main menu.`, true);
+                 console.warn(`Could not find menu item with text: "${specificMenuItemText}". Available items:`, mainMenuElements.map(i => i.text));
+                 // Attempt to find ANY menu item if the specific one isn't found initially, might be a timing issue
+                 const allMenuItems = iframe.contentDocument.querySelectorAll(".menu-option, [class*='menu-item']");
+                 console.log("All potential menu items found:", allMenuItems.length);
+                 allMenuItems.forEach(el => console.log(" - ", elementUtils.getElementText(el))); // Use prefix
 
-      if (!userSelection || !mainMenuItems.includes(userSelection)) {
-        UI.utils.showStatus("Invalid selection. No actions generated.", true);
-        return resolve([]);
-      }
+                 return resolve([]); // Resolve with empty if not found
+            }
 
-      const urlContext = parseUrlContext(currentUrl);
-      const actionSequences = await generateActionsForSelectedMainMenu(
-        userSelection,
-        waitTime,
-        includeToolbarButtons,
-        urlContext
-      );
-      console.log("Generated action sequences:", actionSequences);
-      if (actionSequences.length === 0) {
-        UI.utils.showStatus(
-          "No menu items found. Try adjusting the URL or wait for the page to fully load.",
-          true
-        );
-      }
-      resolve(actionSequences);
-    } catch (error) {
-      console.error("Error generating context-aware menu actions:", error);
-      UI.utils.showStatus(
-        `Error generating context menu actions: ${error.message}`,
-        true
-      );
-      reject(error);
-    }
-  });
+            console.log(`Found target menu item: "${targetMenuItem.text}"`);
+
+            const actionSequences = await generateActionsForSelectedMainMenu(
+                targetMenuItem.text, // Pass the text identifier
+                waitTime,
+                includeToolbarButtons,
+                urlContext // Pass context for potential toolbar URL construction
+            );
+
+            console.log("Generated action sequences:", actionSequences.length);
+            if (actionSequences.length === 0) {
+                // Check if it was just the main item click
+                 const mainItemAction = {
+                    name: targetMenuItem.text,
+                    actions: [
+                        { type: 'click', selector: elementUtils.getElementXPathByText('div', targetMenuItem.text, 'menu-option') }, // Use prefix
+                        { type: 'wait', duration: waitTime }
+                    ]
+                };
+                 console.log("No submenu actions generated, returning main item action only.");
+                 resolve([mainItemAction]); // Return at least the action for the main item itself
+            } else {
+                 resolve(actionSequences);
+            }
+        } catch (error) {
+            console.error(`Error generating context-aware menu actions for "${specificMenuItemText}":`, error);
+            UI.utils.showStatus(
+                `Error generating actions for "${specificMenuItemText}": ${error.message}`,
+                true
+            );
+            reject(error);
+        }
+    });
 }
 
 /**
- * Generate actions for the current context (module/page level) from the selected main menu item.
- * @param {Object} urlContext - URL context object with project, module, page
- * @param {number} waitTime - Wait time between actions
- * @param {boolean} includeToolbarButtons - Whether to include toolbar button actions
- * @returns {Promise<Array>} - Array of action sequences
+ * Generate actions for the current context (module/page level) from the selected main menu item text.
+ * This function might be less relevant now if generateActionsForSelectedMainMenu handles everything.
+ * Kept for potential broader context generation if needed in the future.
+ * @param {Object} urlContext - URL context object (less critical now).
+ * @param {number} waitTime - Wait time between actions.
+ * @param {boolean} includeToolbarButtons - Whether to include toolbar button actions.
+ * @returns {Promise<Array>} - Array of action sequences.
  */
 export async function generateActionsForCurrentContext(
-  urlContext,
-  waitTime,
-  includeToolbarButtons = false
+    urlContext, // Context might still be useful for URL construction later
+    waitTime,
+    includeToolbarButtons = false
 ) {
-  const iframe = UI.elements.iframe;
-  let actions = [];
-  console.log("Generating actions for URL context:", urlContext);
-  if (urlContext.module) {
-    try {
-      const moduleMenuItem = iframe.contentDocument.querySelector(
-        `.menu-option[data-label="${urlContext.module}"]`
-      );
-      if (moduleMenuItem) {
-        console.log(`Found module menu item for ${urlContext.module}`);
+    // This function might need refactoring or removal if generateActionsForSelectedMainMenu
+    // covers the primary use case driven by ui-controls.
+    // If kept, it needs similar updates to use text identifiers and XPath.
+    console.warn("generateActionsForCurrentContext might need updates to use text identifiers if still used.");
+    const iframe = UI.elements.iframe;
+    let actions = [];
 
-        const hasSubmenu =
-          moduleMenuItem.querySelector(
-            '.nav-icon svg[data-icon*="chevron_right"]'
-          ) !== null;
-        if (hasSubmenu) {
-          console.log(`${urlContext.module} has submenu, opening it...`);
-          moduleMenuItem.click();
-          await new Promise((r) => setTimeout(r, waitTime / 2));
-          const submenuItems = await waitForSubmenu(iframe);
-          console.log(
-            `Found ${submenuItems.length} submenu items under ${urlContext.module}`
-          );
-          // Use a Set to filter duplicate submenu labels
-          const seenSubmenuLabels = new Set();
-          for (const subItem of submenuItems) {
-            const subLabel = subItem.getAttribute("data-label");
-            if (
-              !subLabel ||
-              subItem.classList.contains("menu-header") ||
-              subItem.classList.contains("menu-back-action")
-            ) {
-              continue;
-            }
-            if (seenSubmenuLabels.has(subLabel)) continue;
-            seenSubmenuLabels.add(subLabel);
-            const submenuActions = await processSubmenuItem(
-              subItem,
-              urlContext.module,
-              waitTime,
-              iframe,
-              includeToolbarButtons
-            );
-            if (submenuActions.length > 0) {
-              actions = actions.concat(submenuActions);
-            }
+    // Example: Find module by text if urlContext.module exists
+    if (urlContext.module) {
+         const moduleMenuItem = elementUtils.findMenuElements(iframe.contentDocument).find(item => item.text === urlContext.module); // Use prefix
+          if (moduleMenuItem) {
+              // ... rest of the logic using text and XPath ...
+              console.log("Processing based on URL context module:", urlContext.module)
+              // This part requires significant rewrite to match generateActionsForSelectedMainMenu logic
+              // For now, let's assume it delegates or is replaced.
           }
-          try {
-            const backButton = iframe.contentDocument.querySelector(
-              ".submenu-group .menu-back-action"
-            );
-            if (backButton) {
-              console.log("Clicking back button to return to main menu");
-              backButton.click();
-              await new Promise((r) => setTimeout(r, waitTime / 2));
-            }
-          } catch (backBtnError) {
-            console.warn("Error clicking back button:", backBtnError);
-          }
-        } else {
-          console.log(`${urlContext.module} doesn't have a submenu`);
-        }
-      }
-    } catch (moduleError) {
-      console.error(
-        `Error processing module ${urlContext.module}:`,
-        moduleError
-      );
+    } else {
+        // Generate for top-level items (example, limit to 5)
+        const mainMenuItems = elementUtils.findMenuElements(iframe.contentDocument); // Use prefix
+         for (const item of mainMenuItems.slice(0, 5)) {
+              const itemText = item.text;
+              const itemSelector = elementUtils.getElementXPathByText('div', itemText, 'menu-option'); // Use prefix
+               actions.push({
+                   name: itemText,
+                    actions: [
+                        { type: 'click', selector: itemSelector },
+                        { type: 'wait', duration: waitTime }
+                    ]
+               });
+                // Add toolbar logic here if needed, similar to processSubmenuItem
+         }
     }
-  } else {
-    console.log("No specific module in URL, generating generic actions");
-    try {
-      const mainMenuItems = iframe.contentDocument.querySelectorAll(
-        ".menu-wrapper.wrapper-root > .menu-option"
-      );
-      const originalUrl = iframe.contentWindow.location.href;
-      for (const item of Array.from(mainMenuItems).slice(0, 5)) {
-        try {
-          const label = item.getAttribute("data-label");
-          if (!label) continue;
-          const menuAction = {
-            name: label,
-            actions: [
-              {
-                type: "click",
-                selector: `.menu-option[data-label="${label}"]`,
-              },
-              { type: "wait", duration: waitTime },
-            ],
-          };
-          actions.push(menuAction);
-          if (includeToolbarButtons) {
-            try {
-              item.click();
-              await new Promise((r) => setTimeout(r, waitTime));
-              await waitForIframeLoad(iframe);
-              const menuUrl = iframe.contentWindow.location.href;
-              console.log(
-                `Successfully navigated to menu URL for ${label}: ${menuUrl}`
-              );
-              const toolbar = await waitForToolbar(iframe);
-              if (toolbar) {
-                const buttonSelectors = getToolbarButtonSelectors(iframe);
-                if (buttonSelectors && buttonSelectors.length > 0) {
-                  buttonSelectors.forEach((button) => {
-                    const actionsWithButton = JSON.parse(
-                      JSON.stringify(menuAction.actions)
-                    );
-                    actionsWithButton.push(
-                      { type: "click", selector: button.selector },
-                      { type: "wait", duration: waitTime }
-                    );
-                    actions.push({
-                      name: `${label} - ${button.name}`,
-                      actions: actionsWithButton,
-                    });
-                  });
-                } else {
-                  console.log(
-                    `No toolbar buttons found for menu ${label} at URL: ${menuUrl}`
-                  );
-                }
-              } else {
-                console.log(
-                  `No toolbar found for menu ${label} at URL: ${menuUrl}`
-                );
-              }
-              iframe.src = originalUrl;
-              await new Promise((r) => setTimeout(r, waitTime));
-              await waitForIframeLoad(iframe);
-            } catch (toolbarError) {
-              console.warn(
-                `Error generating toolbar actions for ${label}:`,
-                toolbarError
-              );
-            }
-          }
-        } catch (itemError) {
-          console.warn("Error processing main menu item:", itemError);
-        }
-      }
-    } catch (mainMenuError) {
-      console.error("Error processing main menu items:", mainMenuError);
-    }
-  }
-  return actions;
+
+    return actions;
 }
 
 /**
- * Process a submenu item and generate actions for it.
- * Performs direct navigation to ensure toolbar detection occurs at the right URL.
- * @param {Element} subItem - Submenu DOM element
- * @param {string} moduleLabel - Parent module label
- * @param {number} waitTime - Wait time between actions
- * @param {HTMLIFrameElement} iframe - The iframe element
- * @param {boolean} includeToolbarButtons - Whether to include toolbar button actions
- * @returns {Promise<Array>} - Array of action sequences
+ * Process a submenu item (identified by its element) and generate actions for it.
+ * Uses text content for naming and XPath for selectors.
+ * @param {Element} subItemElement - Submenu DOM element.
+ * @param {string} moduleText - Parent module's text content.
+ * @param {number} waitTime - Wait time between actions.
+ * @param {HTMLIFrameElement} iframe - The iframe element.
+ * @param {boolean} includeToolbarButtons - Whether to include toolbar button actions.
+ * @returns {Promise<Array>} - Array of action sequences.
  */
 export async function processSubmenuItem(
-  subItem,
-  moduleLabel,
-  waitTime,
-  iframe,
-  includeToolbarButtons
+    subItemElement, // Pass the element directly
+    moduleText,
+    waitTime,
+    iframe,
+    includeToolbarButtons
 ) {
-  const actions = [];
-  try {
-    const subLabel = subItem.getAttribute("data-label");
-    if (
-      !subLabel ||
-      subItem.classList.contains("menu-header") ||
-      subItem.classList.contains("menu-back-action")
-    )
-      return actions;
-
-    console.log(`Processing submenu item: ${moduleLabel} - ${subLabel}`);
-    const hasSubSubmenu =
-      subItem.querySelector('.nav-icon svg[data-icon*="chevron_right"]') !==
-      null;
-    const submenuAction = {
-      name: `${moduleLabel} - ${subLabel}`,
-      actions: [
-        {
-          type: "click",
-          selector: `.menu-option[data-label="${moduleLabel}"]`,
-        },
-        { type: "wait", duration: waitTime / 2 },
-        {
-          type: "click",
-          selector: `.submenu-group .menu-option[data-label="${subLabel}"]`,
-        },
-        { type: "wait", duration: waitTime },
-      ],
-    };
-    //the initial state screenshot
-    actions.push(submenuAction);
-
-    if (includeToolbarButtons) {
-      try {
-        console.log(
-          `===== PROCESSING SUBMENU TOOLBAR: ${moduleLabel} - ${subLabel} =====`
-        );
-        const originalUrl = iframe.contentWindow.location.href;
-        console.log(`Original URL before navigation: ${originalUrl}`);
-        const urlContext = parseUrlContext(originalUrl);
-        const projectName = urlContext.project;
-
-        // Click the submenu item to navigate to its page
-        console.log(`Clicking submenu item: ${subLabel}`);
-        subItem.click();
-        await new Promise((r) => setTimeout(r, waitTime));
-        await waitForIframeLoad(iframe);
-
-        // Get the actual submenu URL after clicking
-        const submenuUrl = iframe.contentWindow.location.href;
-        console.log(`Successfully navigated to submenu URL: ${submenuUrl}`);
-
-        // IMPORTANT: First check for toolbar on the original submenu URL
-        console.log(
-          `Detecting toolbar on original submenu page: ${submenuUrl}`
-        );
-        let toolbar = await waitForToolbar(iframe);
-        let buttonSelectors = [];
-
-        // If toolbar found on original URL, get its buttons
-        if (toolbar) {
-          console.log(
-            `Found toolbar for ${moduleLabel} - ${subLabel} at original URL: ${submenuUrl}`
-          );
-          buttonSelectors = getToolbarButtonSelectors(iframe);
+    const actions = [];
+    try {
+        const subItemText = elementUtils.getElementText(subItemElement); // Use prefix
+        if (!subItemText || subItemElement.classList.contains('menu-header') || subItemElement.classList.contains('menu-back-action')) {
+            return actions; // Skip if no text or is header/back
         }
-        // If no toolbar found on original URL, try constructed URL
-        else {
-          console.log(
-            `No toolbar found at original URL. Checking if URL needs correction...`
-          );
 
-          // Check if we need to use a constructed URL instead
-          if (
-            !submenuUrl.includes(convertDisplayNameToUrlSegment(moduleLabel))
-          ) {
-            // Construct the expected URL
-            const constructedUrl = constructPageUrl(
-              projectName,
-              moduleLabel,
-              subLabel
-            );
-            if (constructedUrl) {
-              console.log(
-                `URL needs correction, trying constructed URL: ${constructedUrl}`
-              );
-              iframe.src = constructedUrl;
-              await new Promise((r) => setTimeout(r, waitTime));
-              await waitForIframeLoad(iframe);
-              const constructedPageUrl = iframe.contentWindow.location.href;
-              console.log(`Loaded constructed URL: ${constructedPageUrl}`);
+        console.log(`Processing submenu item: ${moduleText} - ${subItemText}`);
 
-              // Try to find toolbar on constructed URL
-              console.log(
-                `Detecting toolbar on constructed submenu page: ${constructedPageUrl}`
-              );
-              toolbar = await waitForToolbar(iframe);
+        // Generate selectors using text
+        const moduleSelector = elementUtils.getElementXPathByText('div', moduleText, 'menu-option'); // Use prefix
+        const subItemSelector = elementUtils.getElementXPathByText('div', subItemText, 'menu-option'); // Use prefix // Assume div, adjust if needed
 
-              if (toolbar) {
-                console.log(
-                  `Found toolbar for ${moduleLabel} - ${subLabel} at constructed URL: ${constructedPageUrl}`
-                );
-                buttonSelectors = getToolbarButtonSelectors(iframe);
-              } else {
-                console.log(
-                  `No toolbar found for ${moduleLabel} - ${subLabel} at constructed URL: ${constructedPageUrl}`
-                );
-              }
+        const submenuAction = {
+            name: `${moduleText} - ${subItemText}`,
+            actions: [
+                { type: 'click', selector: moduleSelector },
+                { type: 'wait', duration: waitTime / 2 },
+                { type: 'click', selector: subItemSelector }, // Use text-based XPath
+                { type: 'wait', duration: waitTime },
+            ],
+        };
+        actions.push(submenuAction); // Add the base action for navigating to the submenu item
+
+        // --- Toolbar Button Logic (using text-based navigation) ---
+        if (includeToolbarButtons) {
+            try {
+                console.log(`===== PROCESSING SUBMENU TOOLBAR: ${moduleText} - ${subItemText} =====`);
+                const originalUrl = iframe.contentWindow.location.href;
+                console.log(`Original URL before submenu navigation: ${originalUrl}`);
+
+                // Navigate using the generated selectors
+                 const moduleElement = iframe.contentDocument.evaluate(moduleSelector, iframe.contentDocument, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                 if(moduleElement) moduleElement.click();
+                 await new Promise(r => setTimeout(r, waitTime / 2));
+
+                 const subElement = iframe.contentDocument.evaluate(subItemSelector, iframe.contentDocument, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                 if(subElement) subElement.click();
+                 await new Promise(r => setTimeout(r, waitTime)); // Wait for navigation
+                 await elementUtils.waitForIframeLoad(iframe); // Use prefix // Wait for page load
+
+                const submenuUrl = iframe.contentWindow.location.href;
+                console.log(`Successfully navigated to submenu URL: ${submenuUrl}`);
+
+                console.log(`Detecting toolbar on submenu page: ${submenuUrl}`);
+                const toolbar = await waitForToolbar(iframe);
+                let buttonSelectors = [];
+
+                if (toolbar) {
+                    console.log(`Found toolbar for ${moduleText} - ${subItemText} at URL: ${submenuUrl}`);
+                    buttonSelectors = getToolbarButtonSelectors(iframe); // This function needs no changes if it returns robust selectors (like XPath or data-component-path)
+                } else {
+                    console.log(`No toolbar found for ${moduleText} - ${subItemText} at URL: ${submenuUrl}`);
+                    // Optional: Try URL construction/correction if needed, similar to previous version
+                    // const urlContext = parseUrlContext(originalUrl);
+                    // const constructedUrl = constructPageUrl(urlContext.project, moduleText, subItemText);
+                    // ... logic to load constructedUrl and check toolbar again ...
+                }
+
+                // Process found toolbar buttons
+                if (buttonSelectors && buttonSelectors.length > 0) {
+                    console.log(`Found ${buttonSelectors.length} toolbar buttons for ${moduleText} - ${subItemText}`);
+                    buttonSelectors.forEach((button) => {
+                        const actionName = `${moduleText} - ${subItemText} - ${button.name}`;
+
+                         if (button.disabled || button.skipActions) {
+                              // Add action sequence just for navigation, no button click
+                              actions.push({
+                                  name: actionName,
+                                  actions: JSON.parse(JSON.stringify(submenuAction.actions)) // Copy base nav actions
+                              });
+                         } else {
+                             // Add action sequence including the button click
+                            const actionsWithButton = JSON.parse(JSON.stringify(submenuAction.actions));
+                            actionsWithButton.push(
+                                { type: "click", selector: button.selector }, // Use the selector from getToolbarButtonSelectors
+                                { type: "wait", duration: 2000 }
+                            );
+                            actions.push({ name: actionName, actions: actionsWithButton });
+                         }
+                    });
+                } else {
+                    console.log(`No usable toolbar buttons found for ${moduleText} - ${subItemText}`);
+                }
+
+                 // --- IMPORTANT: Navigate back to the original state (main menu) ---
+                 // This is crucial for the loop in ui-controls to work correctly
+                 console.log(`Attempting to navigate back to original state from ${submenuUrl}`);
+                 iframe.src = originalUrl; // Go back to the URL before processing this item
+                 await elementUtils.waitForIframeLoad(iframe); // Use prefix
+                 await new Promise(r => setTimeout(r, waitTime / 2)); // Allow main menu to settle
+                 console.log("Navigated back to original state.");
+
+
+            } catch (toolbarError) {
+                console.warn(`Error generating toolbar actions for ${moduleText} - ${subItemText}:`, toolbarError);
+                 // Attempt to navigate back even if toolbar detection failed
+                  try {
+                      const originalUrl = iframe.contentWindow.location.href; // May have changed
+                      const urlContext = parseUrlContext(originalUrl);
+                      const mainMenuUrl = `${urlContext.urlParts.slice(0, urlContext.urlParts.indexOf('client') + 2).join('/')}/${urlContext.project}`; // Basic main menu URL guess
+                      console.warn(`Toolbar error, attempting basic nav back to ${mainMenuUrl}`);
+                      iframe.src = mainMenuUrl;
+                       await elementUtils.waitForIframeLoad(iframe); // Use prefix
+                       await new Promise(r => setTimeout(r, waitTime));
+                  } catch(navBackError) {
+                       console.error("Failed to navigate back after toolbar error", navBackError);
+                  }
             }
-          } else {
-            console.log(
-              `URL appears correct, but no toolbar found for ${moduleLabel} - ${subLabel} at: ${submenuUrl}`
-            );
-          }
         }
 
-        // Process any found toolbar buttons
-        if (buttonSelectors && buttonSelectors.length > 0) {
-          console.log(
-            `Found ${buttonSelectors.length} toolbar buttons for ${moduleLabel} - ${subLabel}`
-          );
-          buttonSelectors.forEach((button) => {
-            // Create a named action sequence for this button
-            const actionName = `${moduleLabel} - ${subLabel} - ${button.name}`;
-
-            // For disabled buttons, just add the name without actions
-            if (button.disabled || button.skipActions) {
-              actions.push({
-                name: actionName,
-                actions: [
-                  // Just include the navigation to the page, but no button click
-                  ...JSON.parse(JSON.stringify(submenuAction.actions)),
-                ],
-              });
-            } else {
-              // For enabled buttons, include the button click
-              const actionsWithButton = JSON.parse(
-                JSON.stringify(submenuAction.actions)
-              );
-              actionsWithButton.push(
-                { type: "click", selector: button.selector },
-                { type: "wait", duration: 2000 } // Fixed duration of 2000ms for all toolbar buttons
-              );
-              actions.push({
-                name: actionName,
-                actions: actionsWithButton,
-              });
-            }
-          });
-        } else {
-          console.log(
-            `No usable toolbar buttons found for ${moduleLabel} - ${subLabel}`
-          );
+        // Check for sub-submenu (visual indicator) - logic remains the same
+        const hasSubSubmenu = subItemElement.querySelector('.nav-icon svg[data-icon*="chevron_right"]') !== null;
+        if (hasSubSubmenu) {
+            console.log(`Found sub-submenu for ${subItemText}, but not exploring it.`);
+            // Add logic here if sub-submenus need processing
         }
-      } catch (toolbarError) {
-        console.warn(
-          `Error generating toolbar actions for ${moduleLabel} - ${subLabel}:`,
-          toolbarError
-        );
-      }
-    }
 
-    if (hasSubSubmenu) {
-      console.log(
-        `Found sub-submenu for ${subLabel}, but not exploring it for now.`
-      );
+    } catch (error) {
+        console.warn(`Error processing submenu item: ${error.message}`, error);
     }
-  } catch (error) {
-    console.warn("Error processing submenu item:", error);
-  }
-  return actions;
+    return actions;
 }
+
 
 /**
- * Generate actions for a selected main menu item and its submenu.
- * @param {string} selectedModule - The selected main menu module name
- * @param {number} waitTime - Wait time between actions
- * @param {boolean} includeToolbarButtons - Whether to include toolbar button actions
- * @param {Object} urlContext - URL context object with project, module, page
- * @returns {Promise<Array>} - Array of action sequences
+ * Generate actions for a selected main menu item (identified by text) and its submenu.
+ * @param {string} selectedModuleText - The text of the selected main menu item.
+ * @param {number} waitTime - Wait time between actions.
+ * @param {boolean} includeToolbarButtons - Whether to include toolbar button actions.
+ * @param {Object} urlContext - URL context object (used for potential URL construction).
+ * @returns {Promise<Array>} - Array of action sequences.
  */
 export async function generateActionsForSelectedMainMenu(
-  selectedModule,
-  waitTime,
-  includeToolbarButtons,
-  urlContext
-) {
-  const iframe = UI.elements.iframe;
-  const mainMenuItem = iframe.contentDocument.querySelector(
-    `.menu-option[data-label="${selectedModule}"]`
-  );
-  if (!mainMenuItem) {
-    UI.utils.showStatus(`Main menu item "${selectedModule}" not found.`, true);
-    return [];
-  }
-  mainMenuItem.click();
-  await new Promise((r) => setTimeout(r, waitTime / 2));
-  const newUrlContext = {
-    isValid: true,
-    project: urlContext.project,
-    module: selectedModule,
-    page: null,
-    depth: 2,
-    urlParts: [],
-  };
-  const actionsForModule = await generateActionsForCurrentContext(
-    newUrlContext,
+    selectedModuleText,
     waitTime,
-    includeToolbarButtons
-  );
-  return actionsForModule;
+    includeToolbarButtons,
+    urlContext // Keep for potential URL construction
+) {
+    const iframe = UI.elements.iframe;
+    let allActions = [];
+
+    // 1. Find the main menu item element using its text
+    const moduleSelector = elementUtils.getElementXPathByText('div', selectedModuleText, 'menu-option'); // Use prefix
+    const mainMenuItemElement = iframe.contentDocument.evaluate(moduleSelector, iframe.contentDocument, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+
+    if (!mainMenuItemElement) {
+        UI.utils.showStatus(`Main menu item "${selectedModuleText}" could not be located via XPath.`, true);
+        console.error(`Failed to find element with XPath: ${moduleSelector}`);
+        return []; // Return empty if element not found
+    }
+
+     // 2. Add the action for clicking the main menu item itself
+     // Note: This action might be duplicated if the item has no submenu,
+     // but processSubmenuItem handles adding toolbar actions *after* this click.
+      const mainClickAction = {
+            name: selectedModuleText,
+            actions: [
+                { type: 'click', selector: moduleSelector },
+                { type: 'wait', duration: waitTime }
+            ]
+        };
+        // Don't add mainClickAction here yet, add it ONLY if no submenu processing happens.
+
+
+    // 3. Check if it has a submenu
+    const hasSubmenu = mainMenuItemElement.querySelector('.nav-icon svg[data-icon*="chevron_right"]') !== null;
+
+    if (hasSubmenu) {
+        console.log(`${selectedModuleText} has submenu, opening it...`);
+        mainMenuItemElement.click(); // Click to open submenu
+        await new Promise(r => setTimeout(r, waitTime / 2)); // Wait for submenu to potentially open
+
+        // 4. Wait for and process submenu items
+        const submenuItemElements = await elementUtils.waitForSubmenu(iframe); // Use prefix
+        console.log(`Found ${submenuItemElements.length} submenu items under ${selectedModuleText}`);
+
+        if (submenuItemElements.length > 0) {
+             // Process each submenu item
+             for (const subItemElement of submenuItemElements) {
+                 const submenuActions = await processSubmenuItem(
+                    subItemElement,
+                    selectedModuleText, // Pass parent text
+                    waitTime,
+                    iframe,
+                    includeToolbarButtons
+                 );
+                 if (submenuActions.length > 0) {
+                    allActions = allActions.concat(submenuActions);
+                 }
+             }
+
+             // 5. Navigation back should now happen *inside* processSubmenuItem after toolbar check
+
+        } else {
+            console.log(`No submenu items found for ${selectedModuleText} after clicking.`);
+             // If no submenu items were found, add the action for the main click itself
+             allActions.push(mainClickAction);
+        }
+
+    } else {
+         console.log(`${selectedModuleText} does not have a submenu.`);
+         // If no submenu, add the action for the main click itself
+         allActions.push(mainClickAction);
+
+         // Optionally, check for toolbar buttons directly on the main item's page
+         if (includeToolbarButtons) {
+              console.log(`Checking for toolbar on main item page: ${selectedModuleText}`);
+               mainMenuItemElement.click(); // Navigate to the page
+               await new Promise(r => setTimeout(r, waitTime));
+               await elementUtils.waitForIframeLoad(iframe); // Use prefix
+               const mainItemUrl = iframe.contentWindow.location.href;
+               const toolbar = await waitForToolbar(iframe);
+                if (toolbar) {
+                     const buttonSelectors = getToolbarButtonSelectors(iframe);
+                     if (buttonSelectors && buttonSelectors.length > 0) {
+                          buttonSelectors.forEach((button) => {
+                               const actionName = `${selectedModuleText} - ${button.name}`;
+                                if (!button.disabled && !button.skipActions) {
+                                     const actionsWithButton = JSON.parse(JSON.stringify(mainClickAction.actions)); // Start with main click
+                                     actionsWithButton.push(
+                                         { type: "click", selector: button.selector },
+                                         { type: "wait", duration: 2000 }
+                                     );
+                                      // Replace the base action with the toolbar-included one? Or add separately?
+                                      // Adding separately seems clearer.
+                                      allActions.push({ name: actionName, actions: actionsWithButton });
+                                } else {
+                                     // Add action for disabled button (just navigation)
+                                      allActions.push({ name: actionName, actions: JSON.parse(JSON.stringify(mainClickAction.actions)) });
+                                }
+                          });
+                           // Remove the basic mainClickAction if we added toolbar actions for it
+                           const mainActionIndex = allActions.findIndex(a => a.name === selectedModuleText);
+                           if(mainActionIndex > -1 && allActions.length > 1) { // Only remove if toolbar actions were added
+                                allActions.splice(mainActionIndex, 1);
+                           }
+                     }
+                }
+                // Navigate back after checking toolbar
+                 const originalUrl = urlContext?.urlParts?.join('/') || iframe.contentWindow.location.origin; // Need a way back
+                 iframe.src = originalUrl; // Attempt basic navigation back
+                 await elementUtils.waitForIframeLoad(iframe); // Use prefix
+         }
+
+    }
+
+    return allActions;
 }
 
+
 export default {
-  generateContextAwareMenuActions,
-  generateActionsForCurrentContext,
-  generateActionsForSelectedMainMenu,
-  processSubmenuItem,
+    generateContextAwareMenuActions,
+    generateActionsForCurrentContext, // Keep or remove based on usage
+    generateActionsForSelectedMainMenu,
+    processSubmenuItem,
 };
