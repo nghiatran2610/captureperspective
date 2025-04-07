@@ -2,18 +2,39 @@ import { elements } from "./elements.js";
 import { progress } from "./progress.js";
 
 export const utils = {
+  // In ui/utils.js, update the showStatus function:
+
   /**
-   * Show status message in the output area
+   * Show status message in the output area with auto-removal for success messages
    * @param {string} message - Message to display
    * @param {boolean} isError - Whether this is an error message
+   * @param {number} [autoRemoveDelay=5000] - Time in ms before removing success messages (0 to keep permanently)
    */
-  showStatus(message, isError = false) {
+  showStatus(message, isError = false, autoRemoveDelay = 5000) {
     const status = document.createElement("div");
     status.className = `status-message ${isError ? "error" : "success"}`;
     status.textContent = message;
     elements.output.appendChild(status);
-  },
 
+    // Auto-remove success messages after delay (if delay > 0)
+    if (!isError && autoRemoveDelay > 0) {
+      setTimeout(() => {
+        // Check if element still exists before trying to remove it
+        if (status.parentElement) {
+          // Add fade-out animation
+          status.style.transition = "opacity 0.5s ease-out";
+          status.style.opacity = "0";
+
+          // Remove from DOM after animation completes
+          setTimeout(() => {
+            if (status.parentElement) {
+              status.parentElement.removeChild(status);
+            }
+          }, 500); // Animation duration
+        }
+      }, autoRemoveDelay);
+    }
+  },
   /**
    * Create a button element
    * @param {string} text - Button text

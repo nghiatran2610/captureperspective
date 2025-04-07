@@ -141,7 +141,9 @@ export const thumbnails = {
           fileName,
           result.width,
           result.height,
-          result.timeTaken
+          result.timeTaken,
+          result.url || currentUrl // Pass the URL of the screenshot
+
         );
       });
     }
@@ -221,7 +223,7 @@ export const thumbnails = {
       const scrollAdjustment = thumbnailRect.bottom - viewportHeight + 20; // 20px padding
       window.scrollBy({
         top: scrollAdjustment,
-        behavior: 'smooth'
+        behavior: "smooth",
       });
     }
 

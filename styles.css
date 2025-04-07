@@ -1509,3 +1509,35 @@ body.simple-mode .stats {
   font-size: 14px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
+
+.screenshot-url-container {
+  margin-bottom: 15px;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  border-radius: var(--border-radius);
+  border-left: 3px solid var(--primary-color);
+  word-break: break-all;
+}
+
+.screenshot-url-label {
+  font-weight: 600;
+  color: var(--text-color-light);
+  margin-right: 5px;
+}
+
+.screenshot-url-link {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.screenshot-url-link:hover {
+  text-decoration: underline;
+}
+
+.status-message {
+  transition: opacity 0.5s ease-out;
+}
+
+.status-message.fading-out {
+  opacity: 0;
+}

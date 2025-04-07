@@ -224,6 +224,8 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
       preset,
       width,
       height: preset === "fullPage" ? finalHeight : height,
+      url: currentUrl // Add the URL to the result
+
     };
 
     // Clean up by resetting the iframe and emit the completion event.
