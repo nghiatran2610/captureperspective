@@ -86,20 +86,20 @@ class App {
     UI.elements.progressOutput.style.display = "none";
 
     // Disable the "Full Page (Auto Height)" option
-    if (UI.elements.capturePreset) {
-      const fullPageOption = Array.from(UI.elements.capturePreset.options).find(
-        (option) => option.value === "fullPage"
-      );
+    // if (UI.elements.capturePreset) {
+    //   const fullPageOption = Array.from(UI.elements.capturePreset.options).find(
+    //     (option) => option.value === "fullPage"
+    //   );
 
-      if (fullPageOption) {
-        fullPageOption.disabled = true;
+    //   if (fullPageOption) {
+    //     fullPageOption.disabled = true;
 
-        // If fullPage is currently selected, change to another preset
-        if (UI.elements.capturePreset.value === "fullPage") {
-          UI.elements.capturePreset.value = "fullHD"; // Default to Full HD
-        }
-      }
-    }
+    //     // If fullPage is currently selected, change to another preset
+    //     if (UI.elements.capturePreset.value === "fullPage") {
+    //       UI.elements.capturePreset.value = "fullHD"; // Default to Full HD
+    //     }
+    //   }
+    // }
   }
 
   _handleModeChange(event) {
@@ -321,6 +321,7 @@ class App {
   // REMOVED toggleAdvancedOptions method
 
   async captureScreenshots() {
+   
     const startTotalTime = performance.now();
     let urlList = []; // Initialize urlList
 
