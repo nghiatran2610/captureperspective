@@ -10,7 +10,7 @@ let _waitTimeout = null;
 
 /**
  * Capture a screenshot of a URL with optional actions.
- * This version includes enhanced error detection.
+ * This version properly handles full page height capture.
  *
  * @param {string} url - The URL to capture.
  * @param {string} [preset='fullHD'] - The size preset to use.
@@ -66,10 +66,12 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
   });
 
   let width, height;
+
+  // Initialize with standard dimensions
   if (preset === "fullPage") {
-    // Use fixed width; dummy height will be recalculated later.
+    // For fullPage, use a fixed width but we'll determine the height later
     width = 1920;
-    height = 1080;
+    height = 1080; // initial height, will be updated
   } else {
     const sizePreset =
       config.screenshot.presets[preset] || config.screenshot.presets.fullHD;
@@ -131,6 +133,9 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
           "Mount error detected after actions"
         );
       }
+      
+      // Give the page a moment to settle after actions
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
     // Stop observing now that we're past the error-prone part
@@ -139,22 +144,66 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
     // Retrieve the current URL from the iframe after navigation.
     const currentUrl = iframe.contentWindow.location.href;
 
-    // For fullPage, recalculate the actual height.
+    // For fullPage, calculate the accurate page height
     let actualHeight = height;
+    
     if (preset === "fullPage") {
       const doc = iframe.contentDocument;
-      const docElement = doc.documentElement;
-      const docBody = doc.body;
+      
+      // Try multiple approaches to get the full page height
+      const bodyScrollHeight = doc.body ? doc.body.scrollHeight : 0;
+      const docScrollHeight = doc.documentElement ? doc.documentElement.scrollHeight : 0;
+      const bodyOffsetHeight = doc.body ? doc.body.offsetHeight : 0;
+      const docOffsetHeight = doc.documentElement ? doc.documentElement.offsetHeight : 0;
+      
+      // Find all elements and get their bottom positions
+      const allElements = doc.querySelectorAll('*');
+      let maxBottom = 0;
+      
+      for (const el of allElements) {
+        const rect = el.getBoundingClientRect();
+        const bottom = rect.bottom + window.pageYOffset;
+        if (bottom > maxBottom) {
+          maxBottom = bottom;
+        }
+      }
+      
+      console.log("Body scroll height:", bodyScrollHeight);
+      console.log("Document scroll height:", docScrollHeight);
+      console.log("Body offset height:", bodyOffsetHeight);
+      console.log("Document offset height:", docOffsetHeight);
+      console.log("Max element bottom:", maxBottom);
+      
+      // Use the maximum of all these values to ensure we capture everything
       actualHeight = Math.max(
-        docElement.scrollHeight || 0,
-        docBody ? docBody.scrollHeight : 0
+        bodyScrollHeight,
+        docScrollHeight,
+        bodyOffsetHeight,
+        docOffsetHeight,
+        maxBottom,
+        1080 // Minimum height of 1080
       );
-      console.log("Calculated full page height:", actualHeight);
-      // Update the iframe height so that all content is visible.
+      
+      console.log("Final calculated height for fullPage:", actualHeight);
+      
+      // Update the iframe height to the calculated height
       iframe.style.height = `${actualHeight}px`;
+      
+      // Ensure that the body and documentElement heights are set to allow full capture
+      try {
+        doc.body.style.height = 'auto';
+        doc.body.style.overflow = 'visible';
+        doc.documentElement.style.height = 'auto';
+        doc.documentElement.style.overflow = 'visible';
+      } catch (e) {
+        console.warn("Couldn't set document styles:", e);
+      }
+      
+      // Wait for the resize to take effect
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
-    // Capture the screenshot (with full-page style adjustments if needed)
+    // Capture the screenshot
     const { screenshotData, actualHeight: finalHeight } =
       await captureScreenshot(iframe, currentUrl, preset, width, actualHeight);
 
@@ -284,6 +333,29 @@ function waitForRendering(url, iframe) {
       }
     };
 
+    // Wait for the DOM content to be fully loaded and images to be loaded
+    const waitForImages = () => {
+      try {
+        if (!iframe.contentDocument) return false;
+        
+        const imgElements = iframe.contentDocument.querySelectorAll('img');
+        const backgroundImgElements = Array.from(iframe.contentDocument.querySelectorAll('*')).filter(el => {
+          const style = window.getComputedStyle(el);
+          return style.backgroundImage && style.backgroundImage !== 'none';
+        });
+        
+        // Check if all images are loaded
+        const allImagesLoaded = Array.from(imgElements).every(img => {
+          return img.complete;
+        });
+        
+        return allImagesLoaded;
+      } catch (e) {
+        console.warn("Error checking image loading status:", e);
+        return true; // Assume images are loaded if there's an error
+      }
+    };
+
     // Function to check for specific error messages in the DOM
     const checkForErrors = () => {
       try {
@@ -336,8 +408,11 @@ function waitForRendering(url, iframe) {
         return;
       }
 
+      // Check if all images are loaded
+      const imagesLoaded = waitForImages();
+
       // Check if countdown finished
-      if (secondsLeft <= 0 || consoleErrorFound) {
+      if ((secondsLeft <= 0 && imagesLoaded) || consoleErrorFound) {
         // Restore original console methods
         console.warn = originalWarn;
         console.error = originalError;
@@ -348,7 +423,10 @@ function waitForRendering(url, iframe) {
             error: "No view configured for center mount error detected",
           });
         } else {
-          resolve({ success: true, error: null });
+          // Give a little extra time after images are loaded for any JavaScript rendering
+          setTimeout(() => {
+            resolve({ success: true, error: null });
+          }, 500);
         }
         return;
       }
@@ -367,8 +445,7 @@ function waitForRendering(url, iframe) {
 
 /**
  * Capture a screenshot using html2canvas and overlay the URL.
- * When "fullPage" is selected, temporarily modify the target element's style
- * to force full height and visible overflow before capturing.
+ * Enhanced to properly handle fullPage captures of any height.
  *
  * @param {HTMLIFrameElement} iframe - The iframe containing the page.
  * @param {string} url - The URL to overlay on the screenshot.
@@ -379,74 +456,131 @@ function waitForRendering(url, iframe) {
  */
 async function captureScreenshot(iframe, url, preset, width, height) {
   const doc = iframe.contentDocument;
-  // Choose the target element for capture.
-  // You may adjust this if you want a specific container.
-  let targetElement = doc.body;
-  if (!targetElement) {
-    targetElement = doc.documentElement;
-  }
-
+  const win = iframe.contentWindow;
+  
   events.emit(events.events.CAPTURE_PROGRESS, {
     message: `Capturing screenshot (${width}x${height})...`,
   });
 
-  let originalOverflow, originalHeight;
-  // For fullPage, temporarily modify styles so the full content is visible.
   if (preset === "fullPage") {
-    originalOverflow = targetElement.style.overflow;
-    originalHeight = targetElement.style.height;
-    targetElement.style.overflow = "visible";
-    targetElement.style.height = "auto";
-  }
-
-  // Define html2canvas options.
-  let options = { ...config.screenshot.html2canvasOptions };
-  if (preset === "fullPage") {
-    // Use the target element's bounding rectangle for dimensions.
-    const rect = targetElement.getBoundingClientRect();
-    options = {
-      ...options,
-      x: rect.x,
-      y: rect.y,
-      width: rect.width,
-      height: rect.height,
-      windowWidth: rect.width,
-      windowHeight: rect.height,
+    // For fullPage, we need special handling to capture the entire document
+    
+    // Temporarily remove any fixed elements or modify their positioning
+    // This prevents duplicated fixed elements in the screenshot
+    const fixedElements = Array.from(doc.querySelectorAll('*')).filter(el => {
+      const style = window.getComputedStyle(el);
+      return style.position === 'fixed';
+    });
+    
+    // Store original styles for restoration later
+    const originalStyles = fixedElements.map(el => ({
+      element: el,
+      position: el.style.position,
+      top: el.style.top,
+      left: el.style.left,
+      right: el.style.right,
+      bottom: el.style.bottom
+    }));
+    
+    // Modify fixed elements to ensure they're captured correctly
+    fixedElements.forEach(el => {
+      el.style.position = 'absolute';
+    });
+    
+    // Set up html2canvas options for fullPage
+    const options = {
+      ...config.screenshot.html2canvasOptions,
+      // Set explicit dimensions
+      width: width,
+      height: height,
+      // These ensure the entire page is captured
+      windowWidth: width,
+      windowHeight: height,
+      x: 0,
+      y: 0,
       scrollX: 0,
       scrollY: 0,
+      // Important for better rendering
+      scale: 1,
+      allowTaint: true,
+      useCORS: true,
+      logging: true,
+      // Use the entire document
+      ignoreElements: (element) => {
+        // Ignore any elements that might interfere with capture
+        return element.classList && 
+               (element.classList.contains('screenshot-ignore') || 
+                element.classList.contains('temp-element'));
+      },
+      onclone: (documentClone) => {
+        // This is called with the cloned document before rendering
+        // We can make additional adjustments here if needed
+        const clonedBody = documentClone.body;
+        if (clonedBody) {
+          clonedBody.style.height = `${height}px`;
+          clonedBody.style.overflow = 'visible';
+        }
+        documentClone.documentElement.style.height = `${height}px`;
+        documentClone.documentElement.style.overflow = 'visible';
+        return documentClone;
+      }
     };
+
+    // Generate the canvas using html2canvas
+    const canvas = await html2canvas(doc.documentElement, options);
+    
+    // Restore original positioning for fixed elements
+    originalStyles.forEach(item => {
+      item.element.style.position = item.position;
+      item.element.style.top = item.top;
+      item.element.style.left = item.left;
+      item.element.style.right = item.right;
+      item.element.style.bottom = item.bottom;
+    });
+    
+    // Overlay the URL onto the canvas
+    const ctx = canvas.getContext("2d");
+    const overlayHeight = 30;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(url, 10, canvas.height - overlayHeight / 2);
+
+    const screenshotData = canvas.toDataURL("image/png");
+    return { screenshotData, actualHeight: canvas.height };
   } else {
-    options = {
-      ...options,
+    // For fixed size presets, keep the original approach
+    const options = {
+      ...config.screenshot.html2canvasOptions,
       width: width,
       height: height,
       windowWidth: width,
       windowHeight: height,
+      scale: 1,
+      allowTaint: true,
+      useCORS: true
     };
+
+    // Generate the canvas using html2canvas
+    const canvas = await html2canvas(doc.documentElement, options);
+
+    // Overlay the URL onto the canvas
+    const ctx = canvas.getContext("2d");
+    const overlayHeight = 30;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(url, 10, canvas.height - overlayHeight / 2);
+
+    const screenshotData = canvas.toDataURL("image/png");
+    return { screenshotData, actualHeight: canvas.height };
   }
-
-  // Generate the canvas using html2canvas on the target element.
-  const canvas = await html2canvas(targetElement, options);
-
-  // Restore the original styles if modified.
-  if (preset === "fullPage") {
-    targetElement.style.overflow = originalOverflow;
-    targetElement.style.height = originalHeight;
-  }
-
-  // Overlay the URL onto the canvas.
-  const ctx = canvas.getContext("2d");
-  const overlayHeight = 30;
-  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-  ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
-  ctx.font = "16px Arial";
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText(url, 10, canvas.height - overlayHeight / 2);
-
-  const screenshotData = canvas.toDataURL("image/png");
-  return { screenshotData, actualHeight: canvas.height };
 }
 
 /**
