@@ -13,6 +13,7 @@ class URLFetcher {
     this.categorizedUrls = {};
     this.isLoading = false;
     this.error = null;
+    // Use a default endpoint but allow it to be overridden
     this.urlEndpoint = '/system/webdev/RF_Main_STG/getUrls';
     this.baseClientUrl = '';
   }
@@ -31,6 +32,7 @@ class URLFetcher {
       // Extract project name and base URL from current location
       this.determineBaseUrls();
       
+      console.log(`Fetching URLs from endpoint: ${this.urlEndpoint}`);
       const response = await fetch(this.urlEndpoint);
       
       if (!response.ok) {
@@ -38,6 +40,7 @@ class URLFetcher {
       }
       
       const data = await response.json();
+      console.log('Received data:', data);
       this.urlsData = data;
       
       // Process URLs from the pages object
@@ -50,6 +53,8 @@ class URLFetcher {
           };
         });
         
+        console.log(`Processed ${this.urlsList.length} URLs`);
+        
         // Categorize URLs by their section (first path segment)
         this.categorizeUrls();
         
@@ -60,9 +65,11 @@ class URLFetcher {
         
         return this.urlsList;
       } else {
+        console.error('Invalid data format received:', data);
         throw new URLProcessingError('Invalid URL data format', this.urlEndpoint);
       }
     } catch (error) {
+      console.error('Error loading URLs:', error);
       this.error = error;
       events.emit(events.events.CAPTURE_FAILED, { 
         url: this.urlEndpoint, 
@@ -79,12 +86,15 @@ class URLFetcher {
    */
   determineBaseUrls() {
     const currentUrl = window.location.href;
+    console.log('Current URL:', currentUrl);
     
     // Extract project name for endpoint
     const projectMatch = currentUrl.match(/\/system\/webdev\/([^\/]+)/);
     if (projectMatch && projectMatch[1]) {
       const projectName = projectMatch[1];
+      // Set the endpoint URL
       this.urlEndpoint = `/system/webdev/${projectName}/getUrls`;
+      console.log(`Set endpoint URL to: ${this.urlEndpoint}`);
       
       // Construct base client URL for forming full URLs
       const baseUrlMatch = currentUrl.match(/(https?:\/\/[^\/]+)/);
@@ -94,6 +104,9 @@ class URLFetcher {
         console.log(`Base client URL: ${this.baseClientUrl}`);
       }
     } else {
+      // Keep the default endpoint if pattern doesn't match
+      console.log(`Could not extract project name from URL. Using default endpoint: ${this.urlEndpoint}`);
+      
       // Fallback to using the current URL's origin as the base
       const urlObj = new URL(currentUrl);
       this.baseClientUrl = urlObj.origin;
@@ -104,11 +117,37 @@ class URLFetcher {
   /**
    * Set the base client URL manually
    * @param {string} url - The base client URL
+   * @returns {boolean} - Whether the operation was successful
    */
   setBaseClientUrl(url) {
-    // Normalize URL (remove trailing slash if present)
-    this.baseClientUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-    console.log(`Base client URL set to: ${this.baseClientUrl}`);
+    if (!url || typeof url !== 'string') {
+      console.error('Invalid base client URL provided');
+      return false;
+    }
+    
+    try {
+      // Normalize URL (remove trailing slash if present)
+      this.baseClientUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+      console.log(`Base client URL set to: ${this.baseClientUrl}`);
+      
+      // Try to extract project name from the URL
+      const projectMatch = url.match(/\/client\/([^\/]+)/);
+      if (projectMatch && projectMatch[1]) {
+        const projectName = projectMatch[1];
+        // Update the endpoint URL based on the extracted project name
+        const urlObj = new URL(url);
+        this.urlEndpoint = `${urlObj.origin}/system/webdev/${projectName}/getUrls`;
+        console.log(`Updated endpoint URL to: ${this.urlEndpoint}`);
+        return true;
+      } else {
+        console.warn('Could not extract project name from the provided URL');
+        // Still return true because the base URL was set successfully
+        return true;
+      }
+    } catch (error) {
+      console.error('Error setting base client URL:', error);
+      return false;
+    }
   }
   
   /**
@@ -128,6 +167,8 @@ class URLFetcher {
       
       this.categorizedUrls[category].push(urlInfo);
     });
+    
+    console.log('URLs categorized:', Object.keys(this.categorizedUrls));
   }
   
   /**
@@ -137,6 +178,11 @@ class URLFetcher {
    */
   generateFullUrls(selectedPaths) {
     if (!selectedPaths || !Array.isArray(selectedPaths) || selectedPaths.length === 0) {
+      return [];
+    }
+    
+    if (!this.baseClientUrl) {
+      console.error('Base client URL not set');
       return [];
     }
     
@@ -159,6 +205,19 @@ class URLFetcher {
         return `${this.baseClientUrl}/${path}`;
       }
     });
+  }
+  
+  /**
+   * Extracts the project name from the base client URL.
+   * @returns {string|null} The project name or null if it cannot be extracted.
+   */
+  extractProjectNameFromBaseUrl() {
+    if (!this.baseClientUrl) {
+      return null;
+    }
+    
+    const match = this.baseClientUrl.match(/\/client\/([^\/]+)$/);
+    return match ? match[1] : null;
   }
 }
 

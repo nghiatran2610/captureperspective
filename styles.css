@@ -1857,3 +1857,55 @@ body.simple-mode .stats {
 .category-header:hover .combine-pdf-btn {
   background-color: #3182ce;
 }
+
+/* Add these styles to your existing CSS file */
+
+.simple-mode-settings {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  background-color: #f5f7fa;
+  padding: 10px 15px;
+  border-radius: 4px;
+  border: 1px solid #dbe3ec;
+}
+
+.setting-container {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.setting-container label {
+  font-weight: 500;
+  font-size: 14px;
+  margin-right: 8px;
+  color: #3f4a5a;
+}
+
+.wait-time-input {
+  width: 50px;
+  height: 30px;
+  text-align: center;
+  border: 1px solid #ccd6e3;
+  border-radius: 4px;
+  padding: 4px;
+}
+
+/* Make the settings display better on mobile */
+@media (max-width: 768px) {
+  .simple-mode-settings {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .setting-container {
+    margin-bottom: 8px;
+    width: 100%;
+  }
+  
+  .setting-container:last-child {
+    margin-bottom: 0;
+  }
+}

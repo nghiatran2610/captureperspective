@@ -15,37 +15,26 @@ export const urlSelector = {
     try {
       // Create URL selector container
       this.createSelectorContainer();
-
-      // Show loading indicator
-      this.showLoadingState();
-
-      // Load URLs from the server
-      await urlFetcher.loadUrls();
-
-      // Render URL categories
-      this.renderUrlCategories(urlFetcher.categorizedUrls);
-
+      
+      // Show initial state (not loading yet - waiting for user input)
+      this.categoriesContainer.innerHTML = `
+        <div class="url-selector-initial">
+          <p>Enter a Base Client URL above and click "Fetch URLs" to load available pages.</p>
+          <p class="url-format-example">Format: http://host/data/perspective/client/PROJECT_NAME</p>
+        </div>
+      `;
+      
       // Add event listeners for selection
       this.setupEventListeners();
-
-      // Show success message
-      utils.showStatus(
-        `Loaded ${urlFetcher.urlsList.length} URLs from server`,
-        false
-      );
+      
     } catch (error) {
       console.error("Failed to initialize URL selector:", error);
-      utils.showStatus(`Failed to load URLs: ${error.message}`, true);
-
+      utils.showStatus(`Failed to initialize URL selector: ${error.message}`, true);
+      
       // Show fallback textarea
       this.showFallbackUI();
     }
   },
-
-  /**
-   * Create the URL selector container
-   */
-  // Update to url-selector.js - Add baseUrl input field
 
   /**
    * Create the URL selector container
@@ -83,20 +72,52 @@ export const urlSelector = {
     baseUrlInput.id = "baseUrlInput";
     baseUrlContainer.appendChild(baseUrlInput);
 
-    // Add update button
+    // Add fetch URLs button
     const updateUrlBtn = document.createElement("button");
-    updateUrlBtn.textContent = "Update";
+    updateUrlBtn.textContent = "Fetch URLs";
     updateUrlBtn.className = "btn btn-small";
     updateUrlBtn.id = "updateUrlBtn";
 
     // Add event listener for updating base URL
-    updateUrlBtn.addEventListener("click", () => {
-      urlFetcher.setBaseClientUrl(baseUrlInput.value);
-      utils.showStatus(
-        `Base URL updated to: ${baseUrlInput.value}`,
-        false,
-        2000
-      );
+    updateUrlBtn.addEventListener("click", async () => {
+      const baseUrlInput = document.getElementById('baseUrlInput');
+      if (!baseUrlInput || !baseUrlInput.value.trim()) {
+        utils.showStatus("Please enter a valid Base Client URL", true);
+        return;
+      }
+      
+      // Try to set the base URL and extract project name
+      const success = urlFetcher.setBaseClientUrl(baseUrlInput.value);
+      
+      if (!success) {
+        utils.showStatus("Could not extract project name from the URL. Please use format: http://host/data/perspective/client/PROJECT_NAME", true);
+        return;
+      }
+      
+      // Show loading state
+      this.showLoadingState();
+      
+      try {
+        // Only now load the URLs
+        await urlFetcher.loadUrls();
+        
+        // Render URL categories 
+        this.renderUrlCategories(urlFetcher.categorizedUrls);
+        
+        // Show success message
+        utils.showStatus(`Fetched ${urlFetcher.urlsList.length} URLs for project: ${urlFetcher.extractProjectNameFromBaseUrl()}`, false);
+      } catch (error) {
+        console.error("Failed to load URLs:", error);
+        utils.showStatus(`Failed to load URLs: ${error.message}`, true);
+        
+        // Show a message in the container instead of fallback UI
+        this.categoriesContainer.innerHTML = `
+          <div class="url-selector-error">
+            <p>Failed to load URLs: ${error.message}</p>
+            <p>Please check the URL and try again.</p>
+          </div>
+        `;
+      }
     });
 
     baseUrlContainer.appendChild(updateUrlBtn);
@@ -160,8 +181,9 @@ export const urlSelector = {
     this.clearSelectionBtn = clearSelectionBtn;
 
     // Initially disable buttons
-    this.selectAllBtn.disabled = false;
+    this.selectAllBtn.disabled = true;
     this.clearSelectionBtn.disabled = true;
+    this.searchInput.disabled = true;
   },
 
   /**
@@ -259,6 +281,10 @@ export const urlSelector = {
   renderUrlCategories(categorizedUrls) {
     if (!categorizedUrls || Object.keys(categorizedUrls).length === 0) {
       this.categoriesContainer.innerHTML = "<p>No URLs available</p>";
+      // Disable search and selection buttons
+      if (this.searchInput) this.searchInput.disabled = true;
+      if (this.selectAllBtn) this.selectAllBtn.disabled = true;
+      if (this.clearSelectionBtn) this.clearSelectionBtn.disabled = true;
       return;
     }
 
@@ -337,6 +363,10 @@ export const urlSelector = {
 
       this.categoriesContainer.appendChild(categorySection);
     });
+    
+    // Enable search and buttons now that we have URLs
+    if (this.searchInput) this.searchInput.disabled = false;
+    if (this.selectAllBtn) this.selectAllBtn.disabled = false;
   },
 
   /**

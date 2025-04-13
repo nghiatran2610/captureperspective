@@ -128,6 +128,8 @@ class App {
     const captureBtn = UI.elements.captureBtn;
     const urlHelpText = UI.elements.urlHelpText;
     const statsSection = UI.elements.stats;
+    const advancedWaitTimeField = UI.elements.waitTime;
+    const capturePreset = UI.elements.capturePreset;
 
     UI.elements.captureForm.style.display = "";
     UI.elements.progressOutput.style.display = "";
@@ -155,6 +157,76 @@ class App {
       if (statsSection) statsSection.style.display = "";
 
       if (urlHelpText) urlHelpText.style.display = "none";
+
+      // Create simple mode settings if they don't exist
+      if (!document.getElementById("simpleModeSetting")) {
+        // Create container for simple mode settings
+        const simpleModeSettings = document.createElement("div");
+        simpleModeSettings.id = "simpleModeSetting";
+        simpleModeSettings.className = "simple-mode-settings";
+
+        // 1. Create container for resolution selector
+        const presetContainer = document.createElement("div");
+        presetContainer.className = "setting-container";
+
+        // Create label for resolution
+        const presetLabel = document.createElement("label");
+        presetLabel.textContent = "Screen Resolution:";
+        presetLabel.htmlFor = capturePreset.id;
+        presetContainer.appendChild(presetLabel);
+
+        // Create a clone of the resolution selector for simple mode
+        const simplePreset = capturePreset.cloneNode(true);
+        simplePreset.id = "simplePreset";
+        simplePreset.value = capturePreset.value; // Copy current value
+        presetContainer.appendChild(simplePreset);
+        simpleModeSettings.appendChild(presetContainer);
+
+        // 2. Create container for wait time (with separate field for simple mode)
+        const waitTimeContainer = document.createElement("div");
+        waitTimeContainer.className = "setting-container";
+
+        // Create label for wait time
+        const waitTimeLabel = document.createElement("label");
+        waitTimeLabel.textContent = "Max Wait Time (sec):";
+        waitTimeLabel.htmlFor = "simpleWaitTime";
+        waitTimeContainer.appendChild(waitTimeLabel);
+
+        // Create separate wait time input for simple mode
+        const simpleWaitTime = document.createElement("input");
+        simpleWaitTime.type = "number";
+        simpleWaitTime.id = "simpleWaitTime";
+        simpleWaitTime.className = "wait-time-input";
+        simpleWaitTime.min = "1";
+        simpleWaitTime.max = "120";
+        simpleWaitTime.value = config.ui.defaultWaitTime || 5;
+
+        waitTimeContainer.appendChild(simpleWaitTime);
+        simpleModeSettings.appendChild(waitTimeContainer);
+
+        // Add settings container before the URL selection area
+        const parentNode = urlList.parentNode;
+        if (parentNode) {
+          // Insert before the urlList or its replacement
+          const referenceNode =
+            document.getElementById("urlSelectorContainer") || urlList;
+          parentNode.insertBefore(simpleModeSettings, referenceNode);
+        }
+
+        // Add event listeners to sync resolution between modes if needed
+        simplePreset.addEventListener("change", () => {
+          capturePreset.value = simplePreset.value;
+        });
+      } else {
+        // If settings already exist, just make sure they're visible
+        document.getElementById("simpleModeSetting").style.display = "";
+
+        // Ensure the resolution selector is in sync
+        const simplePreset = document.getElementById("simplePreset");
+        if (simplePreset) {
+          simplePreset.value = capturePreset.value;
+        }
+      }
 
       // Remove any input event listener for single URL enforcement
       if (urlList._singleUrlListener) {
@@ -185,6 +257,11 @@ class App {
 
       // Hide stats in advanced mode
       if (statsSection) statsSection.style.display = "none";
+
+      // Hide simple mode settings in advanced mode
+      if (document.getElementById("simpleModeSetting")) {
+        document.getElementById("simpleModeSetting").style.display = "none";
+      }
 
       if (urlHelpText) {
         urlHelpText.style.display = "block";
@@ -373,6 +450,12 @@ class App {
 
         actionSequences = []; // No actions in simple mode
         this.usingActionSequences = false;
+
+        // Get wait time from simple mode specific field
+        const simpleWaitTimeEl = document.getElementById("simpleWaitTime");
+        if (simpleWaitTimeEl && UI.elements.waitTime) {
+          UI.elements.waitTime.value = simpleWaitTimeEl.value;
+        }
       } else {
         // Advanced Mode
         const rawUrlInput = UI.elements.urlList.value.trim();
