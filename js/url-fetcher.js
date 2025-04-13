@@ -97,7 +97,7 @@ class URLFetcher {
       if (match && match[1]) {
         this.projectName = match[1];
         const urlObj = new URL(this.baseClientUrl);
-        this.urlEndpoint = `${urlObj.origin}/system/webdev/${this.webdevFolder}/getUrls?projectName=${encodeURIComponent(this.projectName)}`;
+        this.urlEndpoint = `${urlObj.origin}/system/webdev/${this.webdevFolder}/PerspectiveCapture/getUrls?projectName=${encodeURIComponent(this.projectName)}`;
         console.log(`Project name: ${this.projectName}`);
         console.log(`URL endpoint: ${this.urlEndpoint}`);
         return true;
