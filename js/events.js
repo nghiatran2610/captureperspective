@@ -68,7 +68,12 @@ export function addDOMEventListener(element, eventType, handler, options = {}) {
  * @param {Function} handler - Event handler
  * @param {Object} options - removeEventListener options
  */
-export function removeDOMEventListener(element, eventType, handler, options = {}) {
+export function removeDOMEventListener(
+  element,
+  eventType,
+  handler,
+  options = {}
+) {
   if (element) {
     element.removeEventListener(eventType, handler, options);
   }
@@ -90,22 +95,25 @@ export function once(eventName, handler) {
 // Application specific events
 export const events = {
   // Capture process events
-  CAPTURE_STARTED: 'captureStarted',
-  CAPTURE_COMPLETED: 'captureCompleted',
-  CAPTURE_FAILED: 'captureFailed',
-  CAPTURE_PROGRESS: 'captureProgress',
-  
+  CAPTURE_STARTED: "captureStarted",
+  CAPTURE_COMPLETED: "captureCompleted",
+  CAPTURE_FAILED: "captureFailed",
+  CAPTURE_PROGRESS: "captureProgress",
+
   // Screenshot related events
-  SCREENSHOT_TAKEN: 'screenshotTaken',
-  SCREENSHOT_SAVED: 'screenshotSaved',
-  
+  SCREENSHOT_TAKEN: "screenshotTaken",
+  SCREENSHOT_SAVED: "screenshotSaved",
+
   // URL processing events
-  URL_PROCESSING_STARTED: 'urlProcessingStarted',
-  URL_PROCESSING_COMPLETED: 'urlProcessingCompleted',
-  
+  URL_PROCESSING_STARTED: "urlProcessingStarted",
+  URL_PROCESSING_COMPLETED: "urlProcessingCompleted",
+
+  // URL selection events (new)
+  URL_SELECTION_CHANGED: "URL_SELECTION_CHANGED",
+
   // UI events
-  UI_RESET: 'uiReset',
-  DOWNLOAD_ALL_REQUESTED: 'downloadAllRequested'
+  UI_RESET: "uiReset",
+  DOWNLOAD_ALL_REQUESTED: "downloadAllRequested",
 };
 
 export default {
@@ -115,5 +123,5 @@ export default {
   once,
   addDOMEventListener,
   removeDOMEventListener,
-  events
+  events,
 };

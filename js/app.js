@@ -7,7 +7,7 @@ import * as ScreenshotCapture from "./screenshot/core.js";
 import ContextMenuActionsHelper from "./context-menu-actions-helper.js";
 import * as events from "./events.js";
 import { handleError, ScreenshotError, URLProcessingError } from "./errors.js";
-// import * as utils from "./screenshot/utils.js"; // Keep if needed
+import urlSelector from "./ui/url-selector.js";
 
 class App {
   constructor() {
@@ -52,7 +52,6 @@ class App {
       "click",
       this.retryFailedUrls
     );
-    // REMOVED Listener for toggle
     events.addDOMEventListener(
       UI.elements.actionsField,
       "input",
@@ -84,22 +83,6 @@ class App {
     }
     UI.elements.captureForm.style.display = "none";
     UI.elements.progressOutput.style.display = "none";
-
-    // Disable the "Full Page (Auto Height)" option
-    // if (UI.elements.capturePreset) {
-    //   const fullPageOption = Array.from(UI.elements.capturePreset.options).find(
-    //     (option) => option.value === "fullPage"
-    //   );
-
-    //   if (fullPageOption) {
-    //     fullPageOption.disabled = true;
-
-    //     // If fullPage is currently selected, change to another preset
-    //     if (UI.elements.capturePreset.value === "fullPage") {
-    //       UI.elements.capturePreset.value = "fullHD"; // Default to Full HD
-    //     }
-    //   }
-    // }
   }
 
   _handleModeChange(event) {
@@ -138,18 +121,24 @@ class App {
     return "";
   }
 
-  // Add this to the _updateUIMode method in app.js
-
   _updateUIMode() {
     const body = document.body;
     const urlList = UI.elements.urlList;
     const advancedOptions = UI.elements.advancedOptions;
     const captureBtn = UI.elements.captureBtn;
     const urlHelpText = UI.elements.urlHelpText;
-    const statsSection = UI.elements.stats; // Get reference to stats section
+    const statsSection = UI.elements.stats;
 
     UI.elements.captureForm.style.display = "";
     UI.elements.progressOutput.style.display = "";
+
+    // Clean up URL selector first if we're switching modes
+    if (
+      this.currentMode === "advanced" &&
+      typeof urlSelector.cleanup === "function"
+    ) {
+      urlSelector.cleanup();
+    }
 
     if (this.currentMode === "simple") {
       body.classList.add("simple-mode");
@@ -157,9 +146,10 @@ class App {
       urlList.rows = 5;
       urlList.placeholder = "Enter URLs (one per line)";
       urlList.value = ""; // Clear any prefilled value
-      UI.elements.urlInputTitle.textContent = "Enter URLs to Capture";
+      UI.elements.urlInputTitle.textContent = "Select Pages to Capture";
       advancedOptions.style.display = "none";
       captureBtn.classList.remove("initially-hidden");
+      captureBtn.disabled = true; // Disabled until URLs are selected
 
       // Show stats in simple mode
       if (statsSection) statsSection.style.display = "";
@@ -171,6 +161,13 @@ class App {
         urlList.removeEventListener("input", urlList._singleUrlListener);
         delete urlList._singleUrlListener;
       }
+
+      // Initialize URL selector
+      setTimeout(() => {
+        urlSelector.initialize().catch((error) => {
+          console.error("Failed to initialize URL selector:", error);
+        });
+      }, 0);
     } else {
       // Advanced mode
       body.classList.remove("simple-mode");
@@ -189,7 +186,20 @@ class App {
       // Hide stats in advanced mode
       if (statsSection) statsSection.style.display = "none";
 
-      if (urlHelpText) urlHelpText.style.display = "block";
+      if (urlHelpText) {
+        urlHelpText.style.display = "block";
+
+        // Ensure the textarea is positioned right after the help text
+        if (urlHelpText.parentElement && urlList.parentElement) {
+          // Only move if it's not already in the right position
+          if (urlHelpText.nextSibling !== urlList) {
+            urlHelpText.parentElement.insertBefore(
+              urlList,
+              urlHelpText.nextSibling
+            );
+          }
+        }
+      }
 
       // Add input event listener to enforce single URL
       if (!urlList._singleUrlListener) {
@@ -223,6 +233,7 @@ class App {
         urlList.addEventListener("input", urlList._singleUrlListener);
       }
     }
+
     UI.utils.resetUI();
 
     // Additional step: Check if we have a prefilled URL in advanced mode
@@ -231,13 +242,13 @@ class App {
       this._handleActionsInput(); // Will check action field and update button state
     }
   }
-
   _handleActionsInput() {
     // Simply check the capture button state whenever the content changes
     if (this.currentMode === "advanced") {
       this._checkCaptureButtonState();
     }
   }
+
   _checkCaptureButtonState() {
     const captureBtn = UI.elements.captureBtn;
     const buttonContainer = UI.elements.buttonContainer;
@@ -295,13 +306,12 @@ class App {
     events.on(events.events.CAPTURE_PROGRESS, (data) => {
       UI.progress.updateProgressMessage(data.message);
     });
-    events.on(events.events.CAPTURE_FAILED, (data) => {
-      UI.utils.showStatus(
-        `✗ Failed to capture screenshot: ${data.url} (${
-          data.error?.message || "Unknown error"
-        })`,
-        true
-      );
+    events.on("URL_SELECTION_CHANGED", (data) => {
+      console.log("URL_SELECTION_CHANGED event received", data);
+      if (this.currentMode === "simple") {
+        // Enable/disable capture button based on selection count
+        UI.elements.captureBtn.disabled = data.count === 0;
+      }
     });
     events.on(events.events.SCREENSHOT_TAKEN, (data) => {
       UI.utils.showStatus(
@@ -316,12 +326,18 @@ class App {
         this._checkCaptureButtonState(); // This will now run after generation
       }
     });
+
+    // NEW: Add listener for URL selection changes
+    events.on("URL_SELECTION_CHANGED", (data) => {
+      console.log("URL_SELECTION_CHANGED event received", data); // Add log for debugging
+      if (this.currentMode === "simple") {
+        // Enable/disable capture button based on selection count
+        UI.elements.captureBtn.disabled = data.count === 0;
+      }
+    });
   }
 
-  // REMOVED toggleAdvancedOptions method
-
   async captureScreenshots() {
-   
     const startTotalTime = performance.now();
     let urlList = []; // Initialize urlList
 
@@ -332,23 +348,34 @@ class App {
       UI.thumbnails.createLiveThumbnailsContainer();
       UI.thumbnails.addCombineAllToPDFButton(); // Add PDF combine button
 
-      const rawUrlInput = UI.elements.urlList.value.trim();
       const capturePreset = UI.elements.capturePreset.value || "fullHD";
       let actionSequences = [];
 
       // --- Mode-Specific Logic ---
       if (this.currentMode === "simple") {
-        urlList = URLProcessor.processUrlList(rawUrlInput);
+        // Get URLs from URL selector if available
+        if (typeof urlSelector.getSelectedUrlsForCapture === "function") {
+          urlList = urlSelector.getSelectedUrlsForCapture();
+        }
+
+        // Fallback to text input if URL selector isn't available or returned no URLs
+        if (!urlList || urlList.length === 0) {
+          const rawUrlInput = UI.elements.urlList.value.trim();
+          urlList = URLProcessor.processUrlList(rawUrlInput);
+        }
+
         if (urlList.length === 0) {
           throw new URLProcessingError(
-            "Please enter at least one valid URL.",
-            rawUrlInput
+            "Please select at least one page to capture.",
+            "No URLs selected"
           );
         }
+
         actionSequences = []; // No actions in simple mode
         this.usingActionSequences = false;
       } else {
         // Advanced Mode
+        const rawUrlInput = UI.elements.urlList.value.trim();
         const urls = rawUrlInput
           .split("\n")
           .map((url) => url.trim())

@@ -1,3 +1,4 @@
+// ui/thumbnails.js
 import { elements } from "./elements.js";
 import { utils } from "./utils.js";
 import { modals } from "./modals.js";
@@ -33,15 +34,17 @@ export const thumbnails = {
     combinePdfBtn.className = "btn combine-all-pdf-btn";
     combinePdfBtn.textContent = "Combine All Screenshots to PDF";
 
-    combinePdfBtn.addEventListener("click", () => {
+    // Fix the event listener to use a proper reference to the thumbnails object
+    const self = this; // Store a reference to thumbnails
+    combinePdfBtn.addEventListener("click", function () {
       // Get all categories
       const allCategories = document.querySelectorAll(".thumbnail-category");
       if (allCategories.length === 0) {
         utils.showStatus("No screenshots available", true);
         return;
       }
-      // Combine all screenshots from all categories
-      this.combineAllToPDF(allCategories);
+      // Use the stored reference to call the function
+      self.generateAllCategoriesPDF(allCategories);
     });
 
     footerSection.appendChild(combinePdfBtn);
@@ -143,7 +146,6 @@ export const thumbnails = {
           result.height,
           result.timeTaken,
           result.url || currentUrl // Pass the URL of the screenshot
-
         );
       });
     }
@@ -277,7 +279,7 @@ export const thumbnails = {
 
       const thumbnailCount = document.createElement("span");
       thumbnailCount.className = "thumbnail-count";
-      thumbnailCount.textContent = "0";
+      thumbnailCount.textContent = "(0)";
       categoryHeader.appendChild(thumbnailCount);
 
       // Create content container (for actual thumbnails)
@@ -288,9 +290,13 @@ export const thumbnails = {
       const combinePdfBtn = document.createElement("button");
       combinePdfBtn.className = "btn btn-small combine-pdf-btn";
       combinePdfBtn.textContent = "Combine to PDF";
-      combinePdfBtn.addEventListener("click", (e) => {
+
+      // Fix the event listener using a reference to the thumbnails object
+      const self = this;
+      combinePdfBtn.addEventListener("click", function (e) {
         e.stopPropagation();
-        this.combineToPDF(categoryContainer);
+        // Use the stored reference to call the method
+        self.generatePDF(categoryContainer);
       });
 
       categoryHeader.appendChild(combinePdfBtn);
@@ -368,7 +374,9 @@ export const thumbnails = {
     combinePdfBtn.className = "btn combine-all-pdf-btn";
     combinePdfBtn.textContent = "Combine All Screenshots to PDF";
 
-    combinePdfBtn.addEventListener("click", () => {
+    // Store a reference to this
+    const self = this;
+    combinePdfBtn.addEventListener("click", function () {
       // Get all categories
       const allCategories = document.querySelectorAll(".thumbnail-category");
       if (allCategories.length === 0) {
@@ -377,7 +385,7 @@ export const thumbnails = {
       }
 
       // Combine all screenshots from all categories
-      this.combineAllToPDF(allCategories);
+      self.generateAllCategoriesPDF(allCategories);
     });
 
     combinePdfContainer.appendChild(combinePdfBtn);
@@ -402,48 +410,124 @@ export const thumbnails = {
   },
 
   /**
-   * Combine screenshots in a category to a PDF
-   * @param {HTMLElement} categoryContainer - The category container element
+   * Helper function to optimize image for PDF with higher quality
+   * @param {string} dataURL - Data URL of the image
+   * @returns {Promise<string>} - Promise that resolves to optimized data URL
    */
-  combineToPDF(categoryContainer) {
-    // First, check if jsPDF is loaded
-    if (typeof jspdf === "undefined") {
-      // Load jsPDF dynamically
-      this.loadJsPDF()
-        .then(() => {
-          this.generatePDF(categoryContainer);
-        })
-        .catch((error) => {
-          console.error("Error loading jsPDF:", error);
-          utils.showStatus(
-            "Error loading PDF library. Please try again.",
-            true
-          );
-        });
-    } else {
-      // jsPDF is already loaded, generate PDF
-      this.generatePDF(categoryContainer);
-    }
+  optimizeImageForPDF(dataURL) {
+    return new Promise((resolve, reject) => {
+      try {
+        const img = new Image();
+
+        img.onload = () => {
+          try {
+            // Check if we have valid dimensions
+            if (
+              !img.width ||
+              !img.height ||
+              isNaN(img.width) ||
+              isNaN(img.height)
+            ) {
+              console.warn("Invalid image dimensions:", img.width, img.height);
+              resolve(dataURL); // Return original on invalid dimensions
+              return;
+            }
+
+            // Determine target size based on original dimensions
+            let targetWidth = img.width;
+            let targetHeight = img.height;
+
+            // Maximum dimensions - increased for better quality
+            const MAX_DIMENSION = 1800;
+
+            if (targetWidth > MAX_DIMENSION || targetHeight > MAX_DIMENSION) {
+              if (targetWidth > targetHeight) {
+                const ratio = targetHeight / targetWidth;
+                targetWidth = MAX_DIMENSION;
+                targetHeight = Math.round(MAX_DIMENSION * ratio);
+              } else {
+                const ratio = targetWidth / targetHeight;
+                targetHeight = MAX_DIMENSION;
+                targetWidth = Math.round(MAX_DIMENSION * ratio);
+              }
+            }
+
+            // Ensure dimensions are integers and valid
+            targetWidth = Math.max(1, Math.round(targetWidth));
+            targetHeight = Math.max(1, Math.round(targetHeight));
+
+            // Create canvas for resizing
+            const canvas = document.createElement("canvas");
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+
+            // Draw image with high-quality settings
+            const ctx = canvas.getContext("2d");
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+            ctx.fillStyle = "#FFFFFF"; // Fill with white background
+            ctx.fillRect(0, 0, targetWidth, targetHeight); // Ensure canvas is not transparent
+            ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+            // Higher quality compression - use PNG for small images and high-quality JPEG for larger ones
+            let optimizedData;
+
+            if (targetWidth * targetHeight < 250000) {
+              // For smaller images, use PNG for better quality
+              optimizedData = canvas.toDataURL("image/png");
+            } else {
+              // For larger images, use high-quality JPEG
+              // Increased quality from 0.6/0.75 to 0.85/0.92
+              const quality = targetWidth > 1000 ? 0.85 : 0.92;
+              optimizedData = canvas.toDataURL("image/jpeg", quality);
+            }
+
+            // Clean up to free memory
+            canvas.width = 1;
+            canvas.height = 1;
+
+            resolve(optimizedData);
+          } catch (err) {
+            console.warn("Error during image optimization:", err);
+            // Return original on error
+            resolve(dataURL);
+          }
+        };
+
+        img.onerror = () => {
+          console.warn("Failed to load image for optimization");
+          resolve(dataURL); // Return original on error
+        };
+
+        img.src = dataURL;
+      } catch (err) {
+        console.warn("Exception in optimization:", err);
+        resolve(dataURL); // Return original on error
+      }
+    });
   },
 
   /**
-   * Load jsPDF library dynamically
-   * @returns {Promise} - Resolves when library is loaded
+   * Helper function to get valid image dimensions
+   * @param {Image} img - Image element
+   * @returns {Object} - Object with width and height properties
    */
-  loadJsPDF() {
-    return new Promise((resolve, reject) => {
-      // Create script element for jsPDF
-      const jsPdfScript = document.createElement("script");
-      jsPdfScript.src =
-        "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-      jsPdfScript.onload = () => {
-        resolve();
-      };
-      jsPdfScript.onerror = () => {
-        reject(new Error("Failed to load jsPDF library"));
-      };
-      document.head.appendChild(jsPdfScript);
-    });
+  getValidImageDimensions(img) {
+    let width = img.width || img.naturalWidth;
+    let height = img.height || img.naturalHeight;
+
+    // Ensure dimensions are valid
+    if (!width || !height || isNaN(width) || isNaN(height)) {
+      // Default to a small, valid size if dimensions are invalid
+      console.warn("Invalid image dimensions, using defaults");
+      width = 100;
+      height = 100;
+    }
+
+    return {
+      width: Math.max(1, Math.round(width)),
+      height: Math.max(1, Math.round(height)),
+    };
   },
 
   /**
@@ -467,11 +551,14 @@ export const thumbnails = {
     // Show status message
     utils.showStatus(`Generating PDF for ${categoryTitle}...`, false);
 
-    // Create new jsPDF instance
+    // Create new jsPDF instance with better quality settings
     const pdf = new jspdf.jsPDF({
       orientation: "landscape",
       unit: "mm",
       format: "a4",
+      compress: true,
+      precision: 4, // Higher precision for better quality
+      putOnlyUsedFonts: true,
     });
 
     // Add title to first page
@@ -481,108 +568,156 @@ export const thumbnails = {
     pdf.text(`Generated on ${new Date().toLocaleString()}`, 20, 30);
     pdf.line(20, 35, pdf.internal.pageSize.width - 20, 35);
 
-    // Process each screenshot
-    let currentPromise = Promise.resolve();
+    // Define page dimensions
+    const pageWidth = pdf.internal.pageSize.width - 40; // 20mm margins on each side
+    const pageHeight = pdf.internal.pageSize.height - 60; // 30mm margins top and bottom
+
+    // Process each screenshot one at a time to avoid memory issues
+    let currentIndex = 0;
     let pageCount = 1;
 
-    Array.from(thumbnailContainers).forEach((container, index) => {
+    // Start processing
+    const self = this;
+    processNextScreenshot();
+
+    function processNextScreenshot() {
+      if (currentIndex >= thumbnailContainers.length) {
+        // All screenshots processed, save the PDF
+        try {
+          const sanitizedTitle = categoryTitle.replace(/[^a-zA-Z0-9]/g, "_");
+          pdf.save(
+            `${sanitizedTitle}_${new Date().toISOString().slice(0, 10)}.pdf`
+          );
+          utils.showStatus(`PDF generated with ${pageCount} pages`, false);
+        } catch (error) {
+          console.error("Error saving PDF:", error);
+          utils.showStatus("Error saving PDF", true);
+        }
+        return;
+      }
+
+      const container = thumbnailContainers[currentIndex];
       const screenshotData = container.dataset.screenshot;
       const filename = container.dataset.filename;
 
-      if (!screenshotData) return;
+      if (!screenshotData) {
+        // Skip this one and move to next
+        currentIndex++;
+        processNextScreenshot();
+        return;
+      }
 
-      currentPromise = currentPromise.then(() => {
-        return new Promise((resolve) => {
-          // Create a new page for each screenshot after the first
-          if (index > 0) {
-            pdf.addPage();
-            pageCount++;
-          }
+      // Create a new page for each screenshot after the first
+      if (currentIndex > 0) {
+        pdf.addPage();
+        pageCount++;
+      }
 
+      // Use the thumbnails object's method
+      self
+        .optimizeImageForPDF(screenshotData)
+        .then((optimizedData) => {
           // Create an image element to get dimensions
           const img = new Image();
           img.onload = () => {
-            // Calculate dimensions to fit on page
-            const pageWidth = pdf.internal.pageSize.width - 40; // 20mm margins on each side
-            const pageHeight = pdf.internal.pageSize.height - 60; // 30mm margins top and bottom
+            try {
+              // Get valid image dimensions
+              const imgDimensions = self.getValidImageDimensions(img);
 
-            const imgRatio = img.width / img.height;
-            let imgWidth = pageWidth;
-            let imgHeight = imgWidth / imgRatio;
+              // Calculate dimensions to fit on page with validation
+              let imgWidth = Math.min(pageWidth, imgDimensions.width);
+              let imgHeight = Math.min(pageHeight, imgDimensions.height);
 
-            if (imgHeight > pageHeight) {
-              imgHeight = pageHeight;
-              imgWidth = imgHeight * imgRatio;
+              // Calculate aspect ratio correctly
+              const imgRatio = imgDimensions.width / imgDimensions.height;
+
+              // Recalculate dimensions based on aspect ratio
+              if (imgWidth / imgHeight !== imgRatio) {
+                if (imgWidth / imgRatio > pageHeight) {
+                  // Height-constrained
+                  imgHeight = pageHeight;
+                  imgWidth = imgHeight * imgRatio;
+                } else {
+                  // Width-constrained
+                  imgWidth = pageWidth;
+                  imgHeight = imgWidth / imgRatio;
+                }
+              }
+
+              // Ensure all dimensions are valid numbers and not too close to zero
+              imgWidth = Math.max(
+                10,
+                Math.min(pageWidth, Math.round(imgWidth))
+              );
+              imgHeight = Math.max(
+                10,
+                Math.min(pageHeight, Math.round(imgHeight))
+              );
+
+              // Validate one more time before adding to PDF
+              if (
+                isNaN(imgWidth) ||
+                isNaN(imgHeight) ||
+                imgWidth <= 0 ||
+                imgHeight <= 0
+              ) {
+                console.error(
+                  "Invalid image dimensions for PDF:",
+                  imgWidth,
+                  imgHeight
+                );
+                // Skip this image
+                currentIndex++;
+                setTimeout(processNextScreenshot, 10);
+                return;
+              }
+
+              // Add the image to the PDF
+              pdf.addImage(
+                optimizedData,
+                optimizedData.includes("data:image/png") ? "PNG" : "JPEG",
+                20, // X position (left margin)
+                40, // Y position (below the title)
+                imgWidth,
+                imgHeight
+              );
+
+              // Add caption below the image
+              pdf.setFontSize(10);
+
+              // Truncate filename if too long
+              const truncatedFilename =
+                filename.length > 80
+                  ? filename.substring(0, 77) + "..."
+                  : filename;
+
+              pdf.text(truncatedFilename, 20, imgHeight + 45);
+
+              // Process next screenshot
+              currentIndex++;
+              // Small delay to allow UI updates
+              setTimeout(processNextScreenshot, 10);
+            } catch (error) {
+              console.error("Error adding image to PDF:", error);
+              // Continue with next screenshot
+              currentIndex++;
+              processNextScreenshot();
             }
-
-            // Add the image to the PDF
-            pdf.addImage(
-              screenshotData,
-              "PNG",
-              20, // X position (left margin)
-              40, // Y position (below the title)
-              imgWidth,
-              imgHeight
-            );
-
-            // Add caption below the image
-            pdf.setFontSize(10);
-            pdf.text(filename, 20, imgHeight + 45);
-
-            resolve();
           };
 
-          img.src = screenshotData;
-        });
-      });
-    });
+          img.onerror = () => {
+            console.error("Failed to load image for PDF");
+            currentIndex++;
+            processNextScreenshot();
+          };
 
-    // When all screenshots are processed, save the PDF
-    currentPromise
-      .then(() => {
-        const sanitizedTitle = categoryTitle.replace(/[^a-zA-Z0-9]/g, "_");
-        pdf.save(
-          `${sanitizedTitle}_${new Date().toISOString().slice(0, 10)}.pdf`
-        );
-        utils.showStatus(`PDF generated with ${pageCount} pages`, false);
-      })
-      .catch((error) => {
-        console.error("Error generating PDF:", error);
-        utils.showStatus("Error generating PDF", true);
-      });
-  },
-
-  /**
-   * Detect if a screenshot is from a toolbar action based on the filename or sequence name
-   * @param {string} name - Filename or sequence name to check
-   * @returns {boolean} - True if it's a toolbar action
-   */
-  isToolbarAction(name) {
-    return /Button$/.test(name);
-  },
-
-  /**
-   * Combine all screenshots from all categories to a single PDF
-   * @param {NodeList} categoryContainers - All category containers
-   */
-  combineAllToPDF(categoryContainers) {
-    // First, check if jsPDF is loaded
-    if (typeof jspdf === "undefined") {
-      // Load jsPDF dynamically
-      this.loadJsPDF()
-        .then(() => {
-          this.generateAllCategoriesPDF(categoryContainers);
+          img.src = optimizedData;
         })
         .catch((error) => {
-          console.error("Error loading jsPDF:", error);
-          utils.showStatus(
-            "Error loading PDF library. Please try again.",
-            true
-          );
+          console.error("Error optimizing image:", error);
+          currentIndex++;
+          processNextScreenshot();
         });
-    } else {
-      // jsPDF is already loaded, generate PDF
-      this.generateAllCategoriesPDF(categoryContainers);
     }
   },
 
@@ -597,120 +732,323 @@ export const thumbnails = {
       false
     );
 
-    // Create new jsPDF instance
-    const pdf = new jspdf.jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a4",
-    });
+    try {
+      // Create new jsPDF instance with better quality settings
+      const pdf = new jspdf.jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+        precision: 4, // Higher precision for better quality
+        putOnlyUsedFonts: true,
+      });
 
-    // Add title to first page
-    pdf.setFontSize(22);
-    pdf.text("Complete Screenshot Documentation", 20, 20);
-    pdf.setFontSize(12);
-    pdf.text(`Generated on ${new Date().toLocaleString()}`, 20, 30);
-    pdf.line(20, 35, pdf.internal.pageSize.width - 20, 35);
+      // Add title to first page
+      pdf.setFontSize(22);
+      pdf.text("Complete Screenshot Documentation", 20, 20);
+      pdf.setFontSize(12);
+      pdf.text(`Generated on ${new Date().toLocaleString()}`, 20, 30);
+      pdf.line(20, 35, pdf.internal.pageSize.width - 20, 35);
 
-    // Process each category
-    let currentPromise = Promise.resolve();
-    let pageCount = 1;
-    let isFirstPage = true;
+      // Count total screenshots to show progress
+      let totalScreenshots = 0;
+      Array.from(categoryContainers).forEach((categoryContainer) => {
+        const thumbnailContainers = categoryContainer.querySelectorAll(
+          ".category-content .thumbnail-container"
+        );
+        totalScreenshots += thumbnailContainers.length;
+      });
 
-    Array.from(categoryContainers).forEach((categoryContainer) => {
-      const categoryTitle = categoryContainer.querySelector(
-        ".category-header h4"
-      ).textContent;
-      const thumbnailContainers = categoryContainer.querySelectorAll(
-        ".category-content .thumbnail-container"
-      );
+      // Define page dimensions once for reuse
+      const pageWidth = pdf.internal.pageSize.width - 40; // 20mm margins on each side
+      const pageHeight = pdf.internal.pageSize.height - 60; // 30mm margins top and bottom
 
-      if (thumbnailContainers.length === 0) return;
+      // Process categories and screenshots sequentially to prevent memory issues
+      let pageCount = 1;
+      let processedScreenshots = 0;
+      let currentCategory = 0;
+      const totalCategories = categoryContainers.length;
+      let hasScreenshots = false; // Flag to track if any screenshot was added
 
-      // Add category title page
-      currentPromise = currentPromise.then(() => {
-        if (!isFirstPage) {
-          pdf.addPage();
-          pageCount++;
-        } else {
-          isFirstPage = false;
+      // Process one category at a time
+      const self = this;
+      processNextCategory();
+
+      function processNextCategory() {
+        if (currentCategory >= totalCategories) {
+          // All categories processed - save the PDF if any screenshots were added
+          if (hasScreenshots) {
+            finalizePDF();
+          } else {
+            utils.showStatus("No screenshots available to generate PDF.", true);
+          }
+          return;
         }
 
-        pdf.setFontSize(18);
-        pdf.text(`Category: ${categoryTitle}`, 20, 50);
-        pdf.setFontSize(14);
-        pdf.text(`Contains ${thumbnailContainers.length} screenshots`, 20, 60);
+        const categoryContainer = categoryContainers[currentCategory];
+        const categoryTitle =
+          categoryContainer.querySelector(".category-header h4")?.textContent ||
+          `Category ${currentCategory + 1}`;
 
-        return Promise.resolve();
-      });
+        const thumbnailContainers = categoryContainer.querySelectorAll(
+          ".category-content .thumbnail-container"
+        );
 
-      // Process each screenshot in this category
-      Array.from(thumbnailContainers).forEach((container) => {
-        const screenshotData = container.dataset.screenshot;
-        const filename = container.dataset.filename;
+        if (thumbnailContainers.length === 0) {
+          // Skip empty categories
+          currentCategory++;
+          processNextCategory();
+          return;
+        }
 
-        if (!screenshotData) return;
+        // Process screenshots sequentially
+        let currentScreenshot = 0;
 
-        currentPromise = currentPromise.then(() => {
-          return new Promise((resolve) => {
-            // Add a new page for the screenshot
-            pdf.addPage();
-            pageCount++;
+        processNextScreenshot();
 
-            // Create an image element to get dimensions
-            const img = new Image();
-            img.onload = () => {
-              // Calculate dimensions to fit on page
-              const pageWidth = pdf.internal.pageSize.width - 40; // 20mm margins on each side
-              const pageHeight = pdf.internal.pageSize.height - 60; // 30mm margins top and bottom
+        function processNextScreenshot() {
+          if (currentScreenshot >= thumbnailContainers.length) {
+            // All screenshots in this category processed
+            currentCategory++;
+            processNextCategory();
+            return;
+          }
 
-              const imgRatio = img.width / img.height;
-              let imgWidth = pageWidth;
-              let imgHeight = imgWidth / imgRatio;
+          const container = thumbnailContainers[currentScreenshot];
+          const screenshotData = container.dataset.screenshot;
+          const filename = container.dataset.filename;
 
-              if (imgHeight > pageHeight) {
-                imgHeight = pageHeight;
-                imgWidth = imgHeight * imgRatio;
+          if (!screenshotData) {
+            // Skip if no screenshot data
+            currentScreenshot++;
+            processedScreenshots++;
+            processNextScreenshot();
+            return;
+          }
+
+          // Add a new page for the screenshot
+          pdf.addPage();
+          pageCount++;
+          hasScreenshots = true; // Mark that at least one screenshot has been added
+
+          // Process and optimize image
+          self
+            .optimizeImageForPDF(screenshotData)
+            .then((optimizedData) => {
+              try {
+                // Create image element to get dimensions
+                const img = new Image();
+                img.onload = () => {
+                  try {
+                    // Get valid image dimensions
+                    const imgDimensions = self.getValidImageDimensions(img);
+
+                    // Calculate dimensions to fit on page with validation
+                    let imgWidth = Math.min(pageWidth, imgDimensions.width);
+                    let imgHeight = Math.min(pageHeight, imgDimensions.height);
+
+                    // Calculate aspect ratio correctly
+                    const imgRatio = imgDimensions.width / imgDimensions.height;
+
+                    // Recalculate dimensions based on aspect ratio
+                    if (imgWidth / imgHeight !== imgRatio) {
+                      if (imgWidth / imgRatio > pageHeight) {
+                        // Height-constrained
+                        imgHeight = pageHeight;
+                        imgWidth = imgHeight * imgRatio;
+                      } else {
+                        // Width-constrained
+                        imgWidth = pageWidth;
+                        imgHeight = imgWidth / imgRatio;
+                      }
+                    }
+
+                    // Ensure all dimensions are valid numbers and not too close to zero
+                    imgWidth = Math.max(
+                      10,
+                      Math.min(pageWidth, Math.round(imgWidth))
+                    );
+                    imgHeight = Math.max(
+                      10,
+                      Math.min(pageHeight, Math.round(imgHeight))
+                    );
+
+                    // Validate one more time before adding to PDF
+                    if (
+                      isNaN(imgWidth) ||
+                      isNaN(imgHeight) ||
+                      imgWidth <= 0 ||
+                      imgHeight <= 0
+                    ) {
+                      console.error(
+                        "Invalid image dimensions for PDF:",
+                        imgWidth,
+                        imgHeight
+                      );
+                      // Skip this image
+                      processedScreenshots++;
+                      currentScreenshot++;
+                      setTimeout(processNextScreenshot, 10);
+                      return;
+                    }
+
+                    // Add the image to the PDF
+                    pdf.addImage(
+                      optimizedData,
+                      optimizedData.includes("data:image/png") ? "PNG" : "JPEG",
+                      20, // X position
+                      40, // Y position
+                      imgWidth,
+                      imgHeight
+                    );
+
+                    // Add caption below the image
+                    pdf.setFontSize(14);
+                    pdf.text(`Category: ${categoryTitle}`, 20, 30);
+                    pdf.setFontSize(10);
+
+                    // Truncate filename if too long to avoid PDF issues
+                    const truncatedFilename =
+                      filename.length > 80
+                        ? filename.substring(0, 77) + "..."
+                        : filename;
+
+                    pdf.text(truncatedFilename, 20, imgHeight + 45);
+
+                    // Update progress
+                    processedScreenshots++;
+                    utils.showStatus(
+                      `Generating PDF: ${processedScreenshots}/${totalScreenshots} screenshots processed`,
+                      false
+                    );
+
+                    // Continue with next screenshot after a brief delay
+                    setTimeout(() => {
+                      currentScreenshot++;
+                      processNextScreenshot();
+                    }, 10); // Small delay to prevent UI freezing
+                  } catch (error) {
+                    console.error("Error adding image to PDF:", error);
+                    // Continue with next screenshot despite error
+                    processedScreenshots++;
+                    currentScreenshot++;
+                    processNextScreenshot();
+                  }
+                };
+
+                img.onerror = () => {
+                  console.error("Failed to load image for PDF");
+                  processedScreenshots++;
+                  currentScreenshot++;
+                  processNextScreenshot();
+                };
+
+                img.src = optimizedData;
+              } catch (error) {
+                console.error("Error processing image:", error);
+                processedScreenshots++;
+                currentScreenshot++;
+                processNextScreenshot();
               }
+            })
+            .catch((error) => {
+              console.error("Error optimizing image:", error);
+              processedScreenshots++;
+              currentScreenshot++;
+              processNextScreenshot();
+            });
+        }
+      }
 
-              // Add the image to the PDF
-              pdf.addImage(
-                screenshotData,
-                "PNG",
-                20, // X position (left margin)
-                40, // Y position (below the title)
-                imgWidth,
-                imgHeight
-              );
+      function finalizePDF() {
+        try {
+          // Split into multiple PDFs if large
+          if (pageCount > 50) {
+            utils.showStatus(
+              "Large document detected, splitting into multiple PDFs...",
+              false
+            );
 
-              // Add caption below the image
-              pdf.setFontSize(14);
-              pdf.text(`Category: ${categoryTitle}`, 20, 30);
-              pdf.setFontSize(10);
-              pdf.text(filename, 20, imgHeight + 45);
+            // Save in smaller chunks of 40 pages
+            const pagesPerPDF = 40;
+            const totalPDFs = Math.ceil(pageCount / pagesPerPDF);
 
-              resolve();
-            };
+            for (let i = 0; i < totalPDFs; i++) {
+              const startPage = i * pagesPerPDF + 1;
+              const endPage = Math.min((i + 1) * pagesPerPDF, pageCount);
 
-            img.src = screenshotData;
-          });
-        });
-      });
-    });
+              try {
+                // Extract pages to a new PDF
+                const pdfOutput = pdf.output("arraybuffer");
 
-    // When all screenshots are processed, save the PDF
-    currentPromise
-      .then(() => {
-        pdf.save(
-          `All_Screenshots_${new Date().toISOString().slice(0, 10)}.pdf`
-        );
-        utils.showStatus(
-          `Comprehensive PDF generated with ${pageCount} pages`,
-          false
-        );
-      })
-      .catch((error) => {
-        console.error("Error generating comprehensive PDF:", error);
-        utils.showStatus("Error generating comprehensive PDF", true);
-      });
+                // Create a new PDF document
+                const newPdf = new jspdf.jsPDF({
+                  orientation: "landscape",
+                  unit: "mm",
+                  format: "a4",
+                  compress: true,
+                });
+
+                // Add a title page to each split PDF
+                newPdf.setFontSize(16);
+                newPdf.text(
+                  `Screenshots Collection - Part ${i + 1} of ${totalPDFs}`,
+                  20,
+                  20
+                );
+                newPdf.setFontSize(12);
+                newPdf.text(
+                  `Pages ${startPage} to ${endPage} of ${pageCount} total pages`,
+                  20,
+                  30
+                );
+                newPdf.text(
+                  `Generated on ${new Date().toLocaleString()}`,
+                  20,
+                  40
+                );
+
+                // Save this chunk
+                newPdf.save(
+                  `Screenshots_Part${i + 1}_of_${totalPDFs}_${new Date()
+                    .toISOString()
+                    .slice(0, 10)}.pdf`
+                );
+              } catch (splitError) {
+                console.error(
+                  `Error creating split PDF part ${i + 1}:`,
+                  splitError
+                );
+              }
+            }
+
+            utils.showStatus(
+              `PDF generation complete: Split into ${totalPDFs} files`,
+              false
+            );
+          } else {
+            // Single PDF for smaller documents
+            pdf.save(
+              `Screenshots_${new Date().toISOString().slice(0, 10)}.pdf`
+            );
+            utils.showStatus(`PDF generated with ${pageCount} pages`, false);
+          }
+        } catch (error) {
+          console.error("Error saving PDF:", error);
+          utils.showStatus(
+            "Error saving PDF. Try with fewer screenshots or individually.",
+            true
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error generating comprehensive PDF:", error);
+      utils.showStatus(
+        "Error generating comprehensive PDF: " + error.message,
+        true
+      );
+    }
   },
 };
+
+export default thumbnails;
