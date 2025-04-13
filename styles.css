@@ -102,8 +102,8 @@ textarea {
 
 .btn {
   padding: 12px 24px;
-  background-color: var(--primary-color);
-  color: #fff;
+  background-color:#9d4545 ;
+  color: #ffffff;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -113,7 +113,7 @@ textarea {
 }
 
 .btn:hover {
-  background-color: var(--primary-color-dark);
+  background-color: #71c374;
 }
 
 .btn:disabled {
@@ -1696,7 +1696,7 @@ body.simple-mode .stats {
 .btn-small {
   padding: 6px 12px;
   font-size: 13px;
-  background-color: #f8f9fa;
+  background-color: #527598;
   border: 1px solid #ddd;
   border-radius: 4px;
   cursor: pointer;

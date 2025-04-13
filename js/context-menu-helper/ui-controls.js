@@ -116,7 +116,7 @@ function createMenuSelectionDialog(menuItemsWithText) {
     // Create generate button
     const generateButton = document.createElement("button");
     generateButton.textContent = "Generate Actions";
-    generateButton.className = "btn btn-small"; // Use primary button style from styles.css if available
+    generateButton.className = "btn"; // Use primary button style from styles.css if available
 
     // Add event listeners to buttons
     cancelButton.addEventListener("click", () => {
