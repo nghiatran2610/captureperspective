@@ -4,6 +4,7 @@ import App from './app.js';
 import * as events from './events.js';
 import { handleError } from './errors.js';
 import ContextMenuActionsHelper from './context-menu-actions-helper.js';
+import LoginHandler from './login-handler.js';
 
 /**
  * Initialize the application
@@ -20,6 +21,8 @@ function initializeApp() {
         // Expose app to window for debugging if needed
         if (config.debug) {
             window.screenshotApp = app;
+            window.loginHandler = LoginHandler;
+
         }
 
         // Initialize UI controls from ContextMenuActionsHelper

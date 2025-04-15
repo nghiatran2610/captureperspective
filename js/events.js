@@ -114,6 +114,12 @@ export const events = {
   // UI events
   UI_RESET: "uiReset",
   DOWNLOAD_ALL_REQUESTED: "downloadAllRequested",
+
+  // New login-related events
+  LOGIN_STARTED: "LOGIN_STARTED",
+  LOGIN_SUCCESSFUL: "LOGIN_SUCCESSFUL",
+  LOGIN_FAILED: "LOGIN_FAILED",
+  LOGIN_STATUS_CHANGED: "LOGIN_STATUS_CHANGED",
 };
 
 export default {

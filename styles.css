@@ -1909,3 +1909,129 @@ body.simple-mode .stats {
     margin-bottom: 0;
   }
 }
+
+/* Add these styles to styles.css for the login section */
+
+/* Login Section Styles */
+#loginSection {
+  margin-bottom: var(--spacing-xl);
+  transition: all 0.3s ease;
+}
+
+#loginSection h2 {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+}
+
+#loginSection h2::before {
+  content: "🔒";
+  margin-right: 10px;
+  font-size: 18px;
+}
+
+#loginStatus {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #6c757d;
+  transition: all 0.3s ease;
+}
+
+#loginStatus.logged-in {
+  background-color: #d4edda;
+  border-left-color: #28a745;
+}
+
+#loginStatus.logged-out {
+  background-color: #f8d7da;
+  border-left-color: #dc3545;
+}
+
+#loginStatus.checking {
+  background-color: #fff3cd;
+  border-left-color: #ffc107;
+}
+
+.login-status-icon {
+  font-size: 18px;
+  margin-right: 10px;
+}
+
+.login-form {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
+.login-form .input-row {
+  margin-bottom: 12px;
+}
+
+.login-form label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #495057;
+}
+
+.login-form input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.login-form input:focus {
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.login-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+#loginButton {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+  padding: 10px 20px;
+  flex: 1;
+}
+
+#loginButton:hover {
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
+}
+
+#checkLoginButton {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  color: #fff;
+  padding: 8px 12px;
+}
+
+#checkLoginButton:hover {
+  background-color: #5c636a;
+  border-color: #565e64;
+}
+
+/* Loading animation for checking status */
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.checking .login-status-icon {
+  animation: pulse 1.5s infinite;
+}

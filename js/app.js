@@ -8,6 +8,7 @@ import ContextMenuActionsHelper from "./context-menu-actions-helper.js";
 import * as events from "./events.js";
 import { handleError, ScreenshotError, URLProcessingError } from "./errors.js";
 import urlSelector from "./ui/url-selector.js";
+import LoginHandler from "./login-handler.js";
 
 class App {
   constructor() {
@@ -18,6 +19,7 @@ class App {
     this._handleActionsInput = this._handleActionsInput.bind(this);
     this.generatePrefilledUrl = this.generatePrefilledUrl.bind(this); // Bind the new method
     this.prefilledUrl = null; // Will store the generated URL
+    this.loginHandler = LoginHandler;
   }
 
   initialize() {
@@ -28,6 +30,7 @@ class App {
     this._updateUIMode();
     ContextMenuActionsHelper.addUIControls();
     this._checkCaptureButtonState();
+    this.loginHandler.initialize();
     console.log("Application initialized with config:", config);
   }
 
