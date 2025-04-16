@@ -10,8 +10,8 @@ class VisualLoginHandler {
   constructor() {
     this.loginUrl = "http://localhost:8088/data/perspective/login/RF_Main_STG/Admin?forceAuth=true";
     this.defaultCredentials = {
-      username: "Nghia.Tran",
-      password: "tn@123",
+      username: "",
+      password: ""
     };
     this.isLoggedIn = false;
     this.loginStatusElement = null;
@@ -45,7 +45,40 @@ class VisualLoginHandler {
     // Initial visibility based on current mode
     this.updateLoginVisibility(document.body.classList.contains("simple-mode"));
 
+    // Set up console message listener to detect "All auth challenges completed"
+    this.setupConsoleMessageListener();
+
     console.log("Visual Login Handler initialized");
+  }
+
+  /**
+   * Set up a listener for console messages to detect authentication success
+   */
+  setupConsoleMessageListener() {
+    // Create a function to intercept console.log calls 
+    const originalConsoleLog = console.log;
+    console.log = (...args) => {
+      // Call the original console.log
+      originalConsoleLog.apply(console, args);
+      
+      // Check if any argument contains the auth success message
+      const message = args.join(" ");
+      if (message.includes("All auth challenges completed")) {
+        console.log("Authentication success detected via console message");
+        this.handleSuccessfulLogin();
+      }
+    };
+    
+    // Also try to listen for console messages from the iframe if possible
+    if (window.addEventListener) {
+      window.addEventListener("message", (event) => {
+        if (event.data && typeof event.data === "string" && 
+            event.data.includes("All auth challenges completed")) {
+          console.log("Authentication success detected via iframe message");
+          this.handleSuccessfulLogin();
+        }
+      });
+    }
   }
 
   /**
@@ -78,7 +111,6 @@ class VisualLoginHandler {
       </div>
       
       <div id="loginFrameContainer" class="login-frame-container">
-      
         <iframe id="loginFrame" class="login-frame" src="about:blank"></iframe>
       </div>
     `;
@@ -86,15 +118,9 @@ class VisualLoginHandler {
     // Insert login section before capture form
     captureForm.parentNode.insertBefore(loginSection, captureForm);
 
-    // Add event listener for closing the login frame
-    const closeLoginFrame = document.getElementById("closeLoginFrame");
     this.loginStatusElement = document.getElementById("loginStatus");
     this.loginFrame = document.getElementById("loginFrame");
     this.loginFrameContainer = document.getElementById("loginFrameContainer");
-
-    if (closeLoginFrame) {
-      closeLoginFrame.addEventListener("click", () => this.hideLoginFrame());
-    }
 
     // Display login frame by default (since user is not logged in)
     this.showLoginFrame();
@@ -160,29 +186,6 @@ class VisualLoginHandler {
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       }
       
-      .login-frame-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background-color: #f5f7fa;
-        padding: 6px 10px;
-        border-bottom: 1px solid #ddd;
-        font-size: 14px;
-      }
-      
-      .close-login-frame {
-        background: none;
-        border: none;
-        font-size: 18px;
-        cursor: pointer;
-        color: #666;
-        padding: 0 5px;
-      }
-      
-      .close-login-frame:hover {
-        color: #333;
-      }
-      
       .login-frame {
         width: 100%;
         height: 350px;
@@ -196,6 +199,12 @@ class VisualLoginHandler {
       
       .login-status.logged-in .login-status-text {
         color: #155724;
+      }
+      
+      #loginSection h2::before {
+        content: "🔒";
+        margin-right: 10px;
+        font-size: 16px;
       }
     `;
     document.head.appendChild(style);
@@ -222,48 +231,141 @@ class VisualLoginHandler {
     }
 
     if (this.loginFrame) {
-      this.loginFrame.src = this.loginUrl;
+      // Set up event listener to detect navigation events
+      this.loginFrame.addEventListener("load", this.handleFrameLoad.bind(this));
       
-      // Set up event listener to detect successful login
-      this.loginFrame.addEventListener("load", () => {
-        // Check if the current URL indicates successful login
-        try {
-          const currentUrl = this.loginFrame.contentWindow.location.href;
-          if (currentUrl && !currentUrl.includes("login")) {
-            // Successfully logged in - frame navigated to a non-login page
-            this.isLoggedIn = true;
-
-            // Try to find username on the page
-            let username = this.defaultCredentials.username;
-            try {
-              const usernameElement = this.loginFrame.contentDocument.querySelector(
-                '.username, .user-info, .user-name, [id*="username"]'
-              );
-              if (usernameElement && usernameElement.textContent.trim()) {
-                username = usernameElement.textContent.trim();
-              }
-            } catch (e) {
-              console.warn("Could not extract username:", e);
-            }
-
-            // Update status with username
-            this.updateLoginStatus("logged-in", `Logged in as ${username}`);
-
-            // Emit login event
-            events.emit("LOGIN_SUCCESSFUL", { username });
-
-            // Hide the frame after successful login
-            this.hideLoginFrame();
-          }
-        } catch (e) {
-          // Ignore cross-origin errors
-          console.warn("Could not check frame URL:", e);
-        }
-      });
-
-      // Listen for messages from the iframe to detect login success
-      window.addEventListener("message", this.handleLoginMessage.bind(this), false);
+      // Load the login page
+      this.loginFrame.src = this.loginUrl;
     }
+  }
+
+  /**
+   * Handle frame load event
+   */
+  handleFrameLoad() {
+    try {
+      const currentUrl = this.loginFrame.contentWindow.location.href;
+      
+      // If the URL is empty or about:blank, it's likely a logout
+      if (!currentUrl || currentUrl === "about:blank") {
+        this.handleLogout();
+        return;
+      }
+      
+      // Check for exit/logout in the URL
+      if (currentUrl.toLowerCase().includes("logout") || 
+          currentUrl.toLowerCase().includes("exit")) {
+        this.handleLogout();
+        return;
+      }
+      
+      // Try to hook into iframe console
+      try {
+        if (this.loginFrame.contentWindow) {
+          // Try to override console.log in the iframe
+          const frameConsole = this.loginFrame.contentWindow.console;
+          const originalFrameLog = frameConsole.log;
+          
+          frameConsole.log = (...args) => {
+            // Call original
+            originalFrameLog.apply(frameConsole, args);
+            
+            // Check for auth success message
+            const message = args.join(" ");
+            if (message.includes("All auth challenges completed")) {
+              console.log("Authentication success detected in iframe console");
+              this.handleSuccessfulLogin();
+            }
+          };
+        }
+      } catch (e) {
+        // Cross-origin limitation, can't access iframe console
+      }
+    } catch (e) {
+      // Cross-origin errors expected - silently continue
+    }
+  }
+
+  /**
+   * Handle successful login detected
+   */
+  handleSuccessfulLogin() {
+    // Only process once
+    if (this.isLoggedIn) return;
+    
+    // Update state
+    this.isLoggedIn = true;
+    
+    // Try to find username if possible
+    const username = this.findUsernameInFrame();
+    
+    // Update UI
+    if (username) {
+      this.updateLoginStatus("logged-in", `Logged in as ${username}`);
+    } else {
+      this.updateLoginStatus("logged-in", "Authentication successful");
+    }
+    
+    // Emit login event
+    events.emit("LOGIN_SUCCESSFUL", { username: username || "User" });
+    
+    // Hide login frame
+    this.hideLoginFrame();
+  }
+
+  /**
+   * Try to find username in the iframe
+   * @returns {string|null} - Username if found, null otherwise
+   */
+  findUsernameInFrame() {
+    try {
+      // Try to get document from iframe
+      const doc = this.loginFrame.contentDocument;
+      if (!doc) return null;
+      
+      // Common user profile elements
+      const selectors = [
+        '.username', '.user-info', '.user-display', '.user-profile',
+        '[id*="username"]', '[id*="user-name"]', '.user-account'
+      ];
+      
+      // Try each selector
+      for (const selector of selectors) {
+        const el = doc.querySelector(selector);
+        if (el && el.textContent && el.textContent.trim()) {
+          return el.textContent.trim();
+        }
+      }
+      
+      // If no element found, look for the first element that might have a username
+      const possibleUsernameContainers = doc.querySelectorAll(
+        'header, footer, .header, .footer, .user-area, .account-info'
+      );
+      
+      for (const container of possibleUsernameContainers) {
+        // Look for text that might be a username (word with @ or period)
+        const text = container.textContent;
+        if (text) {
+          const matches = text.match(/\b[A-Za-z0-9.]+\.[A-Za-z0-9.]+\b/);
+          if (matches && matches.length > 0) {
+            return matches[0];
+          }
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      // Can't access frame content due to cross-origin
+      return null;
+    }
+  }
+
+  /**
+   * Handle logout state
+   */
+  handleLogout() {
+    this.isLoggedIn = false;
+    this.updateLoginStatus("logged-out", "Not authenticated");
   }
 
   /**
@@ -273,31 +375,6 @@ class VisualLoginHandler {
     const frameContainer = document.getElementById("loginFrameContainer");
     if (frameContainer) {
       frameContainer.style.display = "none";
-    }
-  }
-
-  /**
-   * Handle messages from the login iframe
-   * @param {MessageEvent} event - Message event from iframe
-   */
-  handleLoginMessage(event) {
-    // Check if the message indicates successful login
-    if (event.data && event.data.type === "loginSuccess") {
-      // Extract username if available
-      const username = event.data.username || this.defaultCredentials.username;
-      
-      // Update login status
-      this.isLoggedIn = true;
-      this.updateLoginStatus("logged-in", `Logged in as ${username}`);
-
-      // Hide the login frame
-      this.hideLoginFrame();
-
-      // Emit login event
-      events.emit("LOGIN_SUCCESSFUL", { username });
-
-      // Remove the message listener
-      window.removeEventListener("message", this.handleLoginMessage.bind(this));
     }
   }
 
