@@ -161,31 +161,14 @@ class App {
 
       if (urlHelpText) urlHelpText.style.display = "none";
 
-      // Create simple mode settings if they don't exist
+      // Check if simple mode settings already exist to avoid duplication
       if (!document.getElementById("simpleModeSetting")) {
         // Create container for simple mode settings
         const simpleModeSettings = document.createElement("div");
         simpleModeSettings.id = "simpleModeSetting";
         simpleModeSettings.className = "simple-mode-settings";
 
-        // 1. Create container for resolution selector
-        const presetContainer = document.createElement("div");
-        presetContainer.className = "setting-container";
-
-        // Create label for resolution
-        const presetLabel = document.createElement("label");
-        presetLabel.textContent = "Screen Resolution:";
-        presetLabel.htmlFor = capturePreset.id;
-        presetContainer.appendChild(presetLabel);
-
-        // Create a clone of the resolution selector for simple mode
-        const simplePreset = capturePreset.cloneNode(true);
-        simplePreset.id = "simplePreset";
-        simplePreset.value = capturePreset.value; // Copy current value
-        presetContainer.appendChild(simplePreset);
-        simpleModeSettings.appendChild(presetContainer);
-
-        // 2. Create container for wait time (with separate field for simple mode)
+        // Only create the wait time container, NOT a duplicate screen size selector
         const waitTimeContainer = document.createElement("div");
         waitTimeContainer.className = "setting-container";
 
@@ -215,20 +198,9 @@ class App {
             document.getElementById("urlSelectorContainer") || urlList;
           parentNode.insertBefore(simpleModeSettings, referenceNode);
         }
-
-        // Add event listeners to sync resolution between modes if needed
-        simplePreset.addEventListener("change", () => {
-          capturePreset.value = simplePreset.value;
-        });
       } else {
         // If settings already exist, just make sure they're visible
         document.getElementById("simpleModeSetting").style.display = "";
-
-        // Ensure the resolution selector is in sync
-        const simplePreset = document.getElementById("simplePreset");
-        if (simplePreset) {
-          simplePreset.value = capturePreset.value;
-        }
       }
 
       // Remove any input event listener for single URL enforcement
@@ -244,7 +216,7 @@ class App {
         });
       }, 0);
     } else {
-      // Advanced mode
+      // Advanced mode (existing code remains unchanged)
       body.classList.remove("simple-mode");
       body.classList.add("advanced-mode");
       urlList.rows = 1;

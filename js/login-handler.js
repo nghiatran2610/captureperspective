@@ -1,8 +1,6 @@
-// js/visual-login-handler.js - Simpler visual approach with visible iframe
-
-import UI from './ui/index.js';
-import * as events from './events.js';
-import { handleError } from './errors.js';
+import UI from "./ui/index.js";
+import * as events from "./events.js";
+import { handleError } from "./errors.js";
 
 /**
  * VisualLoginHandler - Provides a simpler visual approach to authentication
@@ -13,11 +11,12 @@ class VisualLoginHandler {
     this.loginUrl = "http://localhost:8088/data/perspective/login/RF_Main_STG/Admin?forceAuth=true";
     this.defaultCredentials = {
       username: "Nghia.Tran",
-      password: "tn@123"
+      password: "tn@123",
     };
     this.isLoggedIn = false;
     this.loginStatusElement = null;
     this.loginFrame = null;
+    this.loginFrameContainer = null;
   }
 
   /**
@@ -26,93 +25,79 @@ class VisualLoginHandler {
   initialize() {
     // Create login UI components for Simple Mode
     this.addLoginUI();
-    
+
     // Add event listener for mode change to show/hide login UI
-    const modeSimple = document.getElementById('modeSimple');
-    const modeAdvanced = document.getElementById('modeAdvanced');
-    
+    const modeSimple = document.getElementById("modeSimple");
+    const modeAdvanced = document.getElementById("modeAdvanced");
+
     if (modeSimple) {
-      modeSimple.addEventListener('change', () => this.updateLoginVisibility(true));
+      modeSimple.addEventListener("change", () =>
+        this.updateLoginVisibility(true)
+      );
     }
-    
+
     if (modeAdvanced) {
-      modeAdvanced.addEventListener('change', () => this.updateLoginVisibility(false));
+      modeAdvanced.addEventListener("change", () =>
+        this.updateLoginVisibility(false)
+      );
     }
-    
+
     // Initial visibility based on current mode
-    this.updateLoginVisibility(document.body.classList.contains('simple-mode'));
-    
-    console.log('Visual Login Handler initialized');
+    this.updateLoginVisibility(document.body.classList.contains("simple-mode"));
+
+    console.log("Visual Login Handler initialized");
   }
 
   /**
-   * Add login UI elements to the page
+   * Add login UI components to the page
    */
   addLoginUI() {
     // Find the container to insert login UI before URL selection
-    const captureForm = document.getElementById('captureForm');
+    const captureForm = document.getElementById("captureForm");
     if (!captureForm) {
-      console.error('Cannot find captureForm element');
+      console.error("Cannot find captureForm element");
       return;
     }
 
     // Create login section container
-    const loginSection = document.createElement('div');
-    loginSection.id = 'loginSection';
-    loginSection.className = 'card';
-    loginSection.style.display = 'none'; // Initially hidden
+    const loginSection = document.createElement("div");
+    loginSection.id = "loginSection";
+    loginSection.className = "card";
+    loginSection.style.marginBottom = "15px";
 
-    // Create login section content
+    // Create login section content with enhanced design - add status indicator
     loginSection.innerHTML = `
-      <h2>Authentication</h2>
-      <div id="loginStatus" class="status-message">
-        <span class="login-status-icon">⚪</span> 
-        <span class="login-status-text">Not logged in</span>
-      </div>
-      
-      <div class="login-options">
-        <p class="login-instructions">Click "Show Login Page" to display the authentication page. Once you've logged in successfully, click "Check Login Status" to verify.</p>
-        
-        <div class="login-credentials">
-          <p>Default credentials: <strong>${this.defaultCredentials.username} / ${this.defaultCredentials.password}</strong></p>
+      <div class="login-header">
+        <h2 style="margin: 0; font-size: 1.3em;">
+          Authentication
+        </h2>
+        <div id="loginStatus" class="login-status logged-out">
+          <span class="login-status-icon">⚪</span>
+          <span class="login-status-text">Not authenticated</span>
         </div>
       </div>
       
-      <div id="loginFrameContainer" class="login-frame-container" style="display: none;">
-        <div class="login-frame-header">
-          <span>Authentication Page</span>
-          <button id="closeLoginFrame" class="close-login-frame">×</button>
-        </div>
+      <div id="loginFrameContainer" class="login-frame-container">
+      
         <iframe id="loginFrame" class="login-frame" src="about:blank"></iframe>
-      </div>
-      
-      <div class="login-buttons">
-        <button id="showLoginBtn" class="btn">Show Login Page</button>
-        <button id="checkLoginButton" class="btn">Check Login Status</button>
       </div>
     `;
 
     // Insert login section before capture form
     captureForm.parentNode.insertBefore(loginSection, captureForm);
 
-    // Add event listeners
-    const showLoginBtn = document.getElementById('showLoginBtn');
-    const checkLoginButton = document.getElementById('checkLoginButton');
-    const closeLoginFrame = document.getElementById('closeLoginFrame');
-    this.loginStatusElement = document.getElementById('loginStatus');
-    this.loginFrame = document.getElementById('loginFrame');
-
-    if (showLoginBtn) {
-      showLoginBtn.addEventListener('click', () => this.showLoginFrame());
-    }
-
-    if (checkLoginButton) {
-      checkLoginButton.addEventListener('click', () => this.checkLoginStatus());
-    }
+    // Add event listener for closing the login frame
+    const closeLoginFrame = document.getElementById("closeLoginFrame");
+    this.loginStatusElement = document.getElementById("loginStatus");
+    this.loginFrame = document.getElementById("loginFrame");
+    this.loginFrameContainer = document.getElementById("loginFrameContainer");
 
     if (closeLoginFrame) {
-      closeLoginFrame.addEventListener('click', () => this.hideLoginFrame());
+      closeLoginFrame.addEventListener("click", () => this.hideLoginFrame());
     }
+
+    // Display login frame by default (since user is not logged in)
+    this.showLoginFrame();
 
     // Add some CSS for the login section
     this.addLoginStyles();
@@ -122,158 +107,95 @@ class VisualLoginHandler {
    * Add CSS styles for login UI components
    */
   addLoginStyles() {
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.textContent = `
-      #loginSection {
-        margin-bottom: var(--spacing-xl);
-        transition: all 0.3s ease;
+      .login-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
       }
       
-      #loginSection h2 {
-        margin-bottom: 15px;
+      .auth-icon {
+        font-size: 0.9em;
+        margin-right: 5px;
+      }
+      
+      .login-status {
         display: flex;
         align-items: center;
-      }
-      
-      #loginSection h2::before {
-        content: "🔒";
-        margin-right: 10px;
-        font-size: 18px;
-      }
-      
-      #loginStatus {
-        display: flex;
-        align-items: center;
-        padding: 12px 15px;
-        margin-bottom: 15px;
+        font-size: 13px;
         background-color: #f8f9fa;
-        border-radius: 6px;
-        border-left: 3px solid #6c757d;
+        padding: 3px 10px;
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
         transition: all 0.3s ease;
       }
       
-      #loginStatus.logged-in {
+      .login-status.logged-in {
         background-color: #d4edda;
-        border-left-color: #28a745;
+        border-color: #c3e6cb;
       }
       
-      #loginStatus.logged-out {
+      .login-status.logged-out {
         background-color: #f8d7da;
-        border-left-color: #dc3545;
+        border-color: #f5c6cb;
       }
       
-      #loginStatus.checking {
+      .login-status.checking {
         background-color: #fff3cd;
-        border-left-color: #ffc107;
+        border-color: #ffeeba;
       }
       
       .login-status-icon {
-        font-size: 18px;
-        margin-right: 10px;
-      }
-      
-      .login-options {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 6px;
-        margin-bottom: 15px;
-        border: 1px solid #e9ecef;
-      }
-      
-      .login-instructions {
-        margin-bottom: 10px;
-        color: #495057;
-      }
-      
-      .login-credentials {
-        background-color: #e9ecef;
-        padding: 10px;
-        border-radius: 4px;
-        margin-top: 10px;
-      }
-      
-      .login-credentials p {
-        margin: 0;
-        font-size: 14px;
-        color: #495057;
+        margin-right: 5px;
+        font-size: 12px;
       }
       
       .login-frame-container {
+        margin: 10px 0;
         border: 1px solid #ddd;
-        border-radius: 6px;
+        border-radius: 4px;
         overflow: hidden;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       }
       
       .login-frame-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 15px;
-        background-color: #f8f9fa;
+        background-color: #f5f7fa;
+        padding: 6px 10px;
         border-bottom: 1px solid #ddd;
+        font-size: 14px;
       }
       
       .close-login-frame {
         background: none;
         border: none;
-        font-size: 20px;
+        font-size: 18px;
         cursor: pointer;
-        color: #6c757d;
+        color: #666;
+        padding: 0 5px;
       }
       
       .close-login-frame:hover {
-        color: #dc3545;
+        color: #333;
       }
       
       .login-frame {
         width: 100%;
-        height: 500px;
+        height: 350px;
         border: none;
-        background-color: #fff;
       }
       
-      .login-buttons {
-        display: flex;
-        gap: 10px;
-        margin-top: 15px;
+      /* Styling for username display */
+      .login-status-text {
+        font-weight: 500;
       }
       
-      #showLoginBtn {
-        background-color: #0d6efd;
-        border-color: #0d6efd;
-        color: #fff;
-        padding: 10px 20px;
-        flex: 1;
-      }
-      
-      #showLoginBtn:hover {
-        background-color: #0b5ed7;
-        border-color: #0a58ca;
-      }
-      
-      #checkLoginButton {
-        background-color: #28a745;
-        border-color: #28a745;
-        color: #fff;
-        padding: 10px 20px;
-        flex: 1;
-      }
-      
-      #checkLoginButton:hover {
-        background-color: #218838;
-        border-color: #1e7e34;
-      }
-      
-      @keyframes pulse {
-        0% { opacity: 0.6; }
-        50% { opacity: 1; }
-        100% { opacity: 0.6; }
-      }
-      
-      .checking .login-status-icon {
-        animation: pulse 1.5s infinite;
+      .login-status.logged-in .login-status-text {
+        color: #155724;
       }
     `;
     document.head.appendChild(style);
@@ -284,79 +206,98 @@ class VisualLoginHandler {
    * @param {boolean} isSimpleMode - Whether simple mode is active
    */
   updateLoginVisibility(isSimpleMode) {
-    const loginSection = document.getElementById('loginSection');
+    const loginSection = document.getElementById("loginSection");
     if (loginSection) {
-      loginSection.style.display = isSimpleMode ? 'block' : 'none';
+      loginSection.style.display = isSimpleMode ? "block" : "none";
     }
   }
 
   /**
-   * Show the login frame with the login page
+   * Show login frame with the login URL
    */
   showLoginFrame() {
-    const frameContainer = document.getElementById('loginFrameContainer');
+    const frameContainer = document.getElementById("loginFrameContainer");
     if (frameContainer) {
-      frameContainer.style.display = 'block';
+      frameContainer.style.display = "block";
     }
 
     if (this.loginFrame) {
       this.loginFrame.src = this.loginUrl;
-      this.updateLoginStatus('checking', 'Login page loaded. Please complete login in the frame below.');
+      
+      // Set up event listener to detect successful login
+      this.loginFrame.addEventListener("load", () => {
+        // Check if the current URL indicates successful login
+        try {
+          const currentUrl = this.loginFrame.contentWindow.location.href;
+          if (currentUrl && !currentUrl.includes("login")) {
+            // Successfully logged in - frame navigated to a non-login page
+            this.isLoggedIn = true;
+
+            // Try to find username on the page
+            let username = this.defaultCredentials.username;
+            try {
+              const usernameElement = this.loginFrame.contentDocument.querySelector(
+                '.username, .user-info, .user-name, [id*="username"]'
+              );
+              if (usernameElement && usernameElement.textContent.trim()) {
+                username = usernameElement.textContent.trim();
+              }
+            } catch (e) {
+              console.warn("Could not extract username:", e);
+            }
+
+            // Update status with username
+            this.updateLoginStatus("logged-in", `Logged in as ${username}`);
+
+            // Emit login event
+            events.emit("LOGIN_SUCCESSFUL", { username });
+
+            // Hide the frame after successful login
+            this.hideLoginFrame();
+          }
+        } catch (e) {
+          // Ignore cross-origin errors
+          console.warn("Could not check frame URL:", e);
+        }
+      });
+
+      // Listen for messages from the iframe to detect login success
+      window.addEventListener("message", this.handleLoginMessage.bind(this), false);
     }
   }
 
   /**
-   * Hide the login frame
+   * Hide login frame (used when user manually closes or after successful login)
    */
   hideLoginFrame() {
-    const frameContainer = document.getElementById('loginFrameContainer');
+    const frameContainer = document.getElementById("loginFrameContainer");
     if (frameContainer) {
-      frameContainer.style.display = 'none';
+      frameContainer.style.display = "none";
     }
   }
 
   /**
-   * Check current login status
+   * Handle messages from the login iframe
+   * @param {MessageEvent} event - Message event from iframe
    */
-  async checkLoginStatus() {
-    try {
-      this.updateLoginStatus('checking', 'Checking login status...');
+  handleLoginMessage(event) {
+    // Check if the message indicates successful login
+    if (event.data && event.data.type === "loginSuccess") {
+      // Extract username if available
+      const username = event.data.username || this.defaultCredentials.username;
       
-      const iframe = this.loginFrame || UI.elements.iframe;
-      
-      // Load a page that requires authentication
-      iframe.src = 'http://localhost:8088/data/perspective/client/RF_Main_STG';
-      
-      // Wait for iframe to load
-      await this.waitForIframeLoad(iframe);
-      
-      // Check if we're redirected to login page or already logged in
-      const currentUrl = iframe.contentWindow.location.href;
-      
-      if (currentUrl.includes('login')) {
-        // We're on login page, not logged in
-        this.isLoggedIn = false;
-        this.updateLoginStatus('logged-out', 'Not logged in. Please log in using the frame below.');
-        return false;
-      } else {
-        // Not on login page, logged in
-        // Try to find username on the page
-        const usernameElement = iframe.contentDocument.querySelector('.username, .user-info, .user-name');
-        const username = usernameElement ? usernameElement.textContent.trim() : this.defaultCredentials.username;
-        
-        this.isLoggedIn = true;
-        this.updateLoginStatus('logged-in', `Logged in as ${username}`);
-        this.hideLoginFrame(); // Hide the login frame since we're now logged in
-        
-        // Emit event for successful login
-        events.emit('LOGIN_SUCCESSFUL', { username });
-        
-        return true;
-      }
-    } catch (error) {
-      console.error('Error checking login status:', error);
-      this.updateLoginStatus('logged-out', `Status check error: ${error.message}`);
-      return false;
+      // Update login status
+      this.isLoggedIn = true;
+      this.updateLoginStatus("logged-in", `Logged in as ${username}`);
+
+      // Hide the login frame
+      this.hideLoginFrame();
+
+      // Emit login event
+      events.emit("LOGIN_SUCCESSFUL", { username });
+
+      // Remove the message listener
+      window.removeEventListener("message", this.handleLoginMessage.bind(this));
     }
   }
 
@@ -367,46 +308,27 @@ class VisualLoginHandler {
    */
   updateLoginStatus(status, message) {
     if (!this.loginStatusElement) return;
-    
+
     // Remove previous status classes
-    this.loginStatusElement.classList.remove('logged-in', 'logged-out', 'checking');
-    
+    this.loginStatusElement.classList.remove("logged-in", "logged-out", "checking");
+
     // Add new status class
     this.loginStatusElement.classList.add(status);
-    
+
     // Update icon
-    const iconElement = this.loginStatusElement.querySelector('.login-status-icon');
+    const iconElement = this.loginStatusElement.querySelector(".login-status-icon");
     if (iconElement) {
-      iconElement.textContent = status === 'logged-in' ? '✅' : status === 'logged-out' ? '❌' : '⏳';
+      iconElement.textContent = 
+        status === "logged-in" ? "✅" : 
+        status === "logged-out" ? "⚪" : 
+        "⏳";
     }
-    
+
     // Update text
-    const textElement = this.loginStatusElement.querySelector('.login-status-text');
+    const textElement = this.loginStatusElement.querySelector(".login-status-text");
     if (textElement) {
       textElement.textContent = message;
     }
-  }
-
-  /**
-   * Wait for iframe to load
-   * @param {HTMLIFrameElement} iframe - The iframe element
-   * @returns {Promise<void>}
-   */
-  waitForIframeLoad(iframe) {
-    return new Promise((resolve) => {
-      const handleLoad = () => {
-        iframe.removeEventListener('load', handleLoad);
-        // Add a small delay to ensure everything is loaded
-        setTimeout(resolve, 1000);
-      };
-      
-      iframe.addEventListener('load', handleLoad);
-      
-      // Already loaded case
-      if (iframe.contentDocument && iframe.contentDocument.readyState === 'complete') {
-        handleLoad();
-      }
-    });
   }
 
   /**
@@ -415,6 +337,14 @@ class VisualLoginHandler {
    */
   getLoginStatus() {
     return this.isLoggedIn;
+  }
+
+  /**
+   * Get the login URL for the iframe
+   * @returns {string} - Login URL
+   */
+  getLoginUrl() {
+    return this.loginUrl;
   }
 }
 
