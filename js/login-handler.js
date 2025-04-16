@@ -8,7 +8,8 @@ import { handleError } from "./errors.js";
  */
 class VisualLoginHandler {
   constructor() {
-    this.loginUrl = "http://localhost:8088/data/perspective/login/RF_Main_STG/Admin?forceAuth=true";
+    // Initialize with empty values
+    this.loginUrl = "";  // Will be set dynamically
     this.defaultCredentials = {
       username: "",
       password: ""
@@ -21,8 +22,13 @@ class VisualLoginHandler {
 
   /**
    * Initialize the login handler UI elements
+   * @param {Object} options - Optional configuration options
+   * @param {string} options.loginUrl - Override the default login URL
    */
-  initialize() {
+  initialize(options = {}) {
+    // Calculate the login URL dynamically based on current location
+    this.loginUrl = this.determineLoginUrl(options.loginUrl);
+    
     // Create login UI components for Simple Mode
     this.addLoginUI();
 
@@ -48,7 +54,66 @@ class VisualLoginHandler {
     // Set up console message listener to detect "All auth challenges completed"
     this.setupConsoleMessageListener();
 
-    console.log("Visual Login Handler initialized");
+    console.log("Visual Login Handler initialized with URL:", this.loginUrl);
+  }
+
+  /**
+   * Determine the login URL based on current location or provided URL
+   * @param {string} overrideUrl - Optional URL to override automatic detection
+   * @returns {string} - The determined login URL
+   */
+  determineLoginUrl(overrideUrl) {
+    // If an override URL is provided, use it
+    if (overrideUrl) {
+      return overrideUrl;
+    }
+
+    try {
+      // Extract from current URL pattern
+      const currentUrl = window.location.href;
+      console.log("Determining login URL from:", currentUrl);
+
+      // Extract project name from URL
+      // Pattern: http(s)://hostname/system/webdev/PROJECT_NAME/perspective_capture/...
+      const projectRegex = /http(s)?:\/\/([^\/]+)\/system\/webdev\/([^\/]+)/;
+      const projectMatch = currentUrl.match(projectRegex);
+
+      if (projectMatch && projectMatch.length >= 4) {
+        const protocol = projectMatch[1] ? "https" : "http";
+        const host = projectMatch[2];
+        const projectName = projectMatch[3];
+
+        // Construct the login URL
+        const loginUrl = `${protocol}://${host}/data/perspective/login/${projectName}/Admin?forceAuth=true`;
+        console.log("Generated login URL:", loginUrl);
+        return loginUrl;
+      }
+
+      // Second pattern: look for /data/perspective in the URL
+      const perspectiveRegex = /http(s)?:\/\/([^\/]+)(\/data\/perspective\/[^\/]+)\/([^\/]+)/;
+      const perspectiveMatch = currentUrl.match(perspectiveRegex);
+
+      if (perspectiveMatch) {
+        const protocol = perspectiveMatch[1] ? "https" : "http";
+        const host = perspectiveMatch[2];
+        const perspectivePath = perspectiveMatch[3];
+        const projectName = perspectiveMatch[4];
+
+        // Construct login URL from perspective path
+        const loginUrl = `${protocol}://${host}/data/perspective/login/${projectName}/Admin?forceAuth=true`;
+        console.log("Generated login URL from perspective path:", loginUrl);
+        return loginUrl;
+      }
+
+      // If no pattern matches, use a default based on the hostname
+      const defaultUrl = `${window.location.protocol}//${window.location.host}/data/perspective/login/RF_Main_STG/Admin?forceAuth=true`;
+      console.log("Using default login URL:", defaultUrl);
+      return defaultUrl;
+    } catch (e) {
+      console.warn("Error determining login URL:", e);
+      // Fallback to default URL in case of error
+      return "http://localhost:8088/data/perspective/login/RF_Main_STG/Admin?forceAuth=true";
+    }
   }
 
   /**
@@ -422,6 +487,17 @@ class VisualLoginHandler {
    */
   getLoginUrl() {
     return this.loginUrl;
+  }
+
+  /**
+   * Update the login URL
+   * @param {string} newUrl - The new login URL to use
+   */
+  setLoginUrl(newUrl) {
+    if (newUrl && newUrl.trim()) {
+      this.loginUrl = newUrl.trim();
+      console.log("Login URL updated to:", this.loginUrl);
+    }
   }
 }
 
