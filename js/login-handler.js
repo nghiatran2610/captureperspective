@@ -12,7 +12,8 @@ class VisualLoginHandler {
     this.loginStatusElement = null;
     this.loginFrame = null;
     this.loginFrameContainer = null;
-    this.initialSessionIds = new Set();
+    // Map of sessionId -> username snapshot before login
+    this.initialSessions = new Map();
     this._pollInterval = null;
   }
 
@@ -20,13 +21,13 @@ class VisualLoginHandler {
    * Initialize UI and login logic
    */
   initialize(options = {}) {
-    // Set or detect login URL
+    // Determine login URL (override if provided)
     this.loginUrl = options.loginUrl || this.determineLoginUrl();
 
-    // Build UI components
+    // Build and insert UI
     this.addLoginUI();
 
-    // Mode toggle (simple vs advanced)
+    // Mode toggle handlers
     const simple = document.getElementById("modeSimple");
     const advanced = document.getElementById("modeAdvanced");
     if (simple) simple.addEventListener("change", () => this.updateLoginVisibility(true));
@@ -84,7 +85,7 @@ class VisualLoginHandler {
     this.loginFrame = document.getElementById("loginFrame");
     this.loginFrameContainer = document.getElementById("loginFrameContainer");
 
-    // Ensure starting status is logged-out
+    // Reset status
     this.updateLoginStatus('logged-out', 'Not authenticated');
 
     this.addLoginStyles();
@@ -111,21 +112,29 @@ class VisualLoginHandler {
   }
 
   /**
-   * Snapshot existing sessions, show iframe, then poll for new valid session only
+   * Show or hide the login section (simple vs advanced)
+   */
+  updateLoginVisibility(isSimple) {
+    const section = document.getElementById("loginSection");
+    if (section) section.style.display = isSimple ? 'block' : 'none';
+  }
+
+  /**
+   * Snapshot sessions, show iframe, and start polling for login
    */
   async prepareFrameLogin() {
-    // Capture all existing session IDs
-    const existing = await this.fetchSessionList();
-    existing.forEach(s => this.initialSessionIds.add(s.id));
+    // Snapshot current sessions
+    const sessions = await this.fetchSessionList();
+    sessions.forEach(s => this.initialSessions.set(s.id, s.username));
 
-    // Show the login iframe
+    // Display iframe
     if (this.loginFrameContainer) this.loginFrameContainer.style.display = 'block';
     this.loginFrame.addEventListener('load', () => this.startSessionPolling(), { once: true });
     this.loginFrame.src = this.loginUrl;
   }
 
   /**
-   * Poll endpoint for a new session with a real username
+   * Poll the session endpoint until a real login appears
    */
   startSessionPolling() {
     if (this._pollInterval) return;
@@ -133,21 +142,24 @@ class VisualLoginHandler {
 
     this._pollInterval = setInterval(async () => {
       const sessions = await this.fetchSessionList();
-      const newValid = sessions.filter(
-        s => !this.initialSessionIds.has(s.id)
-          && s.username
-          && s.username.toLowerCase() !== 'unauthenticated'
-      );
-      if (newValid.length) {
+      // Filter for either a new session or an existing session whose username changed
+      const valid = sessions.filter(s => {
+        const initial = this.initialSessions.get(s.id);
+        const isNew = !this.initialSessions.has(s.id);
+        const usernameValid = s.username && s.username.toLowerCase() !== 'unauthenticated';
+        const changed = initial !== undefined && usernameValid && s.username !== initial;
+        return (isNew && usernameValid) || changed;
+      });
+      if (valid.length) {
         clearInterval(this._pollInterval);
-        const latest = newValid.reduce((a,b) => b.uptimeMs > a.uptimeMs ? b : a, newValid[0]);
+        const latest = valid.reduce((a, b) => b.uptimeMs > a.uptimeMs ? b : a, valid[0]);
         this.completeLogin(latest.username);
       }
     }, 2000);
   }
 
   /**
-   * Fetch all sessions from backend
+   * Fetch all sessions from the backend
    */
   async fetchSessionList() {
     try {
@@ -165,7 +177,7 @@ class VisualLoginHandler {
   }
 
   /**
-   * Finalize login: update UI and fire event
+   * Finalize login: update UI and emit event
    */
   completeLogin(username) {
     if (this.isLoggedIn) return;
@@ -183,7 +195,7 @@ class VisualLoginHandler {
   }
 
   /**
-   * Update the status bubble text/icon
+   * Update the status bubble icon and text
    */
   updateLoginStatus(status, text) {
     if (!this.loginStatusElement) return;
@@ -198,7 +210,7 @@ class VisualLoginHandler {
   }
 
   getLoginStatus() { return this.isLoggedIn; }
-  getLoginUrl()    { return this.loginUrl; }
+  getLoginUrl()    { return this.loginUrl;  }
   setLoginUrl(u)   { if (u) this.loginUrl = u.trim(); }
 }
 
