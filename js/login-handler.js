@@ -162,9 +162,16 @@ class VisualLoginHandler {
    * Fetch all sessions from the backend
    */
   async fetchSessionList() {
+
+    const currentUrl = window.location.href;
+    const regex = /http(s)?:\/\/([^\/]+)\/system\/webdev\/([^\/]+)/;
+    const match = currentUrl.match(regex);
+    const projectName = match[3];
+
+
     try {
       const res = await fetch(
-        '/system/webdev/RF_Main_STG/PerspectiveCapture/getSessionInfo',
+        `/system/webdev/${projectName}/PerspectiveCapture/getSessionInfo`,
         { credentials: 'include' }
       );
       if (!res.ok) throw new Error(`Status ${res.status}`);
