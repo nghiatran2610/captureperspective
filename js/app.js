@@ -12,7 +12,7 @@ import LoginHandler from "./login-handler.js";
 
 class App {
   constructor() {
-    this.currentMode = "advanced"; // Default mode
+    this.currentMode = "simple"; // Default mode
     this.captureScreenshots = this.captureScreenshots.bind(this);
     this.retryFailedUrls = this.retryFailedUrls.bind(this);
     this._handleModeChange = this._handleModeChange.bind(this);
@@ -25,6 +25,13 @@ class App {
   initialize() {
     this.prefilledUrl = this.generatePrefilledUrl();
     this._setupEventListeners();
+
+    // Make sure the radio button selection matches the default mode
+    if (UI.elements.modeSimple && UI.elements.modeAdvanced) {
+      UI.elements.modeSimple.checked = this.currentMode === "simple";
+      UI.elements.modeAdvanced.checked = this.currentMode === "advanced";
+    }
+
     this._initializeUI();
     this._setupEventHandlers();
     this._updateUIMode();
