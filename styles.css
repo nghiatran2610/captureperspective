@@ -2043,3 +2043,67 @@ body.simple-mode .stats {
 .checking .login-status-icon {
   animation: pulse 1.5s infinite;
 }
+
+/* Add these styles to styles.css */
+
+/* Pause/Resume button styling */
+.pause-resume-btn {
+  background-color: #f0ad4e; /* Amber color for the pause button */
+  color: white;
+  margin-left: 10px;
+  position: relative;
+  transition: background-color 0.3s ease;
+}
+
+.pause-resume-btn:hover {
+  background-color: #ec971f; /* Darker amber on hover */
+}
+
+/* Style for when in paused state */
+.pause-resume-btn.paused {
+  background-color: #5cb85c; /* Green for resume */
+}
+
+.pause-resume-btn.paused:hover {
+  background-color: #449d44; /* Darker green on hover */
+}
+
+/* Add icon indicators */
+.pause-resume-btn::before {
+  content: "⏸️"; /* Pause symbol */
+  margin-right: 5px;
+  font-size: 14px;
+}
+
+.pause-resume-btn.paused::before {
+  content: "▶️"; /* Play/resume symbol */
+}
+
+/* Add responsive styling for the button container */
+.btn-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* Make buttons better on mobile */
+@media (max-width: 576px) {
+  .btn-container .btn {
+    flex: 1 0 100%;
+    margin: 5px 0;
+  }
+}
+
+/* Disabled state styling */
+.pause-resume-btn:disabled {
+  background-color: #f8d5ae; /* Lighter amber for disabled state */
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.pause-resume-btn.paused:disabled {
+  background-color: #a3d7a3; /* Lighter green for disabled state */
+  cursor: not-allowed;
+  opacity: 0.7;
+}

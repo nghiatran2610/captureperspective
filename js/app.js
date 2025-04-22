@@ -12,7 +12,7 @@ import LoginHandler from "./login-handler.js";
 
 class App {
   constructor() {
-    this.currentMode = "simple"; // Default mode
+    this.currentMode = "simple"; // Default mode - changed from "advanced" to "simple"
     this.captureScreenshots = this.captureScreenshots.bind(this);
     this.retryFailedUrls = this.retryFailedUrls.bind(this);
     this._handleModeChange = this._handleModeChange.bind(this);
@@ -20,6 +20,12 @@ class App {
     this.generatePrefilledUrl = this.generatePrefilledUrl.bind(this); // Bind the new method
     this.prefilledUrl = null; // Will store the generated URL
     this.loginHandler = LoginHandler;
+
+    // Add new properties for pause/resume functionality
+    this.isPaused = false;
+    this.captureQueue = [];
+    this.currentCaptureIndex = 0;
+    this.pauseResumeCapture = this.pauseResumeCapture.bind(this);
   }
 
   initialize() {
@@ -93,8 +99,9 @@ class App {
     }
     UI.elements.captureForm.style.display = "none";
     UI.elements.progressOutput.style.display = "none";
-  }
+    this.createPauseResumeButton();
 
+  }
   _handleModeChange(event) {
     this.currentMode = event.target.value;
     console.log("Mode changed to:", this.currentMode);
@@ -223,7 +230,7 @@ class App {
         });
       }, 0);
     } else {
-      // Advanced mode (existing code remains unchanged)
+      // Advanced mode
       body.classList.remove("simple-mode");
       body.classList.add("advanced-mode");
       urlList.rows = 1;
@@ -307,7 +314,6 @@ class App {
       this._checkCaptureButtonState();
     }
   }
-
   _checkCaptureButtonState() {
     const captureBtn = UI.elements.captureBtn;
     const buttonContainer = UI.elements.buttonContainer;
@@ -396,6 +402,65 @@ class App {
     });
   }
 
+  // New method to handle pause/resume
+  pauseResumeCapture() {
+    this.isPaused = !this.isPaused;
+
+    if (!this.isPaused && this.captureQueue.length > 0) {
+      // We just resumed and have a queue - continue processing
+      UI.utils.showStatus(
+        `Capture resumed from URL ${this.currentCaptureIndex + 1} of ${
+          this.captureQueue.length
+        }`,
+        false
+      );
+      this.processCaptureQueue();
+    } else if (this.isPaused) {
+      // We just paused
+      UI.utils.showStatus('Capture paused. Click "Resume" to continue.', false);
+    }
+
+    this.updatePauseResumeButton();
+  }
+
+  // Update the button text and style
+  updatePauseResumeButton() {
+    const pauseResumeBtn = document.getElementById("pauseResumeBtn");
+    if (!pauseResumeBtn) return;
+
+    pauseResumeBtn.textContent = this.isPaused ? "Resume" : "Pause";
+    pauseResumeBtn.classList.toggle("paused", this.isPaused);
+  }
+
+  // Create the pause/resume button
+  createPauseResumeButton() {
+    const buttonContainer = UI.elements.buttonContainer;
+    if (!buttonContainer) return;
+
+    // Remove any existing pause/resume button
+    const existingBtn = document.getElementById("pauseResumeBtn");
+    if (existingBtn) existingBtn.remove();
+
+    // Create new button
+    const pauseResumeBtn = document.createElement("button");
+    pauseResumeBtn.id = "pauseResumeBtn";
+    pauseResumeBtn.className = "btn pause-resume-btn";
+    pauseResumeBtn.textContent = "Pause";
+    pauseResumeBtn.addEventListener("click", this.pauseResumeCapture);
+
+    // Insert after capture button but before retry button
+    const captureBtn = UI.elements.captureBtn;
+    const retryBtn = UI.elements.retryFailedBtn;
+
+    if (captureBtn && captureBtn.parentNode) {
+      buttonContainer.insertBefore(pauseResumeBtn, retryBtn);
+    } else {
+      buttonContainer.appendChild(pauseResumeBtn);
+    }
+
+    // Initially disabled until capture starts
+    pauseResumeBtn.disabled = true;
+  }
   async captureScreenshots() {
     const startTotalTime = performance.now();
     let urlList = []; // Initialize urlList
@@ -406,6 +471,10 @@ class App {
       this.usingActionSequences = false; // Reset flag
       UI.thumbnails.createLiveThumbnailsContainer();
       UI.thumbnails.addCombineAllToPDFButton(); // Add PDF combine button
+
+       // Reset pause state
+      this.isPaused = false;
+      this.updatePauseResumeButton();
 
       const capturePreset = UI.elements.capturePreset.value || "fullHD";
       let actionSequences = [];
@@ -492,161 +561,40 @@ class App {
       UI.elements.captureBtn.disabled = true; // Disable button during capture
       UI.elements.retryFailedBtn.disabled = true;
 
-      // --- Capture Loop ---
-      for (let i = 0; i < urlList.length; i++) {
-        const url = urlList[i];
-        UI.progress.updateProgressMessage(
-          `Processing ${i + 1} of ${urlList.length}: ${url}`
-        );
-        try {
-          let result;
-          const timestamp = URLProcessor.getTimestamp();
-          if (this.usingActionSequences) {
-            // Advanced Mode
-            try {
-              const processImmediately = (actionResult) => {
-                const sequenceName = actionResult.sequenceName || "Unknown";
-                const baseFileName = URLProcessor.generateFilename(url, i, "");
-                const fileName = baseFileName.replace(
-                  ".png",
-                  `_${sequenceName.replace(/\s+/g, "_")}_${timestamp}.png`
-                );
-                actionResult.fileName = fileName;
-                if (actionResult.error) {
-                  UI.thumbnails.addLiveThumbnail(
-                    actionResult,
-                    fileName,
-                    sequenceName,
-                    false,
-                    false
-                  );
-                  UI.utils.showStatus(
-                    `✗ Failed "${sequenceName}": ${
-                      actionResult.errorMessage || "Error"
-                    }`,
-                    true
-                  );
-                } else {
-                  const isToolbarAction = sequenceName.includes("Button");
-                  UI.thumbnails.addLiveThumbnail(
-                    actionResult,
-                    fileName,
-                    sequenceName,
-                    false,
-                    isToolbarAction
-                  );
-                }
-                if (!result && !actionResult.error) result = actionResult;
-              };
-              const sequenceResults =
-                await ScreenshotCapture.takeSequentialScreenshots(
-                  url,
-                  capturePreset,
-                  actionSequences,
-                  processImmediately
-                );
-              const firstSuccess = sequenceResults.find((r) => !r.error);
-              if (!firstSuccess)
-                console.warn(`All action sequences failed for ${url}`);
-              else result = firstSuccess;
-            } catch (error) {
-              console.error(
-                `Error during sequential capture for ${url}:`,
-                error
-              );
-            }
-          } else {
-            // Simple mode
-            try {
-              result = await ScreenshotCapture.takeScreenshot(
-                url,
-                capturePreset
-              );
-              const fileName = URLProcessor.generateFilename(
-                url,
-                i,
-                ""
-              ).replace(".png", `_${timestamp}.png`);
-              result.fileName = fileName;
-              UI.thumbnails.addLiveThumbnail(result, fileName);
-            } catch (error) {
-              console.error(
-                `Error capturing simple screenshot for ${url}:`,
-                error
-              );
-              if (
-                error.message &&
-                (error.message.includes("No view configured") ||
-                  error.message.includes("Mount definition"))
-              ) {
-                const errorResult = {
-                  error: true,
-                  errorMessage: error.message,
-                  sequenceName: url,
-                };
-                const fileName = URLProcessor.generateFilename(
-                  url,
-                  i,
-                  ""
-                ).replace(".png", `_Error_${timestamp}.png`);
-                UI.thumbnails.addLiveThumbnail(
-                  errorResult,
-                  fileName,
-                  url,
-                  false,
-                  false
-                );
-                UI.utils.showStatus(`✗ Failed: ${url} (Mount error)`, true);
-                AppState.addFailedUrl(url);
-                UI.progress.updateStats(
-                  urlList.length,
-                  AppState.screenshots.size,
-                  AppState.failedUrls.length,
-                  0
-                );
-                UI.progress.updateProgress(i + 1, urlList.length);
-                continue;
-              } else {
-                throw error;
-              }
-            }
-          }
-          if (result) AppState.addScreenshot(url, result);
-          else AppState.addFailedUrl(url);
-          UI.progress.updateStats(
-            urlList.length,
-            AppState.screenshots.size,
-            AppState.failedUrls.length,
-            0
-          );
-        } catch (error) {
-          // Catch errors for the URL
-          console.error(`Overall capture failed for ${url}: ${error.message}`);
-          AppState.addFailedUrl(url);
-          UI.utils.showStatus(`✗ Failed: ${url} (${error.message})`, true);
-          UI.progress.updateStats(
-            urlList.length,
-            AppState.screenshots.size,
-            AppState.failedUrls.length,
-            0
-          );
-        }
-        UI.progress.updateProgress(i + 1, urlList.length);
-      } // --- End Capture Loop ---
+      // Enable pause/resume button
+      const pauseResumeBtn = document.getElementById("pauseResumeBtn");
+      if (pauseResumeBtn) pauseResumeBtn.disabled = false;
+
+      // Set up the capture queue
+      this.captureQueue = urlList.map((url, index) => ({
+        url,
+        index,
+        capturePreset,
+        actionSequences: this.usingActionSequences ? actionSequences : [],
+      }));
+
+      this.currentCaptureIndex = 0;
+
+      // Start processing the queue
+      await this.processCaptureQueue();
 
       const endTotalTime = performance.now();
       const totalTimeTaken = ((endTotalTime - startTotalTime) / 1000).toFixed(
         2
       );
+
       UI.progress.updateStats(
         urlList.length,
         AppState.screenshots.size,
         AppState.failedUrls.length,
         totalTimeTaken
       );
-      UI.progress.updateProgressMessage(
-        `Completed processing ${urlList.length} URLs (Success: ${AppState.screenshots.size}, Failed: ${AppState.failedUrls.length}, Time: ${totalTimeTaken}s)`
-      );
+
+      const completionMessage = this.isPaused
+        ? `Capture paused after processing ${this.currentCaptureIndex} of ${urlList.length} URLs`
+        : `Completed processing ${urlList.length} URLs (Success: ${AppState.screenshots.size}, Failed: ${AppState.failedUrls.length}, Time: ${totalTimeTaken}s)`;
+
+      UI.progress.updateProgressMessage(completionMessage);
 
       // Enable PDF button now that all actions are complete
       const combineAllPdfBtn = document.getElementById("combineAllPdfBtn");
@@ -659,6 +607,190 @@ class App {
     } finally {
       this._checkCaptureButtonState(); // Re-evaluate button state
       UI.elements.retryFailedBtn.disabled = AppState.failedUrls.length === 0;
+
+      // If paused, keep the pause button enabled and in 'Resume' state
+      // Otherwise disable it as capture is complete
+      const pauseResumeBtn = document.getElementById("pauseResumeBtn");
+      if (pauseResumeBtn) {
+        if (this.isPaused) {
+          pauseResumeBtn.textContent = "Resume";
+          pauseResumeBtn.classList.add("paused");
+        } else {
+          pauseResumeBtn.disabled = true;
+        }
+      }
+    }
+  }
+
+  // New method to process the capture queue
+  async processCaptureQueue() {
+    // If paused or queue is empty, return
+    if (this.isPaused || this.currentCaptureIndex >= this.captureQueue.length) {
+      return;
+    }
+
+    const totalUrls = this.captureQueue.length;
+
+    // Process all remaining items in the queue
+    while (this.currentCaptureIndex < totalUrls && !this.isPaused) {
+      const item = this.captureQueue[this.currentCaptureIndex];
+      const { url, index, capturePreset, actionSequences } = item;
+
+      UI.progress.updateProgressMessage(
+        `Processing ${this.currentCaptureIndex + 1} of ${totalUrls}: ${url}`
+      );
+
+      try {
+        let result;
+        const timestamp = URLProcessor.getTimestamp();
+
+        if (this.usingActionSequences) {
+          // Advanced Mode processing
+          try {
+            const processImmediately = (actionResult) => {
+              const sequenceName = actionResult.sequenceName || "Unknown";
+              const baseFileName = URLProcessor.generateFilename(
+                url,
+                index,
+                ""
+              );
+              const fileName = baseFileName.replace(
+                ".png",
+                `_${sequenceName.replace(/\s+/g, "_")}_${timestamp}.png`
+              );
+              actionResult.fileName = fileName;
+              if (actionResult.error) {
+                UI.thumbnails.addLiveThumbnail(
+                  actionResult,
+                  fileName,
+                  sequenceName,
+                  false,
+                  false
+                );
+                UI.utils.showStatus(
+                  `✗ Failed "${sequenceName}": ${
+                    actionResult.errorMessage || "Error"
+                  }`,
+                  true
+                );
+              } else {
+                const isToolbarAction = sequenceName.includes("Button");
+                UI.thumbnails.addLiveThumbnail(
+                  actionResult,
+                  fileName,
+                  sequenceName,
+                  false,
+                  isToolbarAction
+                );
+              }
+              if (!result && !actionResult.error) result = actionResult;
+            };
+
+            const sequenceResults =
+              await ScreenshotCapture.takeSequentialScreenshots(
+                url,
+                capturePreset,
+                actionSequences,
+                processImmediately
+              );
+            const firstSuccess = sequenceResults.find((r) => !r.error);
+            if (!firstSuccess)
+              console.warn(`All action sequences failed for ${url}`);
+            else result = firstSuccess;
+          } catch (error) {
+            console.error(`Error during sequential capture for ${url}:`, error);
+          }
+        } else {
+          // Simple mode
+          try {
+            result = await ScreenshotCapture.takeScreenshot(url, capturePreset);
+            const fileName = URLProcessor.generateFilename(
+              url,
+              index,
+              ""
+            ).replace(".png", `_${timestamp}.png`);
+            result.fileName = fileName;
+            UI.thumbnails.addLiveThumbnail(result, fileName);
+          } catch (error) {
+            console.error(
+              `Error capturing simple screenshot for ${url}:`,
+              error
+            );
+            if (
+              error.message &&
+              (error.message.includes("No view configured") ||
+                error.message.includes("Mount definition"))
+            ) {
+              const errorResult = {
+                error: true,
+                errorMessage: error.message,
+                sequenceName: url,
+              };
+              const fileName = URLProcessor.generateFilename(
+                url,
+                index,
+                ""
+              ).replace(".png", `_Error_${timestamp}.png`);
+              UI.thumbnails.addLiveThumbnail(
+                errorResult,
+                fileName,
+                url,
+                false,
+                false
+              );
+              UI.utils.showStatus(`✗ Failed: ${url} (Mount error)`, true);
+              AppState.addFailedUrl(url);
+              UI.progress.updateStats(
+                totalUrls,
+                AppState.screenshots.size,
+                AppState.failedUrls.length,
+                0
+              );
+              UI.progress.updateProgress(
+                this.currentCaptureIndex + 1,
+                totalUrls
+              );
+              this.currentCaptureIndex++;
+              continue;
+            } else {
+              throw error;
+            }
+          }
+        }
+
+        if (result) AppState.addScreenshot(url, result);
+        else AppState.addFailedUrl(url);
+
+        UI.progress.updateStats(
+          totalUrls,
+          AppState.screenshots.size,
+          AppState.failedUrls.length,
+          0
+        );
+      } catch (error) {
+        // Catch errors for the URL
+        console.error(`Overall capture failed for ${url}: ${error.message}`);
+        AppState.addFailedUrl(url);
+        UI.utils.showStatus(`✗ Failed: ${url} (${error.message})`, true);
+        UI.progress.updateStats(
+          totalUrls,
+          AppState.screenshots.size,
+          AppState.failedUrls.length,
+          0
+        );
+      }
+
+      UI.progress.updateProgress(this.currentCaptureIndex + 1, totalUrls);
+      this.currentCaptureIndex++;
+
+      // Check if we should pause after each URL
+      if (this.isPaused) {
+        UI.utils.showStatus(
+          `Capture paused at URL ${this.currentCaptureIndex} of ${totalUrls}`,
+          false
+        );
+        break;
+      }
     }
   }
 
