@@ -31,18 +31,17 @@ class App {
   initialize() {
     this.prefilledUrl = this.generatePrefilledUrl();
     this._setupEventListeners();
-
-    // Make sure the radio button selection matches the default mode
-    if (UI.elements.modeSimple && UI.elements.modeAdvanced) {
-      UI.elements.modeSimple.checked = this.currentMode === "simple";
-      UI.elements.modeAdvanced.checked = this.currentMode === "advanced";
-    }
-
     this._initializeUI();
     this._setupEventHandlers();
+
+    // Force simple mode classes
+    document.body.classList.add("simple-mode");
+    document.body.classList.remove("advanced-mode");
+
+    // We still need this for compatibility
     this._updateUIMode();
-    ContextMenuActionsHelper.addUIControls();
-    this._checkCaptureButtonState();
+
+    // Initialize login handler
     this.loginHandler.initialize();
     console.log("Application initialized with config:", config);
   }
@@ -100,13 +99,12 @@ class App {
     UI.elements.captureForm.style.display = "none";
     UI.elements.progressOutput.style.display = "none";
     this.createPauseResumeButton();
-
   }
   _handleModeChange(event) {
-    this.currentMode = event.target.value;
-    console.log("Mode changed to:", this.currentMode);
+    // Always use simple mode, ignore the event
+    this.currentMode = "simple";
+    console.log("Mode is fixed to simple");
     this._updateUIMode();
-    this._checkCaptureButtonState(); // Update button state when mode changes
   }
 
   /**
@@ -472,7 +470,7 @@ class App {
       UI.thumbnails.createLiveThumbnailsContainer();
       UI.thumbnails.addCombineAllToPDFButton(); // Add PDF combine button
 
-       // Reset pause state
+      // Reset pause state
       this.isPaused = false;
       this.updatePauseResumeButton();
 
