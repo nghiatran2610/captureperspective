@@ -802,8 +802,8 @@ textarea {
   background-color: #805ad5;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 8px 16px;
+  border-radius: 6px;
+  padding: 10px 20px;
   font-size: 14px;
   cursor: pointer;
   transition: background-color 0.2s ease, transform 0.2s ease;
@@ -812,7 +812,12 @@ textarea {
 .combine-all-pdf-btn:hover {
   background-color: #6b46c1;
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.combine-all-pdf-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Error thumbnail styling */
@@ -870,7 +875,7 @@ textarea {
   font-style: italic;
 }
 
-/* Add these styles to your existing styles.css */
+/* Add these styles to styles.css */
 
 /* Add/Modify these styles in your existing styles.css */
 
@@ -1016,10 +1021,6 @@ body.advanced-mode #captureBtn.initially-hidden {
 
 .generate-actions-btn:active {
   transform: translateY(1px);
-}
-
-.generate-actions-btn i {
-  font-size: 16px;
 }
 
 /* Context Actions Section Styling */
@@ -1400,7 +1401,7 @@ body.advanced-mode #captureBtn.initially-hidden {
 
 .thumbnail-container:hover {
   transform: translateY(-3px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 body.advanced-mode .stats {
@@ -2106,4 +2107,20 @@ body.simple-mode .stats {
   background-color: #a3d7a3; /* Lighter green for disabled state */
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+/* New style for the login option section */
+.login-option-section h2 {
+    margin-bottom: 15px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.login-option-section .input-row {
+    justify-content: flex-start;
+    gap: 30px; /* Increase gap between radio buttons */
+}
+
+.login-option-section label {
+    font-size: 16px; /* Larger font size for radio labels */
 }

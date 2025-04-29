@@ -16,6 +16,23 @@
       tab.
     </div>
 
+    <div id="loginOptionSection" class="card login-option-section">
+        <h2>Select Login Option</h2>
+        <div class="input-row">
+            <label>
+                <input type="radio" name="loginOption" value="continueWithoutLogin" id="optionContinueWithoutLogin" checked>
+                Continue without login
+            </label>
+            <label>
+                <input type="radio" name="loginOption" value="login" id="optionLogin">
+                Login
+            </label>
+        </div>
+    </div>
+
+    <div id="loginSection" class="card" style="display: none;">
+        </div>
+
     <div id="captureForm" style="display: none">
       <div class="card">
         <h2 id="urlInputTitle">Enter URL(s) to Capture</h2>
@@ -68,7 +85,6 @@
           </div>
 
           <div class="input-row">
-            <!-- This is the container that will be replaced by the context-actions-header -->
             <label
               title="Actions to perform before capturing (JSON format)"
               style="display: block; width: 100%"
