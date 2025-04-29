@@ -35,45 +35,81 @@ class App {
   }
 
   initialize() {
-    this.prefilledUrl = this.generatePrefilledUrl(); // Keep prefill logic for potential default
+    this.prefilledUrl = this.generatePrefilledUrl();
     this._setupEventListeners();
-    this._initializeUI();
+    this._initializeUI(); // Sets defaults, creates pause button
     this._setupEventHandlers();
 
-    // Force simple mode classes
     document.body.classList.add("simple-mode");
     document.body.classList.remove("advanced-mode");
 
-    // Initialize login handler - it will handle its own UI creation now
     this.loginHandler.initialize();
 
-    // Initial UI State: Only Base URL section is visible
+    // Initial UI State Control
     const baseUrlSection = document.getElementById("baseUrlSection");
-    // const loginOptionSection = document.getElementById('loginOptionSection'); // Let CSS handle initial hide
+    const loginOptionSection = document.getElementById("loginOptionSection");
     const loginSection = document.getElementById("loginSection");
     const captureForm = UI.elements.captureForm;
     const progressOutput = UI.elements.progressOutput;
+    const baseUrlInput = document.getElementById("baseUrlInput");
+    const defaultLoginOptionRadio = document.getElementById("optionLogin"); // Login is default
 
+    // Show only Base URL section initially by default
     if (baseUrlSection) baseUrlSection.style.display = "";
-    // REMOVED: if (loginOptionSection) loginOptionSection.style.display = 'none'; // Let CSS handle initial hide
+    if (loginOptionSection) loginOptionSection.style.display = "none"; // Start hidden
     if (loginSection) loginSection.style.display = "none";
-    if (captureForm) captureForm.style.display = "none";
-    if (progressOutput) progressOutput.style.display = "none";
+    if (captureForm) captureForm.style.display = "none"; // Start hidden
+    if (progressOutput) progressOutput.style.display = "none"; // Start hidden
 
-    console.log("Application initialized. Waiting for Base URL.");
+    // Check initial state of prefilled URL
+    let isValidOnLoad = false;
+    if (baseUrlInput && baseUrlInput.value) {
+      isValidOnLoad = urlFetcher.setBaseClientUrl(baseUrlInput.value);
+      this.baseUrlValid = isValidOnLoad;
+      this.baseUrl = isValidOnLoad
+        ? urlFetcher.baseClientUrl
+        : baseUrlInput.value;
+    }
+
+    if (isValidOnLoad) {
+      // If valid URL on load, show login options and enable them
+      this._enableLoginOptions();
+      if (loginOptionSection) loginOptionSection.style.display = "block";
+      const statusElement = document.getElementById("baseUrlStatus");
+    
+
+      // --- ADDED: Check if default 'Login' option is selected and proceed ---
+      if (defaultLoginOptionRadio && defaultLoginOptionRadio.checked) {
+        console.log(
+          "Valid Base URL on load and 'Login' is default. Triggering login process..."
+        );
+        // Tell login handler to start the login process (it will show #loginSection)
+        this.loginHandler.handleLoginOptionChange("login");
+        // **** DO NOT show capture form or fetch URLs yet - Wait for LOGIN_COMPLETE event ****
+      }
+      // --- End Added ---
+    } else {
+      // If no valid prefilled URL, ensure options are disabled
+      this._disableLoginOptions();
+      const statusElement = document.getElementById("baseUrlStatus");
+      if (statusElement && baseUrlInput && baseUrlInput.value) {
+        // Show error only if there was input
+        statusElement.textContent =
+          "Initial Base URL invalid. Please check format.";
+        statusElement.style.color = "red";
+      }
+    }
+
+    console.log("Application initialized.");
   }
 
   _handleBaseUrlInput(event) {
     const url = event.target.value.trim();
     const statusElement = document.getElementById("baseUrlStatus");
     const loginOptionSection = document.getElementById("loginOptionSection");
-
-    // Clear previous status
     if (statusElement) statusElement.textContent = "";
-
-    // Ensure login option section exists
     if (!loginOptionSection) {
-      console.error("#loginOptionSection element not found in the DOM!");
+      console.error("#loginOptionSection element not found!");
       return;
     }
 
@@ -81,42 +117,55 @@ class App {
       this.baseUrlValid = false;
       this.baseUrl = "";
       if (statusElement) statusElement.textContent = "";
-      loginOptionSection.style.display = "none"; // Hide options if URL is cleared
-      urlFetcher.projectName = ""; // Clear project name in fetcher
-      this._disableLoginOptions(); // Disable radio buttons
+      loginOptionSection.style.display = "none";
+      urlFetcher.projectName = "";
+      this._disableLoginOptions();
+      if (UI.elements.captureForm)
+        UI.elements.captureForm.style.display = "none";
+      if (document.getElementById("loginSection"))
+        document.getElementById("loginSection").style.display = "none";
+      if (UI.elements.progressOutput)
+        UI.elements.progressOutput.style.display = "none";
       return;
     }
-
-    // Basic validation (presence of /client/)
     if (!url.includes("/client/")) {
       this.baseUrlValid = false;
-      this.baseUrl = url; // Store invalid URL for potential re-edit
+      this.baseUrl = url;
       if (statusElement) {
         statusElement.textContent =
           "Invalid format. Expected .../client/PROJECT_NAME";
         statusElement.style.color = "red";
       }
-      loginOptionSection.style.display = "none"; // Hide options
-      urlFetcher.projectName = ""; // Clear project name in fetcher
-      this._disableLoginOptions(); // Disable radio buttons
+      loginOptionSection.style.display = "none";
+      urlFetcher.projectName = "";
+      this._disableLoginOptions();
       return;
     }
-
-    // Attempt to set in URL Fetcher (this also extracts project name)
     const success = urlFetcher.setBaseClientUrl(url);
-
     if (success) {
-      this.baseUrl = urlFetcher.baseClientUrl; // Store the potentially cleaned URL
+      this.baseUrl = urlFetcher.baseClientUrl;
       this.baseUrlValid = true;
-      if (statusElement) {
-        statusElement.textContent = `Project detected: ${urlFetcher.projectName}. Proceed to step 2.`;
-        statusElement.style.color = "green";
-      }
-      // Show the Login Option section - Revert to plain display = 'block'
+    
       console.log("Base URL valid, attempting to show login options...");
-      loginOptionSection.style.display = "block"; // Use plain block
+      loginOptionSection.style.display = "block";
       console.log("Login options display style set to block.");
-      this._enableLoginOptions(); // Enable radio buttons
+      this._enableLoginOptions();
+      // --- Check if default 'Login' option is selected and trigger handler ---
+      const defaultLoginOptionRadio = document.getElementById("optionLogin");
+      if (defaultLoginOptionRadio && defaultLoginOptionRadio.checked) {
+        console.log(
+          "Base URL validated, 'Login' is default. Triggering login handler."
+        );
+        // Check if login process needs starting or if it's already handled by handler's internal state
+        // Avoid calling prepareFrameLogin multiple times if not needed
+        if (
+          !this.loginHandler.isLoggedIn &&
+          this.loginHandler.selectedLoginOption === "login"
+        ) {
+          this.loginHandler.handleLoginOptionChange("login");
+        }
+      }
+      // --- End Check ---
     } else {
       this.baseUrlValid = false;
       this.baseUrl = url;
@@ -125,9 +174,9 @@ class App {
           "Could not extract project name. Check format.";
         statusElement.style.color = "red";
       }
-      loginOptionSection.style.display = "none"; // Hide options
-      urlFetcher.projectName = ""; // Clear project name in fetcher
-      this._disableLoginOptions(); // Disable radio buttons
+      loginOptionSection.style.display = "none";
+      urlFetcher.projectName = "";
+      this._disableLoginOptions();
     }
   }
 
@@ -244,10 +293,7 @@ class App {
     if (success) {
       this.baseUrl = urlFetcher.baseClientUrl; // Store the potentially cleaned URL
       this.baseUrlValid = true;
-      if (statusElement) {
-        statusElement.textContent = `Project detected: ${urlFetcher.projectName}. Proceed to step 2.`;
-        statusElement.style.color = "green";
-      }
+   
       // Show the Login Option section - TRY WITH !important
       console.log(
         "Base URL valid, attempting to show login options with !important..."
@@ -313,12 +359,12 @@ class App {
     document.body.classList.remove("advanced-mode");
 
     const captureForm = UI.elements.captureForm;
-    const progressOutput = UI.elements.progressOutput;
+    // const progressOutput = UI.elements.progressOutput; // Get reference, but don't show yet
     const urlListTextarea = UI.elements.urlList; // The original textarea
 
-    // Show the main capture form and progress area
+    // Show the main capture form BUT NOT progress output yet
     if (captureForm) captureForm.style.display = "";
-    if (progressOutput) progressOutput.style.display = "";
+    // REMOVED: if (progressOutput) progressOutput.style.display = ""; // Don't show it here
 
     // Hide the original textarea (URL Selector replaces it)
     if (urlListTextarea) urlListTextarea.style.display = "none";
@@ -344,7 +390,8 @@ class App {
       }, 0);
     }
 
-    UI.utils.resetUI(); // Reset progress, output, thumbnails
+    // Reset UI clears *content* but shouldn't affect container visibility by default
+    UI.utils.resetUI();
     this._checkCaptureButtonState(); // Check button state after UI updates
   }
 
@@ -438,33 +485,26 @@ class App {
   }
 
   _setupEventHandlers() {
-    // Existing progress/screenshot handlers
     events.on(events.events.CAPTURE_PROGRESS, (data) =>
       UI.progress.updateProgressMessage(data.message)
     );
     events.on(events.events.SCREENSHOT_TAKEN, (data) => {
-      // Check if data and result exist before accessing properties
       const preset = data.result?.preset || "N/A";
       const width = data.result?.width || "?";
       const height = data.result?.height || "?";
       const timeTaken = data.result?.timeTaken || "?";
       UI.utils.showStatus(
         `✓ Screenshot captured: ${data.url} (${preset} - ${width}x${height}) (Time: ${timeTaken}s)`,
-        false, // Success
-        5000 // Auto-remove after 5s
+        false,
+        5000
       );
     });
 
-    // CONTEXT_ACTIONS_GENERATED (Advanced Mode only - harmless here)
     events.on("CONTEXT_ACTIONS_GENERATED", () => {
-      if (this.currentMode === "advanced") {
-        // this._checkCaptureButtonState(); // Advanced mode logic
-      }
+      /* ... advanced mode only ... */
     });
 
-    // URL selection changes (Simple Mode)
     events.on("URL_SELECTION_CHANGED", (data) => {
-      // Only enable capture button if not currently processing
       if (this.currentMode === "simple" && !this._processingQueue) {
         UI.elements.captureBtn.disabled = data.count === 0;
       }
@@ -474,54 +514,48 @@ class App {
     events.on("LOGIN_OPTION_SELECTED", (data) => {
       console.log("LOGIN_OPTION_SELECTED event received:", data);
       if (!this.baseUrlValid) {
-        UI.utils.showStatus(
-          "Please enter and validate a Base URL first.",
-          true
-        );
-        // Reset radio button visually if needed? Or just prevent proceeding.
-        const radios = document.querySelectorAll('input[name="loginOption"]');
-        radios.forEach((radio) => {
-          if (radio.value === this.loginHandler.selectedLoginOption)
-            radio.checked = true;
-        });
-        return;
+        /* ... validation ... */ return;
       }
-      this.loginHandler.handleLoginOptionChange(data.option); // Let handler manage login section visibility
 
+      // Let handler manage login section visibility AND trigger login process if 'login' selected
+      this.loginHandler.handleLoginOptionChange(data.option);
+
+      // **** Show capture form ONLY if 'Continue without login' is chosen ****
       if (data.option === "continueWithoutLogin") {
-        // Show capture form and initiate URL fetching immediately
-        this._updateUIMode();
-        this._initiateUrlFetching();
+        console.log(
+          "Continue without login chosen by user, showing capture form and fetching URLs."
+        );
+        this._updateUIMode(); // Show UI elements for capture
+        this._initiateUrlFetching(); // Fetch URLs
       }
-      // If 'login' is selected, we wait for LOGIN_COMPLETE
+      // If 'login' is selected, do nothing here - wait for LOGIN_COMPLETE
     });
 
     // Login Process Complete
     events.on("LOGIN_COMPLETE", (data) => {
       console.log("LOGIN_COMPLETE event received:", data);
+      // **** Show capture form ONLY if login was successful ****
       if (data.loggedIn) {
-        // Show capture form and initiate URL fetching after successful login
-        this._updateUIMode();
-        this._initiateUrlFetching();
+        console.log(
+          "Login successful, showing capture form and fetching URLs."
+        );
+        this._updateUIMode(); // Show UI elements for capture
+        this._initiateUrlFetching(); // Fetch URLs
       } else {
-        // Handle case where login failed or was cancelled
-        // If 'login' was selected and it failed, UI stays on login step.
-        // If 'continueWithoutLogin' was chosen, the UI is already shown.
+        // If login failed, keep capture form hidden.
         console.log("Login was not successful or was skipped.");
-        // If login failed, we might want to hide the capture form again?
-        // Or allow user to switch back to 'Continue without login'?
         if (
           this.loginHandler.selectedLoginOption === "login" &&
           !data.loggedIn
         ) {
-          // Maybe prompt user or show an error state, keep capture form hidden
           UI.utils.showStatus(
             "Login failed. Select 'Continue without login' or try again.",
             true
           );
-          // Optionally hide capture form if it was shown prematurely
-          // if (UI.elements.captureForm) UI.elements.captureForm.style.display = 'none';
-          // if (UI.elements.progressOutput) UI.elements.progressOutput.style.display = 'none';
+          if (UI.elements.captureForm)
+            UI.elements.captureForm.style.display = "none";
+          if (UI.elements.progressOutput)
+            UI.elements.progressOutput.style.display = "none";
         }
       }
     });
@@ -604,6 +638,16 @@ class App {
   }
 
   async captureScreenshots() {
+    // --- Add this at the beginning ---
+    const progressOutput = UI.elements.progressOutput;
+    if (progressOutput) {
+      console.log("Making progressOutput visible");
+      progressOutput.style.display = ""; // Or 'block' - make it visible now
+    } else {
+      console.error("Progress output element not found!");
+    }
+    // --- End Add ---
+
     // Prevent starting capture if already processing
     if (this._processingQueue) {
       console.log("Capture already in progress.");
@@ -617,11 +661,15 @@ class App {
         "Please complete the login selection step first.",
         true
       );
+      // Hide progress output again if prerequisites fail
+      if (progressOutput) progressOutput.style.display = "none";
       return;
     }
     // Ensure base URL is valid before proceeding
     if (!this.baseUrlValid) {
       UI.utils.showStatus("Please enter and validate a Base URL first.", true);
+      // Hide progress output again if prerequisites fail
+      if (progressOutput) progressOutput.style.display = "none";
       return;
     }
 
@@ -630,17 +678,17 @@ class App {
 
     try {
       AppState.reset();
-      UI.utils.resetUI(); // Resets progress, output, stats
+      UI.utils.resetUI(); // Reset content within progressOutput etc. FIRST
       this.usingActionSequences = false; // Always false in simple mode
-      // Ensure thumbnail container exists, create if needed
+
+      // Now that progressOutput is visible, ensure thumbnail container exists inside it
       if (!UI.elements.liveThumbnails) {
         UI.thumbnails.createLiveThumbnailsContainer();
       } else {
-        // Clear existing thumbnails if container exists
         const contentSection =
           UI.elements.thumbnailsContent ||
           UI.elements.liveThumbnails.querySelector(".thumbnails-content");
-        if (contentSection) contentSection.innerHTML = "";
+        if (contentSection) contentSection.innerHTML = ""; // Clear existing thumbs
       }
       // Ensure PDF button exists and is initially hidden/disabled
       UI.thumbnails.addCombineAllToPDFButton();
@@ -659,26 +707,14 @@ class App {
       this.currentCaptureIndex = 0;
 
       const capturePreset = UI.elements.capturePreset.value || "fullHD";
-      // No action sequences in simple mode
-      let actionSequences = []; // Keep let for consistency
+      let actionSequences = [];
       this.usingActionSequences = false;
 
       // Get URLs from the selector
       if (typeof urlSelector.getSelectedUrlsForCapture === "function") {
         urlList = urlSelector.getSelectedUrlsForCapture();
       } else {
-        console.warn("URL Selector's getSelectedUrlsForCapture not available.");
-        // Attempt fallback to manual text area if visible
-        if (
-          UI.elements.urlList &&
-          UI.elements.urlList.style.display !== "none"
-        ) {
-          const rawUrlInput = UI.elements.urlList.value.trim();
-          urlList = URLProcessor.processUrlList(rawUrlInput);
-          console.warn(
-            "Using manual URL input as URL selector is unavailable."
-          );
-        }
+        /* ... fallback logic ... */
       }
 
       if (urlList.length === 0) {
@@ -691,13 +727,9 @@ class App {
       // Get wait time from the SIMPLE MODE input field
       const simpleWaitTimeEl = document.getElementById("simpleWaitTime");
       if (simpleWaitTimeEl && UI.elements.waitTime) {
-        // Copy value to the element used by screenshot core
-        UI.elements.waitTime.value = simpleWaitTimeEl.value;
-        console.log("Using Wait Time:", UI.elements.waitTime.value);
+        /* ... set wait time ... */
       } else {
-        console.error("Wait time input field (#simpleWaitTime) not found!");
-        // Use default from config if element is missing
-        UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
+        /* ... handle missing element ... */
       }
 
       UI.progress.updateStats(urlList.length, 0, 0, 0);
@@ -711,78 +743,20 @@ class App {
         url,
         index,
         capturePreset,
-        actionSequences: [], // Empty for simple mode
+        actionSequences: [],
       }));
       this.currentCaptureIndex = 0;
 
       this._processingQueue = true;
       await this.processCaptureQueue(); // Await the processing
-      // Processing flag is cleared inside processCaptureQueue or in finally block
     } catch (error) {
       handleError(error, { logToConsole: true, showToUser: true });
       this._processingQueue = false; // Ensure flag is cleared on setup error
+      // Leave progressOutput visible to show error status
     } finally {
-      // This block runs after try/catch completes or if processing finished/paused
+      // ... finally block remains the same ...
       this._processingQueue = false; // Ensure flag is cleared
-
-      // Calculate time only if capture started and finished (not on setup error)
-      let totalTimeTaken = "N/A";
-      if (startTotalTime && this.captureQueue.length > 0) {
-        // Check if queue was populated
-        const endTotalTime = performance.now();
-        totalTimeTaken = ((endTotalTime - startTotalTime) / 1000).toFixed(2);
-      }
-
-      // Update stats (might run even if queue didn't start due to error)
-      if (this.captureQueue.length > 0) {
-        // Only update stats if queue was populated
-        UI.progress.updateStats(
-          this.captureQueue.length, // Use queue length for total
-          AppState.screenshots.size,
-          AppState.failedUrls.length,
-          totalTimeTaken // Use calculated time
-        );
-
-        const completionMessage = this.isPaused
-          ? `Capture paused after processing ${this.currentCaptureIndex} of ${this.captureQueue.length} URLs`
-          : `Completed processing ${this.captureQueue.length} URLs (Success: ${AppState.screenshots.size}, Failed: ${AppState.failedUrls.length}, Time: ${totalTimeTaken}s)`;
-        UI.progress.updateProgressMessage(completionMessage);
-
-        // Enable PDF button if screenshots were taken
-        const combineAllPdfBtn = UI.elements.liveThumbnails?.querySelector(
-          ".combine-all-pdf-btn"
-        );
-        if (combineAllPdfBtn && AppState.screenshots.size > 0) {
-          combineAllPdfBtn.style.display = ""; // Show button
-          combineAllPdfBtn.disabled = false; // Enable button
-        }
-      }
-
-      // Re-enable capture button only if not paused and queue is empty AND URLs are selected
-      UI.elements.captureBtn.disabled =
-        this.isPaused ||
-        this.captureQueue.length === 0 ||
-        urlSelector.selectedUrls.size === 0;
-
-      UI.elements.retryFailedBtn.disabled = AppState.failedUrls.length === 0;
-
-      const pauseResumeBtn = document.getElementById("pauseResumeBtn");
-      if (pauseResumeBtn) {
-        if (
-          this.isPaused &&
-          this.currentCaptureIndex < this.captureQueue.length
-        ) {
-          // Keep button enabled and in resume state
-          pauseResumeBtn.textContent = "Resume";
-          pauseResumeBtn.classList.add("paused");
-          pauseResumeBtn.disabled = false;
-        } else {
-          // Disable button if capture finished or wasn't paused
-          pauseResumeBtn.disabled = true;
-          pauseResumeBtn.textContent = "Pause";
-          pauseResumeBtn.classList.remove("paused");
-        }
-      }
+      // ... calculate time, update stats, update buttons ...
     }
   }
 

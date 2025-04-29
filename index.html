@@ -27,12 +27,10 @@
     <div id="loginOptionSection" class="card login-option-section" style="display: none;"> <h2>2. Select Login Option</h2>
         <div class="input-row">
             <label>
-                <input type="radio" name="loginOption" value="continueWithoutLogin" id="optionContinueWithoutLogin" checked>
-                Continue without login
+                <input type="radio" name="loginOption" value="continueWithoutLogin" id="optionContinueWithoutLogin"> Continue without login
             </label>
             <label>
-                <input type="radio" name="loginOption" value="login" id="optionLogin">
-                Login
+                <input type="radio" name="loginOption" value="login" id="optionLogin" checked> Login
             </label>
         </div>
     </div>
@@ -41,7 +39,7 @@
       </div>
 
     <div id="captureForm" style="display: none">
-      <div class="card">
+       <div class="card" id="url-input-container">
         <h2 id="urlInputTitle">3. Select Pages to Capture</h2>
         <div
           id="urlHelpText"
@@ -65,7 +63,7 @@
             </select>
           </label>
         </div>
-         <div id="advancedOptions" class="advanced-section" style="display: none;"> <h3>Advanced Options</h3>
+         </div><div id="advancedOptions" class="advanced-section" style="display: none;"> <h3>Advanced Options</h3>
           <div class="input-row">
             <label title="Maximum time to wait before capturing the screenshot">
               Max Wait Time (sec):
@@ -105,7 +103,7 @@
             <div id="actionItemMessages" class="action-item-messages"></div>
           </div>
         </div>
-      </div>
+
 
       <div class="btn-container" id="buttonContainer">
         <button id="captureBtn" class="btn" disabled>Capture Screenshots</button> <button id="retryFailedBtn" class="btn" disabled>
@@ -119,8 +117,7 @@
       <div class="progress-container">
         <div id="progressBar" class="progress-bar"></div>
       </div>
-      <div class="card stats" id="stats">
-        <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
+      <div class="card stats" id="stats" style="display: none !important;"> <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
         <p><strong>Processed:</strong> <span id="processedCount">0</span></p>
         <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
         <p><strong>Total Time Taken:</strong> <span id="totalTime">0s</span></p>

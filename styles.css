@@ -2135,3 +2135,6 @@ body.simple-mode .stats {
   display: block; /* Or flex, depending on your layout */
 }
 
+#stats {
+  display: none !important;
+}
