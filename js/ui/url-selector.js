@@ -6,6 +6,7 @@ import * as events from "../events.js";
 
 export const urlSelector = {
   selectedUrls: new Set(),
+  baseUrlInput: null, // Added reference
 
   /**
    * Initialize the URL selector UI
@@ -15,22 +16,21 @@ export const urlSelector = {
     try {
       // Create URL selector container
       this.createSelectorContainer();
-      
-      // Show initial state (not loading yet - waiting for user input)
+
+      // Show initial state - waiting for URLs to be fetched after login option selection
       this.categoriesContainer.innerHTML = `
         <div class="url-selector-initial">
-          <p>Enter a Base Client URL above and click "Fetch URLs" to load available pages.</p>
-          <p class="url-format-example">Format: http://host/data/perspective/client/PROJECT_NAME</p>
+          <p>Available pages will load here after selecting a login option.</p>
         </div>
       `;
-      
+
       // Add event listeners for selection
       this.setupEventListeners();
-      
+
     } catch (error) {
       console.error("Failed to initialize URL selector:", error);
       utils.showStatus(`Failed to initialize URL selector: ${error.message}`, true);
-      
+
       // Show fallback textarea
       this.showFallbackUI();
     }
@@ -54,76 +54,16 @@ export const urlSelector = {
     this.container.id = "urlSelectorContainer";
     this.container.className = "url-selector-container";
 
-    // Add base URL input field
-    const baseUrlContainer = document.createElement("div");
-    baseUrlContainer.className = "base-url-container";
+    // --- Base URL input is now moved to index.html and handled by app.js ---
+    // --- Remove base URL input creation and fetch button ---
+    // const baseUrlContainer = document.createElement("div"); ...
+    // const baseUrlLabel = ...
+    // this.baseUrlInput = document.createElement("input"); ... // Keep reference if needed
+    // const updateUrlBtn = document.createElement("button"); ...
+    // updateUrlBtn.addEventListener("click", ... ); // REMOVE LISTENER
+    // REMOVE adding these to this.container
 
-    const baseUrlLabel = document.createElement("label");
-    baseUrlLabel.textContent = "Base Client URL:";
-    baseUrlLabel.className = "base-url-label";
-    baseUrlContainer.appendChild(baseUrlLabel);
-
-    const baseUrlInput = document.createElement("input");
-    baseUrlInput.type = "text";
-    baseUrlInput.value = urlFetcher.baseClientUrl;
-    baseUrlInput.placeholder =
-      "http://localhost:8088/data/perspective/client/PROJECT_NAME";
-    baseUrlInput.className = "base-url-input";
-    baseUrlInput.id = "baseUrlInput";
-    baseUrlContainer.appendChild(baseUrlInput);
-
-    // Add fetch URLs button
-    const updateUrlBtn = document.createElement("button");
-    updateUrlBtn.textContent = "Fetch URLs";
-    updateUrlBtn.className = "btn btn-small";
-    updateUrlBtn.id = "updateUrlBtn";
-
-    // Add event listener for updating base URL
-    updateUrlBtn.addEventListener("click", async () => {
-      const baseUrlInput = document.getElementById('baseUrlInput');
-      if (!baseUrlInput || !baseUrlInput.value.trim()) {
-        utils.showStatus("Please enter a valid Base Client URL", true);
-        return;
-      }
-      
-      // Try to set the base URL and extract project name
-      const success = urlFetcher.setBaseClientUrl(baseUrlInput.value);
-      
-      if (!success) {
-        utils.showStatus("Could not extract project name from the URL. Please use format: http://host/data/perspective/client/PROJECT_NAME", true);
-        return;
-      }
-      
-      // Show loading state
-      this.showLoadingState();
-      
-      try {
-        // Only now load the URLs
-        await urlFetcher.loadUrls();
-        
-        // Render URL categories 
-        this.renderUrlCategories(urlFetcher.categorizedUrls);
-        
-        // Show success message
-        utils.showStatus(`Fetched ${urlFetcher.urlsList.length} URLs for project: ${urlFetcher.extractProjectNameFromBaseUrl()}`, false);
-      } catch (error) {
-        console.error("Failed to load URLs:", error);
-        utils.showStatus(`Failed to load URLs: ${error.message}`, true);
-        
-        // Show a message in the container instead of fallback UI
-        this.categoriesContainer.innerHTML = `
-          <div class="url-selector-error">
-            <p>Failed to load URLs: ${error.message}</p>
-            <p>Please check the URL and try again.</p>
-          </div>
-        `;
-      }
-    });
-
-    baseUrlContainer.appendChild(updateUrlBtn);
-    this.container.appendChild(baseUrlContainer);
-
-    // Create toolbar with search and actions
+    // --- Keep Toolbar Creation ---
     const toolbar = document.createElement("div");
     toolbar.className = "url-selector-toolbar";
 
@@ -161,7 +101,7 @@ export const urlSelector = {
     actionsContainer.appendChild(selectionCounter);
 
     toolbar.appendChild(actionsContainer);
-    this.container.appendChild(toolbar);
+    this.container.appendChild(toolbar); // Add toolbar to container
 
     // Create URL categories container
     const categoriesContainer = document.createElement("div");
@@ -169,18 +109,29 @@ export const urlSelector = {
     categoriesContainer.id = "urlCategoriesContainer";
     this.container.appendChild(categoriesContainer);
 
-    // Replace the textarea with our container
-    parentElement.replaceChild(this.container, urlList);
+    // Replace the original textarea with our container
+    // Ensure parentElement is valid before replacing
+     if (parentElement && urlList && urlList.parentNode === parentElement) {
+        parentElement.replaceChild(this.container, urlList);
+     } else if (parentElement) {
+        // Fallback if urlList was already removed or structure changed
+        parentElement.appendChild(this.container);
+        console.warn("URL list textarea not found for replacement, appending URL selector.");
+     } else {
+         console.error("Parent element for URL list not found. Cannot add URL selector.");
+         return; // Stop initialization if parent is missing
+     }
+
 
     // Keep a reference to these elements
-    this.baseUrlInput = baseUrlInput;
+    // this.baseUrlInput = baseUrlInput; // Reference removed as it's outside now
     this.categoriesContainer = categoriesContainer;
     this.searchInput = searchInput;
     this.selectionCounter = selectionCounter;
     this.selectAllBtn = selectAllBtn;
     this.clearSelectionBtn = clearSelectionBtn;
 
-    // Initially disable buttons
+    // Initially disable buttons and search until URLs are loaded
     this.selectAllBtn.disabled = true;
     this.clearSelectionBtn.disabled = true;
     this.searchInput.disabled = true;
@@ -190,12 +141,17 @@ export const urlSelector = {
    * Show loading state while fetching URLs
    */
   showLoadingState() {
+    if (!this.categoriesContainer) return; // Add guard clause
     this.categoriesContainer.innerHTML = `
       <div class="url-selector-loading">
         <div class="loading-spinner"></div>
         <p>Loading available pages...</p>
       </div>
     `;
+    // Disable controls during load
+    if (this.searchInput) this.searchInput.disabled = true;
+    if (this.selectAllBtn) this.selectAllBtn.disabled = true;
+    if (this.clearSelectionBtn) this.clearSelectionBtn.disabled = true;
   },
 
   /**
@@ -211,12 +167,12 @@ export const urlSelector = {
     // Restore original textarea
     if (this.originalUrlList) {
       parentElement.appendChild(this.originalUrlList);
-      this.originalUrlList.style.display = "block";
+      this.originalUrlList.style.display = "block"; // Make it visible
 
       // Update title
       if (elements.urlInputTitle) {
         elements.urlInputTitle.textContent =
-          "Enter URLs to Capture (one per line)";
+          "Enter URLs to Capture (one per line)"; // Revert title
       }
 
       // Add a note about the failure
@@ -226,6 +182,9 @@ export const urlSelector = {
       fallbackNote.textContent =
         "Failed to load URLs from server. Please enter URLs manually.";
       parentElement.insertBefore(fallbackNote, this.originalUrlList);
+
+       // Ensure the manual textarea is used for capture if fallback occurs
+        UI.elements.urlList = this.originalUrlList; // Restore reference in UI elements
     }
   },
 
@@ -279,16 +238,18 @@ export const urlSelector = {
    * @param {Object} categorizedUrls - URLs organized by category
    */
   renderUrlCategories(categorizedUrls) {
+     if (!this.categoriesContainer) return; // Guard clause
+
     if (!categorizedUrls || Object.keys(categorizedUrls).length === 0) {
-      this.categoriesContainer.innerHTML = "<p>No URLs available</p>";
-      // Disable search and selection buttons
+      this.categoriesContainer.innerHTML = "<p>No URLs available for the specified project.</p>";
+      // Keep controls disabled
       if (this.searchInput) this.searchInput.disabled = true;
       if (this.selectAllBtn) this.selectAllBtn.disabled = true;
       if (this.clearSelectionBtn) this.clearSelectionBtn.disabled = true;
       return;
     }
 
-    this.categoriesContainer.innerHTML = "";
+    this.categoriesContainer.innerHTML = ""; // Clear previous content (like loading spinner)
 
     // Sort categories alphabetically
     const sortedCategories = Object.keys(categorizedUrls).sort();
@@ -320,38 +281,38 @@ export const urlSelector = {
       // Add expand/collapse toggle
       const toggleIcon = document.createElement("span");
       toggleIcon.className = "toggle-icon";
-      toggleIcon.innerHTML = "▼";
+      toggleIcon.innerHTML = "▼"; // Default to expanded
       toggleIcon.title = "Expand/collapse category";
       categoryHeader.appendChild(toggleIcon);
 
       // Create URLs container
       const urlsContainer = document.createElement("div");
-      urlsContainer.className = "url-items-container";
+      urlsContainer.className = "url-items-container"; // Default to expanded
 
       // Add URL items
       urls.forEach((url) => {
         const urlItem = document.createElement("div");
         urlItem.className = "url-item";
-        urlItem.dataset.path = url.path;
+        urlItem.dataset.path = url.path; // Store path without base URL
 
         // Add URL checkbox
         const urlCheckbox = document.createElement("input");
         urlCheckbox.type = "checkbox";
         urlCheckbox.className = "url-checkbox";
-        urlCheckbox.dataset.path = url.path;
+        urlCheckbox.dataset.path = url.path; // Store path without base URL
         urlItem.appendChild(urlCheckbox);
 
         // Add URL title
         const urlTitle = document.createElement("span");
         urlTitle.className = "url-title";
-        urlTitle.textContent = url.title || url.path;
-        urlTitle.title = url.path;
+        urlTitle.textContent = url.title || url.path; // Use title, fallback to path
+        urlTitle.title = url.path; // Tooltip shows the path
         urlItem.appendChild(urlTitle);
 
-        // Add URL path as subtitle
+        // Add URL path as subtitle (relative path)
         const urlPath = document.createElement("span");
         urlPath.className = "url-path";
-        urlPath.textContent = url.path;
+        urlPath.textContent = url.path; // Show relative path
         urlItem.appendChild(urlPath);
 
         urlsContainer.appendChild(urlItem);
@@ -363,16 +324,22 @@ export const urlSelector = {
 
       this.categoriesContainer.appendChild(categorySection);
     });
-    
+
     // Enable search and buttons now that we have URLs
     if (this.searchInput) this.searchInput.disabled = false;
     if (this.selectAllBtn) this.selectAllBtn.disabled = false;
+    // clearSelectionBtn is enabled/disabled based on selection count later
   },
 
   /**
    * Set up event listeners for the URL selector
    */
   setupEventListeners() {
+    // Ensure container exists before adding listeners
+    if (!this.container) {
+        console.warn("URL Selector container not ready, skipping event listeners setup.");
+        return;
+    }
     // Category toggle
     this.categoriesContainer.addEventListener("click", (event) => {
       const toggleIcon = event.target.closest(".toggle-icon");
@@ -499,12 +466,15 @@ export const urlSelector = {
    * Update category checkboxes based on URL selections
    */
   updateCategoryCheckboxes() {
+     if (!this.categoriesContainer) return; // Guard clause
     const categories =
       this.categoriesContainer.querySelectorAll(".url-category");
 
     categories.forEach((category) => {
       const categoryName = category.dataset.category;
       const categoryCheckbox = category.querySelector(".category-checkbox");
+       if (!categoryCheckbox) return; // Skip if checkbox not found
+
       const urlCheckboxes = category.querySelectorAll(".url-checkbox");
       const checkedCount = Array.from(urlCheckboxes).filter(
         (cb) => cb.checked
@@ -528,12 +498,17 @@ export const urlSelector = {
    * Update the selection counter
    */
   updateSelectionCounter() {
+     if (!this.selectionCounter) return; // Guard clause
     const count = this.selectedUrls.size;
     this.selectionCounter.textContent = `${count} selected`;
 
-    // Update buttons state
-    this.selectAllBtn.disabled = count === urlFetcher.urlsList.length;
-    this.clearSelectionBtn.disabled = count === 0;
+    // Update buttons state - check if elements exist first
+    if (this.selectAllBtn) {
+         this.selectAllBtn.disabled = count === urlFetcher.urlsList.length && urlFetcher.urlsList.length > 0; // Only disable if all are selected and list isn't empty
+    }
+     if (this.clearSelectionBtn) {
+        this.clearSelectionBtn.disabled = count === 0;
+     }
   },
 
   /**
@@ -554,52 +529,46 @@ export const urlSelector = {
    * @param {string} searchTerm - The search term
    */
   filterUrls(searchTerm) {
-    if (!searchTerm) {
-      // Reset all visibility
-      this.categoriesContainer.querySelectorAll(".url-item").forEach((item) => {
-        item.style.display = "";
-      });
+     if (!this.categoriesContainer) return; // Guard clause
 
-      // Reset category headers
-      this.updateCategoryVisibility();
-
-      // Remove no results message if it exists
-      if (this.noResultsMessage) {
-        this.noResultsMessage.style.display = "none";
-      }
-      return;
+    // Remove existing no results message if present
+    if (this.noResultsMessage && this.noResultsMessage.parentNode) {
+        this.noResultsMessage.remove();
+        this.noResultsMessage = null;
     }
 
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase().trim();
     let visibleCount = 0;
 
     // Hide or show URLs based on search term
     this.categoriesContainer.querySelectorAll(".url-item").forEach((item) => {
-      const path = item.dataset.path.toLowerCase();
-      const title = item.querySelector(".url-title").textContent.toLowerCase();
+        if (!term) {
+            // If search term is empty, show all items
+            item.style.display = "";
+            visibleCount++;
+        } else {
+            const path = (item.dataset.path || "").toLowerCase();
+            const title = (item.querySelector(".url-title")?.textContent || "").toLowerCase();
 
-      if (path.includes(term) || title.includes(term)) {
-        item.style.display = "";
-        visibleCount++;
-      } else {
-        item.style.display = "none";
-      }
+            if (path.includes(term) || title.includes(term)) {
+                item.style.display = "";
+                visibleCount++;
+            } else {
+                item.style.display = "none";
+            }
+        }
     });
+
 
     // Update category headers based on visible URLs
     this.updateCategoryVisibility();
 
-    // If no results found, show a message
-    if (visibleCount === 0) {
-      if (!this.noResultsMessage) {
+    // If no results found after filtering, show a message
+    if (term && visibleCount === 0) { // Only show if actively filtering
         this.noResultsMessage = document.createElement("div");
         this.noResultsMessage.className = "no-results-message";
         this.noResultsMessage.textContent = "No matching URLs found.";
         this.categoriesContainer.appendChild(this.noResultsMessage);
-      }
-      this.noResultsMessage.style.display = "block";
-    } else if (this.noResultsMessage) {
-      this.noResultsMessage.style.display = "none";
     }
   },
 
@@ -607,6 +576,7 @@ export const urlSelector = {
    * Update category visibility based on visible URLs
    */
   updateCategoryVisibility() {
+     if (!this.categoriesContainer) return; // Guard clause
     const categories =
       this.categoriesContainer.querySelectorAll(".url-category");
 
@@ -618,17 +588,21 @@ export const urlSelector = {
       if (visibleItems === 0) {
         category.style.display = "none";
       } else {
-        category.style.display = "";
+        category.style.display = ""; // Ensure category is visible
 
         // Update category header to show visible count
         const categoryName = category.dataset.category;
-        const totalCount = urlFetcher.categorizedUrls[categoryName].length;
+        const totalCount = urlFetcher.categorizedUrls[categoryName]?.length || 0; // Use optional chaining and fallback
         const categoryTitle = category.querySelector("h3");
 
-        if (visibleItems < totalCount) {
-          categoryTitle.textContent = `${categoryName} (${visibleItems} of ${totalCount})`;
-        } else {
-          categoryTitle.textContent = `${categoryName} (${totalCount})`;
+        if (categoryTitle) { // Check if title element exists
+            if (visibleItems < totalCount && totalCount > 0) { // Only show "(x of y)" if different and total > 0
+              categoryTitle.textContent = `${categoryName} (${visibleItems} of ${totalCount})`;
+            } else if (totalCount > 0) {
+              categoryTitle.textContent = `${categoryName} (${totalCount})`;
+            } else {
+                 categoryTitle.textContent = categoryName; // Fallback if total count is 0
+            }
         }
       }
     });
@@ -638,6 +612,7 @@ export const urlSelector = {
    * Select all visible URLs
    */
   selectAll() {
+     if (!this.categoriesContainer) return; // Guard clause
     // Get all visible URL checkboxes
     const visibleCheckboxes = Array.from(
       this.categoriesContainer.querySelectorAll(".url-item")
@@ -646,8 +621,10 @@ export const urlSelector = {
       .map((item) => item.querySelector(".url-checkbox"));
 
     visibleCheckboxes.forEach((checkbox) => {
-      checkbox.checked = true;
-      this.selectedUrls.add(checkbox.dataset.path);
+       if (checkbox) { // Check if checkbox exists
+        checkbox.checked = true;
+        this.selectedUrls.add(checkbox.dataset.path);
+       }
     });
 
     // Update UI
@@ -660,11 +637,12 @@ export const urlSelector = {
    * Clear all URL selections
    */
   clearSelection() {
+     if (!this.categoriesContainer) return; // Guard clause
     // Uncheck all URL checkboxes
     this.categoriesContainer
       .querySelectorAll(".url-checkbox")
       .forEach((checkbox) => {
-        checkbox.checked = false;
+         if (checkbox) checkbox.checked = false;
       });
 
     // Clear the selected URLs set

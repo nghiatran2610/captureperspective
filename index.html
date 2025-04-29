@@ -16,8 +16,15 @@
       tab.
     </div>
 
-    <div id="loginOptionSection" class="card login-option-section">
-        <h2>Select Login Option</h2>
+    <div id="baseUrlSection" class="card">
+        <h2>1. Enter Base Client URL</h2>
+        <div class="base-url-container">
+             <label for="baseUrlInput" class="base-url-label">Base URL:</label>
+             <input type="text" placeholder="http://localhost:8088/data/perspective/client/PROJECT_NAME" class="base-url-input" id="baseUrlInput">
+             </div>
+         <div id="baseUrlStatus" class="help-text" style="margin-top: 5px;"></div> </div>
+
+    <div id="loginOptionSection" class="card login-option-section" style="display: none;"> <h2>2. Select Login Option</h2>
         <div class="input-row">
             <label>
                 <input type="radio" name="loginOption" value="continueWithoutLogin" id="optionContinueWithoutLogin" checked>
@@ -31,23 +38,22 @@
     </div>
 
     <div id="loginSection" class="card" style="display: none;">
-        </div>
+      </div>
 
     <div id="captureForm" style="display: none">
       <div class="card">
-        <h2 id="urlInputTitle">Enter URL(s) to Capture</h2>
+        <h2 id="urlInputTitle">3. Select Pages to Capture</h2>
         <div
           id="urlHelpText"
           class="help-text"
-          style="margin-top: -15px; margin-bottom: 10px"
-        >
+          style="margin-top: -15px; margin-bottom: 10px; display: none;" >
           Note that this is the home page with menu
         </div>
         <textarea
           id="urlList"
           placeholder="Enter URLs (one per line)"
           rows="5"
-        ></textarea>
+          style="display: none;" ></textarea>
         <div class="input-row screen-size-row">
           <label>
             Screen Size:
@@ -59,9 +65,7 @@
             </select>
           </label>
         </div>
-
-        <div id="advancedOptions" class="advanced-section">
-          <h3>Advanced Options</h3>
+         <div id="advancedOptions" class="advanced-section" style="display: none;"> <h3>Advanced Options</h3>
           <div class="input-row">
             <label title="Maximum time to wait before capturing the screenshot">
               Max Wait Time (sec):
@@ -83,7 +87,6 @@
               </small>
             </div>
           </div>
-
           <div class="input-row">
             <label
               title="Actions to perform before capturing (JSON format)"
@@ -105,8 +108,7 @@
       </div>
 
       <div class="btn-container" id="buttonContainer">
-        <button id="captureBtn" class="btn">Capture Screenshots</button>
-        <button id="retryFailedBtn" class="btn" disabled>
+        <button id="captureBtn" class="btn" disabled>Capture Screenshots</button> <button id="retryFailedBtn" class="btn" disabled>
           Retry Failed URLs
         </button>
       </div>

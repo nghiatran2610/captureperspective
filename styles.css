@@ -2124,3 +2124,14 @@ body.simple-mode .stats {
 .login-option-section label {
     font-size: 16px; /* Larger font size for radio labels */
 }
+
+/* Add this rule to styles.css */
+#loginOptionSection {
+  display: none; /* Default state is hidden */
+}
+
+/* Optional: Ensure cards are block elements by default if needed */
+.card {
+  display: block; /* Or flex, depending on your layout */
+}
+
