@@ -1,12 +1,14 @@
 // js/login-handler.js
+// Combine New UI Flow with OLD (Working) Fetching Logic
+// + Use SIMPLIFIED Polling Logic (Find ANY valid user)
+// + Fix for race condition in completeLogin
+// + Increased Polling Interval to 3000ms
+
 import UI from "./ui/index.js";
 import * as events from "./events.js";
 import { handleError } from "./errors.js";
-import urlFetcher from "./url-fetcher.js"; // Import urlFetcher
+import urlFetcher from "./url-fetcher.js";
 
-/**
- * VisualLoginHandler - Handles iframe-based login and accurate status updates
- */
 class VisualLoginHandler {
   constructor() {
     this.loginUrl = "";
@@ -14,447 +16,404 @@ class VisualLoginHandler {
     this.loginStatusElement = null;
     this.loginFrame = null;
     this.loginFrameContainer = null;
-    this.loginSection = null; // Added reference to the login section div
-    // Map of sessionId -> username snapshot before login
+    this.loginSection = null;
     this.initialSessions = new Map();
     this._pollInterval = null;
-    this.selectedLoginOption = 'continueWithoutLogin'; // Default option
-    this._frameLoadHandler = null; // Store load handler reference
+    this.selectedLoginOption = 'continueWithoutLogin';
+    this._frameLoadHandler = null;
   }
 
-  /**
-   * Initialize UI and login logic
-   */
   initialize(options = {}) {
-    // Determine login URL (override if provided)
-    // Login URL determination now depends on Base URL being set first by app.js
-    // this.loginUrl = options.loginUrl || this.determineLoginUrl(); // Defer this
+    this.addLoginUI(); // Adds structure, gets element refs
 
-    // Build and insert UI structure (iframe, status)
-    this.addLoginUI();
-
-    // Find radio buttons and set up listeners (moved FROM app.js)
     const optionContinueWithoutLogin = document.getElementById('optionContinueWithoutLogin');
     const optionLogin = document.getElementById('optionLogin');
     if (optionContinueWithoutLogin) {
-        // Disable initially until base URL is valid
-        optionContinueWithoutLogin.disabled = true;
+        // Starts disabled, enabled by app.js
         events.addDOMEventListener(optionContinueWithoutLogin,'change', () => {
              events.emit('LOGIN_OPTION_SELECTED', { option: 'continueWithoutLogin' });
         });
     }
     if (optionLogin) {
-        // Disable initially until base URL is valid
-        optionLogin.disabled = true;
+         // Starts disabled, enabled by app.js
          events.addDOMEventListener(optionLogin,'change', () => {
              events.emit('LOGIN_OPTION_SELECTED', { option: 'login' });
         });
     }
-
-    // Initial visibility is handled by app.js based on Base URL validation
-
-    console.log("VisualLoginHandler initialized. Waiting for option selection.");
+    console.log("VisualLoginHandler initialized. Structure added. Waiting for option selection.");
   }
 
-  /**
-   * Determine default login URL based on the validated base URL
-   * This should be called *after* urlFetcher.setBaseClientUrl is successful.
-   */
   determineLoginUrl() {
     if (!urlFetcher.baseClientUrl || !urlFetcher.projectName) {
         console.warn("Cannot determine login URL: Base URL or project name not set.");
-        // Provide a generic placeholder or return null
-        return null; // Or a default fallback if absolutely necessary
+        return null;
     }
     try {
       const urlObj = new URL(urlFetcher.baseClientUrl);
-      // Construct standard login URL path - this might need adjustment based on actual system
-      // Let's assume a pattern like /data/perspective/login might work, or rely on a known view if applicable
-       return `${urlObj.origin}/data/perspective/login?forceAuth=true`; // More likely generic path
-      // Example with project/view:
-      // return `${urlObj.origin}/data/perspective/login/${urlFetcher.projectName}/YourDefaultLoginView?forceAuth=true`;
+      const loginViewName = 'Admin'; // IMPORTANT: Confirm this view name
+      const loginUrl = `${urlObj.origin}/data/perspective/login/${urlFetcher.projectName}/${loginViewName}?forceAuth=true`;
+      console.log("Determined login URL:", loginUrl);
+      return loginUrl;
     } catch (e) {
       console.error('Error constructing login URL:', e);
-      return null; // Return null on error
+      return null;
     }
   }
 
-
-  /**
-   * Build and insert login section structure
-   */
   addLoginUI() {
     this.loginSection = document.getElementById("loginSection");
     if (!this.loginSection) {
-      console.error("#loginSection not found in HTML");
-      return;
-    }
-
-    // Populate the login section with content (status and iframe container)
-    // The login form itself isn't created here, the iframe loads the system's login page
+         console.error("#loginSection not found in HTML");
+         return;
+        }
     this.loginSection.innerHTML = `
-      <div class="login-header">
-        <h2>Authentication</h2>
-        <div id="loginStatus" class="login-status logged-out">
-          <span class="login-status-icon">⚪</span>
-          <span class="login-status-text">Not authenticated</span>
-        </div>
-      </div>
-      <div id="loginFrameContainer" class="login-frame-container hidden"> <iframe id="loginFrame" class="login-frame" src="about:blank"></iframe>
-      </div>
+      <div class="login-header"><h2>Authentication</h2><div id="loginStatus" class="login-status logged-out"><span class="login-status-icon">⚪</span><span class="login-status-text">Not authenticated</span></div></div>
+      <div id="loginFrameContainer" class="login-frame-container hidden"><iframe id="loginFrame" class="login-frame" src="about:blank"></iframe></div>
     `;
-
     this.loginStatusElement = document.getElementById("loginStatus");
     this.loginFrame = document.getElementById("loginFrame");
     this.loginFrameContainer = document.getElementById("loginFrameContainer");
-
     this.updateLoginStatus('logged-out', 'Not authenticated');
-    this.addLoginStyles(); // Add necessary CSS
+    this.addLoginStyles();
   }
 
-  /**
-   * Inject CSS for the login UI (only iframe and status specific styles)
-   */
   addLoginStyles() {
-    const style = document.createElement("style");
-    style.textContent = `
-      .login-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
-      .login-header h2 { margin:0; font-size:1.3em; }
-      .login-status { display:flex; align-items:center; padding:3px 10px; border:1px solid #e2e8f0; border-radius:4px; font-size:13px; transition:all .3s; }
-      .login-status.logged-out { background:#f8d7da; border-color:#f5c6cb; }
-      .login-status.checking  { background:#fff3cd; border-color:#ffeeba; }
-      .login-status.logged-in { background:#d4edda; border-color:#c3e6cb; }
-      .login-status-icon { margin-right:5px; font-size:12px; }
-      .login-frame-container { margin:10px 0; border:1px solid #ddd; border-radius:4px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
-      .login-frame { width:100%; height:350px; border:none; }
-      /* Add a hidden class for the iframe container */
-      .login-frame-container.hidden { display: none; }
-    `;
-    document.head.appendChild(style);
-  }
+     const style = document.createElement("style");
+     style.textContent = `
+       .login-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+       .login-header h2 { margin:0; font-size:1.3em; }
+       .login-status { display:flex; align-items:center; padding:3px 10px; border:1px solid #e2e8f0; border-radius:4px; font-size:13px; transition:all .3s; }
+       .login-status.logged-out { background:#f8d7da; border-color:#f5c6cb; }
+       .login-status.checking  { background:#fff3cd; border-color:#ffeeba; }
+       .login-status.logged-in { background:#d4edda; border-color:#c3e6cb; }
+       .login-status-icon { margin-right:5px; font-size:12px; }
+       .login-frame-container { margin:10px 0; border:1px solid #ddd; border-radius:4px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+       .login-frame { width:100%; height:350px; border:none; }
+       /* Add a hidden class for the iframe container */
+       .login-frame-container.hidden { display: none; }
+     `;
+     document.head.appendChild(style);
+    }
 
-
-  /**
-   * Handle change in login option radio buttons (called by app.js event)
-   * @param {string} option - 'continueWithoutLogin' or 'login'
-   */
   handleLoginOptionChange(option) {
       this.selectedLoginOption = option;
       this.toggleLoginSectionVisibility(option);
-
-      // If switching TO 'login', prepare the frame
       if (option === 'login' && !this.isLoggedIn) {
            this.prepareFrameLogin();
       } else if (option === 'continueWithoutLogin') {
-           // If switching away from login, stop polling and hide frame
-           this.stopSessionPolling();
-           this.hideLoginFrame();
-           // Ensure status reflects the choice
-            this.updateLoginStatus('logged-out', 'Continuing without login');
+           this.stopSessionPolling(); this.hideLoginFrame();
+           this.updateLoginStatus('logged-out', 'Continuing without login');
       }
   }
 
-  /**
-   * Show or hide the login section (card with iframe/status)
-   * @param {string} option - 'continueWithoutLogin' or 'login'
-   */
   toggleLoginSectionVisibility(option) {
       if (!this.loginSection) return;
-
       if (option === 'login') {
-          this.loginSection.style.display = 'block'; // Show the whole login card
-           // The iframe container's visibility is handled within prepareFrameLogin/hideLoginFrame
-           if (this.isLoggedIn && this.loginFrameContainer) {
-               // If already logged in, keep the iframe hidden
+          this.loginSection.style.display = 'block';
+           // Show/hide iframe container is handled in prepareFrameLogin/hideLoginFrame/completeLogin
+          if (this.isLoggedIn && this.loginFrameContainer) {
                this.loginFrameContainer.classList.add('hidden');
-           } else if (!this.isLoggedIn && this.loginFrameContainer) {
-                // If not logged in, ensure iframe container is potentially visible
-                // (prepareFrameLogin will actually show it)
            }
-      } else {
-          this.loginSection.style.display = 'none'; // Hide the whole login card
       }
+      else {
+          this.loginSection.style.display = 'none';
+        }
   }
 
-  /**
-   * Snapshot sessions, show iframe, and start polling for login
-   * Called when the 'Login' option is selected.
-   */
   async prepareFrameLogin() {
-     // Ensure Base URL is set before trying to determine login URL or fetch sessions
-     if (!urlFetcher.baseClientUrl || !urlFetcher.projectName) {
+    if (!urlFetcher.baseClientUrl || !urlFetcher.projectName) {
          console.error("Cannot prepare login: Base URL or Project Name missing.");
          this.updateLoginStatus('logged-out', 'Error: Base URL not set.');
          return;
-     }
-
-     // Determine the login URL now that base URL is available
-     this.loginUrl = this.determineLoginUrl();
-     if (!this.loginUrl) {
+        }
+    this.loginUrl = this.determineLoginUrl(); // Determine URL *now*
+    if (!this.loginUrl) {
          console.error("Could not determine Login URL.");
          this.updateLoginStatus('logged-out', 'Error: Cannot determine login URL.');
          return;
-     }
+        }
 
-
-    // Clear previous state
+    // --- Reset isLoggedIn flag HERE ---
     this.isLoggedIn = false;
     this.initialSessions.clear();
-    this.stopSessionPolling(); // Ensure no previous polling is active
+    this.stopSessionPolling(); // Ensure any previous polling is stopped
 
-    // Snapshot current sessions before loading login page
-     try {
-        const sessions = await this.fetchSessionList();
-        if (sessions === null) { // fetchSessionList returns null on critical error
-             this.updateLoginStatus('logged-out', 'Error fetching session info.');
-             return; // Stop if session fetching failed critically
+    try { // Snapshot sessions BEFORE loading iframe
+      const sessions = await this.fetchSessionList(); // Uses OLD working fetch logic now
+      if (sessions === null) {
+          this.updateLoginStatus('logged-out', 'Error fetching session info.');
+          return;
+         }
+      sessions.forEach(s => this.initialSessions.set(s.id, s.username));
+      console.log("Initial sessions snapshot:", JSON.stringify(Array.from(this.initialSessions.entries()))); // Use JSON stringify for map logging
+    } catch (error) {
+         console.error("Error snapshotting initial sessions:", error);
+         this.updateLoginStatus('logged-out', 'Error checking sessions.');
         }
-        sessions.forEach(s => this.initialSessions.set(s.id, s.username));
-        console.log("Initial sessions snapshot:", this.initialSessions);
-     } catch (error) {
-          console.error("Error snapshotting initial sessions:", error);
-          this.updateLoginStatus('logged-out', 'Error checking sessions.');
-          // Optionally return here, or try to proceed with login page loading
-     }
 
-
-    // Display iframe container
     if (this.loginFrameContainer) this.loginFrameContainer.classList.remove('hidden');
 
-    // Load login URL if not already loaded or is about:blank
     if (this.loginFrame && (!this.loginFrame.src || this.loginFrame.src === 'about:blank' || this.loginFrame.src !== this.loginUrl)) {
          console.log(`Loading login URL in iframe: ${this.loginUrl}`);
          this.loginFrame.src = this.loginUrl;
 
-         // Add listener for load to start polling
+         // --- Use { once: true } for the load listener ---
          if (this._frameLoadHandler) {
-             this.loginFrame.removeEventListener('load', this._frameLoadHandler); // Remove previous
+             // Remove previous listener just in case (though 'once' should handle it)
+             this.loginFrame.removeEventListener('load', this._frameLoadHandler);
          }
          this._frameLoadHandler = () => {
-             console.log("Login iframe loaded, starting session polling.");
-             this.startSessionPolling(); // Start polling ONLY after load
-             // Consider removing the listener if it should only run once per src change
-              // this.loginFrame.removeEventListener('load', this._frameLoadHandler);
-              // No, keep it in case the user reloads the iframe manually
+             console.log("Login iframe LOADED (once listener), starting session polling.");
+             this.startSessionPolling(); // Uses SIMPLIFIED poll logic now
          };
-         this.loginFrame.addEventListener('load', this._frameLoadHandler);
+         // Add listener with the 'once' option
+         this.loginFrame.addEventListener('load', this._frameLoadHandler, { once: true });
+         // --- End change ---
+
     } else if (this.loginFrame && this.loginFrame.src === this.loginUrl) {
-        // If login page is already loaded, just start polling
-        console.log("Login iframe already loaded, starting session polling.");
-        this.startSessionPolling();
+        // If login page is already loaded (e.g., user clicks away and back), restart polling
+        // But ensure we reset the state correctly first
+         console.log("Login iframe already loaded, restarting session polling.");
+         this.stopSessionPolling(); // Stop any previous polling just in case
+         this.startSessionPolling(); // Uses SIMPLIFIED poll logic now
     } else if (!this.loginFrame) {
          console.error("Login iframe element not found.");
-    }
+        }
   }
 
-  /**
-   * Poll the session endpoint until a real login appears
-   */
+  // **** USE SIMPLIFIED POLLING LOGIC - ADJUSTED INTERVAL ****
   startSessionPolling() {
-    if (this._pollInterval) {
-        console.log("Polling already active.");
-        return; // Don't start if already polling
-    }
+    if (this._pollInterval) return; // Don't start if already polling
     this.updateLoginStatus('checking', 'Waiting for authentication…');
-    console.log("Starting session polling...");
+    console.log("Starting session polling (SIMPLIFIED check)...");
+    // Log initial sessions for comparison (still useful for debugging)
+    console.log("Initial sessions snapshot used for polling:", JSON.stringify(Array.from(this.initialSessions.entries())));
 
-    this._pollInterval = setInterval(async () => {
-      // console.log("Polling..."); // Less verbose logging
-       // Check if login option is still 'login', stop polling if user switched away
+    // Define the interval callback function separately
+    const pollCallback = async () => {
+       // --- Guard: Check if polling should have stopped ---
+       if (!this._pollInterval) { return; }
+
        const currentOption = document.querySelector('input[name="loginOption"]:checked')?.value;
        if (currentOption !== 'login') {
            console.log("Login option changed, stopping polling.");
-           this.stopSessionPolling();
-           return;
+           this.stopSessionPolling(); return;
        }
-
 
       const sessions = await this.fetchSessionList();
-       if (sessions === null) {
-           console.warn("Polling failed to fetch sessions, will retry.");
-           // Optionally increase interval or stop after N failures
-           return;
-       }
+      // --- Guard: Check if polling was stopped during await ---
+      if (!this._pollInterval) { return; }
 
-      // Filter for either a new session or an existing session whose username changed
-      const valid = sessions.filter(s => {
-        const initialUsername = this.initialSessions.get(s.id);
-        const isNewSession = !this.initialSessions.has(s.id);
-        // Consider any username other than 'unauthenticated' or null/empty as potentially valid
-        const currentUsernameValid = s.username && s.username.toLowerCase() !== 'unauthenticated' && s.username !== 'null';
-        // Check if an existing session's username changed AND is now valid
-        const existingChangedAndValid = initialUsername !== undefined && currentUsernameValid && s.username !== initialUsername;
-         // Log individual session check for debugging
-        // console.log(`Session ID: ${s.id}, Username: ${s.username}, Initial: ${initialUsername}, IsNew: ${isNewSession}, ValidNow: ${currentUsernameValid}, ChangedValid: ${existingChangedAndValid}`);
-        return (isNewSession && currentUsernameValid) || existingChangedAndValid;
-      });
-
-      if (valid.length > 0) {
-        console.log("Valid session found, stopping polling.");
-        this.stopSessionPolling();
-        // Find the latest valid session based on uptime (or simply the first one found)
-        const latest = valid.reduce((latestSession, currentSession) => {
-           return (currentSession.uptimeMs || 0) > (latestSession.uptimeMs || 0) ? currentSession : latestSession;
-        }, valid[0]);
-        this.completeLogin(latest.username);
-      } else {
-           // console.log("No valid authenticated session found yet."); // Less verbose logging
+      if (sessions === null) {
+          console.warn("Polling failed to fetch sessions, will retry."); return;
       }
-    }, 3000); // Poll every 3 seconds
+
+      // console.log("Polling: Fetched sessions:", JSON.stringify(sessions)); // Can be verbose
+
+      // --- SIMPLIFIED Check: Find ANY session with a valid username ---
+      let loggedInSession = null;
+      for (const session of sessions) {
+           const currentUsername = session.username;
+           // Define what constitutes a 'valid' logged-in username
+           const isValidUsername = currentUsername && currentUsername.toLowerCase() !== 'unauthenticated' && currentUsername !== 'null' && currentUsername.trim() !== '';
+
+           if (isValidUsername) {
+                console.log(`Polling: Found session with VALID username: ID=${session.id}, User=${currentUsername}`);
+                loggedInSession = session;
+                break; // Found one, assume login is complete
+           }
+      }
+      // --- End Simplified Check ---
+
+      if (loggedInSession) { // If we found any valid session
+        console.log(`Valid session found (ID: ${loggedInSession.id}). Stopping polling.`);
+        // --- Stop polling IMMEDIATELY ---
+        this.stopSessionPolling();
+        // --- Call completeLogin AFTER stopping interval ---
+        // Check isLoggedIn one last time before calling completeLogin to prevent race conditions if possible
+        if (!this.isLoggedIn) {
+             this.completeLogin(loggedInSession.username);
+        } else {
+            console.warn("Polling found valid session, but isLoggedIn flag was already true. Preventing duplicate completeLogin call.");
+        }
+      } else {
+           // console.log("Polling: No valid authenticated session found yet."); // Less verbose
+      }
+    };
+
+    // Start the interval - *** INCREASED DURATION ***
+    this._pollInterval = setInterval(pollCallback, 3000); // Changed to 3000 (3 seconds)
   }
 
-    /**
-     * Stop the session polling
-     */
-    stopSessionPolling() {
-        if (this._pollInterval) {
-            console.log("Stopping session polling.");
-            clearInterval(this._pollInterval);
-            this._pollInterval = null;
-        }
-    }
+
+  // KEEP stopSessionPolling from current version
+  stopSessionPolling() {
+       if (this._pollInterval) {
+           console.log("Stopping session polling.");
+           clearInterval(this._pollInterval);
+           this._pollInterval = null;
+       }
+  }
 
 
-  /**
-   * Fetch all sessions from the backend
-   */
+  // **** USE OLD (WORKING) SESSION FETCH LOGIC ****
   async fetchSessionList() {
-       // Use the endpoint constructed by urlFetcher when setBaseClientUrl was called
-       if (!urlFetcher.urlEndpoint) {
-           console.error("Cannot fetch sessions: URL endpoint not constructed.");
-           return null; // Return null to indicate critical failure
-       }
-       // Ensure the endpoint uses the correct base path (e.g., /system/webdev/...)
-       // and targets the getSessionInfo resource.
-       let fetchUrl = '';
-       try {
-            const baseEndpoint = new URL(urlFetcher.urlEndpoint); // Parse the getUrls endpoint
-            baseEndpoint.pathname = baseEndpoint.pathname.replace('/getUrls', '/getSessionInfo'); // Change resource
-            baseEndpoint.search = ''; // Remove query params like projectName from session info request
-            fetchUrl = baseEndpoint.toString();
-       } catch (e) {
-            console.error("Error constructing session fetch URL from base endpoint:", e);
-            return null;
-       }
+    // console.log("Fetching session list (using previous working logic)..."); // Less verbose
+    // Determine project name from the CURRENT page URL (tool's URL)
+    const currentUrl = window.location.href;
+    const regex = /http(s)?:\/\/([^\/]+)\/system\/webdev\/([^\/]+)/;
+    const match = currentUrl.match(regex);
 
-
-       // console.log("Fetching sessions from:", fetchUrl); // Less verbose logging
-
+    // Check if the match is valid and has the project name group
+    if (!match || !match[3]) {
+        console.error("Could not extract project name from current tool URL:", currentUrl);
+        this.updateLoginStatus('logged-out', 'Error: Cannot determine endpoint project.');
+        return null; // Indicate critical failure
+    }
+    const projectName = match[3]; // e.g., RF_Main_STG
+    const fetchUrl = `/system/webdev/${projectName}/PerspectiveCapture/getSessionInfo`;
+    // console.log("Constructed fetchSessionList URL:", fetchUrl); // Less verbose
 
     try {
-      // Use 'include' credentials to send cookies
       const res = await fetch(fetchUrl, { credentials: 'include' });
       if (!res.ok) {
-          console.error(`WorkspaceSessionList failed: HTTP ${res.status}`, await res.text());
-          // Don't throw, but return null to indicate failure
-          return null;
+          console.error(`fetchSessionList failed: HTTP ${res.status}`, await res.text());
+           // Update UI status only if not already logged in
+          if (!this.isLoggedIn) {
+               this.updateLoginStatus('logged-out', `Error fetching sessions (${res.status})`);
+          }
+          return null; // Indicate failure
       }
       const data = await res.json();
-      // console.log("fetchSessionList data:", data); // Debugging received data
       return Array.isArray(data) ? data : [];
     } catch (e) {
       console.error('fetchSessionList fetch error:', e);
-       // Update status only if not already logged in successfully
-        if (!this.loginStatusElement?.classList.contains('logged-in')) {
-             this.updateLoginStatus('logged-out', 'Error fetching sessions');
-        }
-      return null; // Return null on critical fetch error
+       if (!this.isLoggedIn) {
+           this.updateLoginStatus('logged-out', 'Error fetching sessions (network)');
+       }
+      return null; // Indicate critical failure
     }
   }
 
-  /**
-   * Finalize login: update UI and emit event
-   * @param {string} username - The logged-in username
-   */
+
+  // KEEP completeLogin from current version (includes logging and try/catch/guard)
   completeLogin(username) {
-    if (this.isLoggedIn) return; // Prevent duplicate completion
-    this.isLoggedIn = true;
-    const finalUsername = username || 'Unknown User'; // Fallback for safety
-    console.log(`Login successful as ${finalUsername}`);
-    this.updateLoginStatus('logged-in', `Logged in as ${finalUsername}`);
-    events.emit('LOGIN_SUCCESSFUL', { username: finalUsername });
-    this.hideLoginFrame();
+    try {
+      console.log("[completeLogin] Entering function...");
+      // --- Guard against race condition ---
+      if (this.isLoggedIn) {
+           console.warn("[completeLogin] Guard triggered: Already logged in state detected. Exiting redundant call.");
+           return; // Prevent duplicate completion logic
+      }
+      // --- Set flag only AFTER the guard check ---
+      this.isLoggedIn = true;
+      const finalUsername = username || 'Unknown User'; // Fallback for safety
 
-    // Emit an event to app.js to indicate that login is complete and UI can proceed
-     events.emit('LOGIN_COMPLETE', { loggedIn: true, username: finalUsername });
+      console.log(`[completeLogin] Username received: '${username}', Using: '${finalUsername}'`);
+
+      // Log BEFORE updating status
+      console.log("[completeLogin] Attempting to call updateLoginStatus for 'logged-in'...");
+      this.updateLoginStatus('logged-in', `Logged in as ${finalUsername}`);
+      // Log AFTER updating status
+      console.log("[completeLogin] Returned from updateLoginStatus.");
+
+      // Log BEFORE emitting events
+      console.log("[completeLogin] Attempting to emit events (LOGIN_SUCCESSFUL, LOGIN_COMPLETE)...");
+      events.emit('LOGIN_SUCCESSFUL', { username: finalUsername });
+      events.emit('LOGIN_COMPLETE', { loggedIn: true, username: finalUsername });
+      // Log AFTER emitting events
+      console.log("[completeLogin] Finished emitting events.");
+
+
+      // Log BEFORE hiding frame
+      console.log("[completeLogin] Attempting to hide login frame...");
+      this.hideLoginFrame();
+      // Log AFTER hiding frame
+      console.log("[completeLogin] Finished hiding login frame.");
+
+      console.log("[completeLogin] Function finished successfully."); // Log successful completion
+
+
+    } catch (error) {
+        console.error("!!!!!!!! ERROR INSIDE completeLogin FUNCTION !!!!!!!!", error);
+         this.isLoggedIn = false; // Reset flag on error within completion logic
+         try {
+             this.updateLoginStatus('logged-out', 'Error during login completion');
+         } catch (finalError) {
+             console.error("[completeLogin] Failed even to set error status:", finalError);
+         }
+    }
   }
 
-   /**
-     * Indicate login failure
-     */
-    indicateLoginFailed() {
-        if (this.isLoggedIn) return; // Don't indicate failure if already logged in
-        this.isLoggedIn = false;
-        console.warn("Login process indicated as failed.");
-        this.updateLoginStatus('logged-out', 'Authentication failed');
-        this.hideLoginFrame();
-        this.stopSessionPolling();
+  // KEEP indicateLoginFailed from current version
+   indicateLoginFailed() {
+       if (this.isLoggedIn) return; // Don't indicate failure if already logged in
+       this.isLoggedIn = false;
+       console.warn("Login process indicated as failed.");
+       this.updateLoginStatus('logged-out', 'Authentication failed');
+       this.hideLoginFrame();
+       this.stopSessionPolling();
 
-        // Emit an event to app.js to indicate that login failed
-        events.emit('LOGIN_COMPLETE', { loggedIn: false });
-    }
+       // Emit an event to app.js to indicate that login failed
+       events.emit('LOGIN_COMPLETE', { loggedIn: false });
+   }
 
+  // KEEP hideLoginFrame from current version
+   hideLoginFrame() {
+       if (this.loginFrameContainer) {
+           this.loginFrameContainer.classList.add('hidden'); // Use hidden class
+           // Optionally clear iframe content to free resources
+           if (this.loginFrame) {
+               // Check if src is already blank to avoid unnecessary reload/event firing
+                if (this.loginFrame.src !== 'about:blank') {
+                   this.loginFrame.src = 'about:blank';
+                }
+           }
+       }
+   }
 
-  /**
-   * Hide the login iframe container
-   */
-  hideLoginFrame() {
-    if (this.loginFrameContainer) {
-        this.loginFrameContainer.classList.add('hidden'); // Use hidden class
-        // Optionally clear iframe content to free resources
-        if (this.loginFrame) {
-            // Check if src is already blank to avoid unnecessary reload/event firing
-             if (this.loginFrame.src !== 'about:blank') {
-                this.loginFrame.src = 'about:blank';
-             }
-        }
-    }
-  }
-
-  /**
-   * Update the status bubble icon and text
-   * @param {string} status - 'logged-in', 'logged-out', 'checking'
-   * @param {string} text - Status message
-   */
+  // KEEP updateLoginStatus from current version (includes logging)
   updateLoginStatus(status, text) {
-    if (!this.loginStatusElement) return;
-    // Remove previous status classes safely
-    this.loginStatusElement.classList.remove('logged-in', 'logged-out', 'checking');
-    // Add the new status class
-    this.loginStatusElement.classList.add(status);
+     if (!this.loginStatusElement) {
+         console.error("Cannot update login status: loginStatusElement not found.");
+         return;
+     }
+     console.log(`Updating login status UI: Status='${status}', Text='${text}'`);
+     // Remove previous status classes safely
+     this.loginStatusElement.classList.remove('logged-in', 'logged-out', 'checking');
+     // Add the new status class
+     this.loginStatusElement.classList.add(status);
 
-    const icon = this.loginStatusElement.querySelector('.login-status-icon');
-    if (icon) icon.textContent = status === 'logged-in' ? '✅' : status === 'checking' ? '⏳' : '⚪';
+     const icon = this.loginStatusElement.querySelector('.login-status-icon');
+     if (icon) icon.textContent = status === 'logged-in' ? '✅' : status === 'checking' ? '⏳' : '⚪';
 
-    const lbl = this.loginStatusElement.querySelector('.login-status-text');
-    if (lbl) lbl.textContent = text;
-  }
+     const lbl = this.loginStatusElement.querySelector('.login-status-text');
+     if (lbl) {
+         lbl.textContent = text;
+         console.log("Successfully updated .login-status-text content.");
+     } else {
+         console.error("Cannot update login status text: .login-status-text element not found within #loginStatus.");
+     }
+   }
 
-    /**
-     * Get the currently selected login option
-     * @returns {string} 'continueWithoutLogin' or 'login'
-     */
-    getSelectedLoginOption() {
+  // KEEP getSelectedLoginOption from current version
+   getSelectedLoginOption() {
         // Read directly from the radio button state if available
-         const checkedOption = document.querySelector('input[name="loginOption"]:checked');
-         return checkedOption ? checkedOption.value : this.selectedLoginOption; // Fallback to stored value
+        const checkedOption = document.querySelector('input[name="loginOption"]:checked');
+        return checkedOption ? checkedOption.value : this.selectedLoginOption; // Fallback to stored value
     }
 
-    /**
-     * Check if the user is considered authenticated for the purpose of capturing.
-     * This is true if 'continueWithoutLogin' is selected OR if login was successful.
-     * @returns {boolean}
-     */
-    isAuthenticatedForCapture() {
-         const selectedOption = this.getSelectedLoginOption();
-         // Also check if login process failed after 'login' was selected
-         const loginFailed = selectedOption === 'login' && !this.isLoggedIn && this.loginStatusElement?.classList.contains('logged-out'); // Check current visual status too
+  // KEEP isAuthenticatedForCapture from current version
+   isAuthenticatedForCapture() {
+        const selectedOption = this.getSelectedLoginOption();
+        // Also check if login process failed after 'login' was selected
+        const loginFailed = selectedOption === 'login' && !this.isLoggedIn && this.loginStatusElement?.classList.contains('logged-out'); // Check current visual status too
 
-         return selectedOption === 'continueWithoutLogin' || (selectedOption === 'login' && this.isLoggedIn);
-    }
+        return selectedOption === 'continueWithoutLogin' || (selectedOption === 'login' && this.isLoggedIn);
+   }
 
-
-  getLoginStatus() { return this.isLoggedIn; } // is logged in via iframe
+  // KEEP getters/setters
+  getLoginStatus() { return this.isLoggedIn; }
   getLoginUrl()    { return this.loginUrl;  }
   setLoginUrl(u)   { if (u) this.loginUrl = u.trim(); }
 }
