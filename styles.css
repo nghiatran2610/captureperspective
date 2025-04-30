@@ -2226,3 +2226,86 @@ body.simple-mode .stats {
   max-height: none; /* Remove any max-height transition */
   /* display: block; Ensure it's displayed if collapsing logic was hiding it */
 }
+
+/* styles.css */
+
+/* --- Replace previous collapsible styles with these --- */
+
+/* Wrapper for the H2 and the toggle indicator */
+.card-header-toggle-wrapper {
+  display: flex;
+  align-items: center; /* Vertically align H2 and indicator */
+  justify-content: space-between; /* Push indicator to the right */
+  margin-bottom: var(--spacing-lg); /* Standard margin below H2 */
+  cursor: pointer;
+  position: relative;
+  /* Remove any background/border added previously */
+  background-color: transparent;
+  border: none;
+  padding: 0; /* Use card padding */
+}
+
+/* Style H2 within the wrapper to look standard */
+.card-header-toggle-wrapper h2 {
+  margin: 0;
+  font-size: 1.5em;
+  color: var(--text-color-light);
+  flex-grow: 1; /* Allow title to take space */
+}
+
+/* Style for the indicator (arrow) */
+.collapse-indicator {
+  font-size: 1.1em; /* Adjust size */
+  color: var(--primary-color); /* Indicator color */
+  margin-left: 10px; /* Space from title */
+  line-height: 1; /* Align vertically */
+  transition: transform 0.3s ease; /* Animate rotation */
+  display: inline-block; /* Needed for transform */
+  transform-origin: center;
+  padding: 2px; /* Make clickable area slightly larger */
+}
+
+/* Rotate indicator when COLLAPSED (wrapper has .collapsed) */
+.card-header-toggle-wrapper.collapsed .collapse-indicator {
+  transform: rotate(-90deg); /* Point right when collapsed */
+}
+/* Default state (Expanded): No rotation needed if HTML char is ▼ */
+.card-header-toggle-wrapper:not(.collapsed) .collapse-indicator {
+  transform: rotate(0deg);
+}
+
+/* Remove header margin when collapsed */
+.card-header-toggle-wrapper.collapsed {
+   margin-bottom: 0;
+}
+
+/* Style for the collapsible content - keep smooth transition */
+#captureSettingsContent {
+  overflow: hidden;
+  transition: max-height 0.4s ease-out, padding-top 0.4s ease-out, padding-bottom 0.4s ease-out, border-top-width 0.4s ease-out, margin-top 0.4s ease-out;
+  max-height: 1500px; /* Adjust if content is taller */
+  padding-top: 15px;
+  padding-bottom: 15px;
+  border-top: 1px solid var(--border-color); /* Separator line when open */
+  margin-top: 15px; /* Add margin when open */
+  background-color: transparent; /* Use card background */
+}
+
+/* Collapsed state */
+#captureSettingsContent.collapsed {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-color: transparent; /* Hide border smoothly */
+  margin-top: 0;
+}
+
+/* Ensure card padding looks right */
+#url-input-container.card {
+    padding: var(--spacing-xl); /* Standard card padding */
+    overflow: visible;
+}
+
+/* --- End Replace --- */
+
+/* --- Keep other styles as they are --- */
