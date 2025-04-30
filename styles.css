@@ -1782,8 +1782,6 @@ body.simple-mode .stats {
   display: flex;
   align-items: center;
   padding: 10px 15px;
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
 }
 
 .base-url-label {
@@ -2276,13 +2274,15 @@ body.simple-mode .stats {
 
 /* Remove header margin when collapsed */
 .card-header-toggle-wrapper.collapsed {
-   margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 /* Style for the collapsible content - keep smooth transition */
 #captureSettingsContent {
   overflow: hidden;
-  transition: max-height 0.4s ease-out, padding-top 0.4s ease-out, padding-bottom 0.4s ease-out, border-top-width 0.4s ease-out, margin-top 0.4s ease-out;
+  transition: max-height 0.4s ease-out, padding-top 0.4s ease-out,
+    padding-bottom 0.4s ease-out, border-top-width 0.4s ease-out,
+    margin-top 0.4s ease-out;
   max-height: 1500px; /* Adjust if content is taller */
   padding-top: 15px;
   padding-bottom: 15px;
@@ -2302,8 +2302,8 @@ body.simple-mode .stats {
 
 /* Ensure card padding looks right */
 #url-input-container.card {
-    padding: var(--spacing-xl); /* Standard card padding */
-    overflow: visible;
+  padding: var(--spacing-xl); /* Standard card padding */
+  overflow: visible;
 }
 
 /* --- End Replace --- */

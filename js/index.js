@@ -16,7 +16,7 @@ function initializeApp() {
         app.initialize();
 
         // Log success
-        console.log('Screenshot Tool initialized successfully');
+        console.log('Ignition Perspective Screenshot Capture initialized successfully');
 
         // Expose app to window for debugging if needed
         if (config.debug) {
