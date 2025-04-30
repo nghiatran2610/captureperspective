@@ -569,6 +569,8 @@ class App {
       this._setCaptureSettingsCollapsed(false); // Expand on error
       this._checkCaptureButtonState();
       this.updatePauseResumeButton();
+      // Inside perspective_capture/js/app.js
+      // Within the captureScreenshots function...
     } finally {
       const isFinished = this.currentCaptureIndex >= this.captureQueue.length;
       const endTotalTime = performance.now();
@@ -589,18 +591,23 @@ class App {
         // Finished naturally
         this._checkCaptureButtonState();
         this.updatePauseResumeButton(); // Should disable pause btn
-        this._setCaptureSettingsCollapsed(false); // Expand settings when finished
+        // --- REMOVED LINE BELOW ---
+        // this._setPagesListCollapsed(false); // REMOVED: No longer expand automatically
+        // --- END REMOVED LINE ---
       } else if (!this.isPaused && !isFinished) {
         // Errored out
         this._checkCaptureButtonState();
         this.updatePauseResumeButton();
-        this._setCaptureSettingsCollapsed(false); // Expand settings
+        // --- REMOVED LINE BELOW ---
+        // this._setPagesListCollapsed(false); // REMOVED: No longer expand automatically on error
+        // --- END REMOVED LINE ---
       } else if (this.isPaused) {
         // Paused mid-run
-        this._setCaptureSettingsCollapsed(true); // Keep collapsed
+        this._setPagesListCollapsed(true); // Keep collapsed if paused
         if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
       }
 
+      // Keep the PDF button logic
       const pdfBtnVisible = AppState.screenshots.size > 0;
       const combineAllPdfBtn = document.querySelector(".combine-all-pdf-btn");
       if (combineAllPdfBtn) {
