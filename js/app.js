@@ -52,7 +52,7 @@ class App {
     const captureForm = UI.elements.captureForm;
     const progressOutput = UI.elements.progressOutput;
     const baseUrlInput = document.getElementById("baseUrlInput");
-    const defaultLoginOptionRadio = document.getElementById("optionLogin"); // Login is default
+    // const defaultLoginOptionRadio = document.getElementById("optionLogin"); // No longer checking default
 
     // Show only Base URL section initially by default
     if (baseUrlSection) baseUrlSection.style.display = "";
@@ -76,18 +76,8 @@ class App {
       this._enableLoginOptions();
       if (loginOptionSection) loginOptionSection.style.display = "block";
       const statusElement = document.getElementById("baseUrlStatus");
-    
 
-      // --- ADDED: Check if default 'Login' option is selected and proceed ---
-      if (defaultLoginOptionRadio && defaultLoginOptionRadio.checked) {
-        console.log(
-          "Valid Base URL on load and 'Login' is default. Triggering login process..."
-        );
-        // Tell login handler to start the login process (it will show #loginSection)
-        this.loginHandler.handleLoginOptionChange("login");
-        // **** DO NOT show capture form or fetch URLs yet - Wait for LOGIN_COMPLETE event ****
-      }
-      // --- End Added ---
+      // --- Initialization now waits for explicit user selection ---
     } else {
       // If no valid prefilled URL, ensure options are disabled
       this._disableLoginOptions();
@@ -145,27 +135,23 @@ class App {
     if (success) {
       this.baseUrl = urlFetcher.baseClientUrl;
       this.baseUrlValid = true;
-    
+
       console.log("Base URL valid, attempting to show login options...");
       loginOptionSection.style.display = "block";
       console.log("Login options display style set to block.");
       this._enableLoginOptions();
-      // --- Check if default 'Login' option is selected and trigger handler ---
-      const defaultLoginOptionRadio = document.getElementById("optionLogin");
-      if (defaultLoginOptionRadio && defaultLoginOptionRadio.checked) {
-        console.log(
-          "Base URL validated, 'Login' is default. Triggering login handler."
-        );
-        // Check if login process needs starting or if it's already handled by handler's internal state
-        // Avoid calling prepareFrameLogin multiple times if not needed
-        if (
-          !this.loginHandler.isLoggedIn &&
-          this.loginHandler.selectedLoginOption === "login"
-        ) {
-          this.loginHandler.handleLoginOptionChange("login");
-        }
+      // --- Flow now waits for explicit user selection via LOGIN_OPTION_SELECTED event ---
+      // Ensure dependent sections (login, capture form) are hidden initially after URL validation
+      if (document.getElementById("loginSection")) {
+          document.getElementById("loginSection").style.display = "none";
       }
-      // --- End Check ---
+      if (UI.elements.captureForm) {
+          UI.elements.captureForm.style.display = "none";
+      }
+      if (UI.elements.progressOutput) {
+           UI.elements.progressOutput.style.display = "none";
+      }
+      // --- End Wait ---
     } else {
       this.baseUrlValid = false;
       this.baseUrl = url;
@@ -268,7 +254,17 @@ class App {
       if (statusElement) statusElement.textContent = "";
       loginOptionSection.style.display = "none"; // Hide options if URL is cleared
       urlFetcher.projectName = ""; // Clear project name in fetcher
-      this._disableLoginOptions(); // Disable radio buttons
+      this._disableLoginOptions(); // Disable and uncheck radio buttons
+      // Also hide subsequent sections
+        if (document.getElementById("loginSection")) {
+          document.getElementById("loginSection").style.display = "none";
+        }
+        if (UI.elements.captureForm) {
+          UI.elements.captureForm.style.display = "none";
+        }
+        if (UI.elements.progressOutput) {
+          UI.elements.progressOutput.style.display = "none";
+        }
       return;
     }
 
@@ -283,7 +279,17 @@ class App {
       }
       loginOptionSection.style.display = "none"; // Hide options
       urlFetcher.projectName = ""; // Clear project name in fetcher
-      this._disableLoginOptions(); // Disable radio buttons
+      this._disableLoginOptions(); // Disable and uncheck radio buttons
+       // Also hide subsequent sections
+        if (document.getElementById("loginSection")) {
+          document.getElementById("loginSection").style.display = "none";
+        }
+        if (UI.elements.captureForm) {
+          UI.elements.captureForm.style.display = "none";
+        }
+        if (UI.elements.progressOutput) {
+          UI.elements.progressOutput.style.display = "none";
+        }
       return;
     }
 
@@ -293,7 +299,7 @@ class App {
     if (success) {
       this.baseUrl = urlFetcher.baseClientUrl; // Store the potentially cleaned URL
       this.baseUrlValid = true;
-   
+
       // Show the Login Option section - TRY WITH !important
       console.log(
         "Base URL valid, attempting to show login options with !important..."
@@ -301,6 +307,20 @@ class App {
       loginOptionSection.style.setProperty("display", "block", "important"); // Use setProperty
       console.log("Login options display style set to block !important."); // Add log
       this._enableLoginOptions(); // Enable radio buttons
+
+       // --- Flow now waits for explicit user selection via LOGIN_OPTION_SELECTED event ---
+       // Ensure dependent sections (login, capture form) are hidden initially after URL validation
+       if (document.getElementById("loginSection")) {
+           document.getElementById("loginSection").style.display = "none";
+       }
+       if (UI.elements.captureForm) {
+           UI.elements.captureForm.style.display = "none";
+       }
+       if (UI.elements.progressOutput) {
+            UI.elements.progressOutput.style.display = "none";
+       }
+       // --- End Wait ---
+
     } else {
       this.baseUrlValid = false;
       this.baseUrl = url;
@@ -311,17 +331,27 @@ class App {
       }
       loginOptionSection.style.display = "none"; // Hide options
       urlFetcher.projectName = ""; // Clear project name in fetcher
-      this._disableLoginOptions(); // Disable radio buttons
+      this._disableLoginOptions(); // Disable and uncheck radio buttons
+       // Also hide subsequent sections
+        if (document.getElementById("loginSection")) {
+          document.getElementById("loginSection").style.display = "none";
+        }
+        if (UI.elements.captureForm) {
+          UI.elements.captureForm.style.display = "none";
+        }
+        if (UI.elements.progressOutput) {
+          UI.elements.progressOutput.style.display = "none";
+        }
     }
   }
 
   // Helper to disable login options
   _disableLoginOptions() {
     const radios = document.querySelectorAll('input[name="loginOption"]');
-    radios.forEach((radio) => (radio.disabled = true));
-    // Also reset the checked state to default maybe?
-    const defaultRadio = document.getElementById("optionContinueWithoutLogin");
-    if (defaultRadio) defaultRadio.checked = true;
+    radios.forEach((radio) => {
+        radio.disabled = true;
+        radio.checked = false; // Explicitly uncheck
+    });
   }
   // Helper to enable login options
   _enableLoginOptions() {
@@ -514,21 +544,38 @@ class App {
     events.on("LOGIN_OPTION_SELECTED", (data) => {
       console.log("LOGIN_OPTION_SELECTED event received:", data);
       if (!this.baseUrlValid) {
-        /* ... validation ... */ return;
+        // Should not happen if radios are disabled correctly, but double-check
+        console.warn("Login option selected, but Base URL is not valid.");
+        return;
       }
 
       // Let handler manage login section visibility AND trigger login process if 'login' selected
       this.loginHandler.handleLoginOptionChange(data.option);
 
-      // **** Show capture form ONLY if 'Continue without login' is chosen ****
+      // Hide the other dependent sections initially when an option is FIRST selected
+      // The LOGIN_COMPLETE handler will show the capture form later if login is successful.
+      if (data.option === "login") {
+           if (UI.elements.captureForm) {
+               UI.elements.captureForm.style.display = "none";
+           }
+           if (UI.elements.progressOutput) {
+               UI.elements.progressOutput.style.display = "none";
+           }
+      }
+
+      // Show capture form and fetch URLs ONLY if 'Continue without login' is chosen
       if (data.option === "continueWithoutLogin") {
         console.log(
           "Continue without login chosen by user, showing capture form and fetching URLs."
         );
+        // Ensure login section is hidden if user switches TO this option
+        if (document.getElementById("loginSection")) {
+            document.getElementById("loginSection").style.display = "none";
+        }
         this._updateUIMode(); // Show UI elements for capture
         this._initiateUrlFetching(); // Fetch URLs
       }
-      // If 'login' is selected, do nothing here - wait for LOGIN_COMPLETE
+      // If 'login' is selected, the flow now waits for LOGIN_COMPLETE event.
     });
 
     // Login Process Complete
@@ -728,8 +775,12 @@ class App {
       const simpleWaitTimeEl = document.getElementById("simpleWaitTime");
       if (simpleWaitTimeEl && UI.elements.waitTime) {
         /* ... set wait time ... */
+         UI.elements.waitTime.value = simpleWaitTimeEl.value; // Sync value
+         console.log("Using Wait Time:", UI.elements.waitTime.value);
       } else {
         /* ... handle missing element ... */
+         console.error("Wait time input field not found!");
+         UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
       }
 
       UI.progress.updateStats(urlList.length, 0, 0, 0);
@@ -754,9 +805,37 @@ class App {
       this._processingQueue = false; // Ensure flag is cleared on setup error
       // Leave progressOutput visible to show error status
     } finally {
-      // ... finally block remains the same ...
-      this._processingQueue = false; // Ensure flag is cleared
-      // ... calculate time, update stats, update buttons ...
+      // This block executes regardless of whether an error occurred in the try block
+      // It might execute even if processCaptureQueue is still technically running asynchronously if not awaited correctly
+      // Ensure processing flag is cleared reliably
+      // this._processingQueue = false; // Moved clearing this flag inside processCaptureQueue completion/pause
+
+      const endTotalTime = performance.now();
+      const totalTimeTaken = ((endTotalTime - startTotalTime) / 1000).toFixed(2);
+
+      // Update final stats using AppState
+      UI.progress.updateStats(
+        AppState.orderedUrls.length + AppState.failedUrls.length, // Total attempted
+        AppState.screenshots.size, // Successful
+        AppState.failedUrls.length, // Failed
+        totalTimeTaken
+      );
+
+      // Update button states after completion or if an error occurred during setup
+      if (!this._processingQueue) { // Only update buttons if queue is not running (or paused)
+        UI.elements.captureBtn.disabled = urlSelector.selectedUrls.size === 0;
+        UI.elements.retryFailedBtn.disabled = AppState.failedUrls.length === 0;
+         const pauseResumeBtn = document.getElementById("pauseResumeBtn");
+         if (pauseResumeBtn) pauseResumeBtn.disabled = true; // Disable pause/resume once complete
+      }
+       // Show the combine PDF button if there are successful screenshots
+      if (AppState.screenshots.size > 0) {
+           const combineAllPdfBtn = UI.elements.liveThumbnails?.querySelector(".combine-all-pdf-btn");
+           if (combineAllPdfBtn) {
+               combineAllPdfBtn.style.display = "inline-block";
+               combineAllPdfBtn.disabled = false;
+           }
+       }
     }
   }
 
@@ -817,6 +896,7 @@ class App {
           // Add thumbnail for the single screenshot
           UI.thumbnails.addLiveThumbnail(result, fileName);
           AppState.addScreenshot(url, result); // Mark URL as successful
+          AppState.removeFailedUrl(url); // Ensure it's removed from failed list if it was retried
         } catch (error) {
           // Handle errors specific to single screenshot capture
           console.error(`Error capturing simple screenshot for ${url}:`, error);
@@ -872,9 +952,9 @@ class App {
 
         // Update stats after processing each URL
         UI.progress.updateStats(
-          totalUrls,
-          AppState.screenshots.size,
-          AppState.failedUrls.length,
+          totalUrls, // Total URLs being processed in this run
+          AppState.screenshots.size, // Current total successful
+          AppState.failedUrls.length, // Current total failed
           0 // Time is updated at the end of the overall capture
         );
       } catch (error) {
@@ -915,42 +995,28 @@ class App {
     // After the loop finishes (either completed or paused)
     if (this.currentCaptureIndex >= totalUrls) {
       console.log("Queue processing complete.");
-      // Final updates and cleanup if all URLs are processed
+      UI.progress.updateProgressMessage(`Capture complete. Processed ${totalUrls} pages.`);
+      this._processingQueue = false; // Clear flag on completion
+      // Final updates are handled in the main captureScreenshots finally block
     } else if (this.isPaused) {
       console.log("Queue processing paused.");
-      // Keep state as is, waiting for resume
+      // Keep processing flag true while paused
     }
-
-    // Clear processing flag when loop finishes or pauses
-    this._processingQueue = false;
 
     // Update button states based on final status
     this._checkCaptureButtonState(); // Update capture button based on pause/completion and selection
     UI.elements.retryFailedBtn.disabled = AppState.failedUrls.length === 0;
 
-    // Ensure pause/resume button state is correct after processing
-    const pauseResumeBtn = document.getElementById("pauseResumeBtn");
-    if (pauseResumeBtn) {
-      if (
-        this.isPaused &&
-        this.currentCaptureIndex < this.captureQueue.length
-      ) {
-        pauseResumeBtn.textContent = "Resume";
-        pauseResumeBtn.classList.add("paused");
-        pauseResumeBtn.disabled = false; // Keep enabled if paused with items left
-      } else {
-        pauseResumeBtn.disabled = true; // Disable if not paused or no items left
-        pauseResumeBtn.textContent = "Pause"; // Reset text
-        pauseResumeBtn.classList.remove("paused"); // Reset class
-      }
-    }
-  }
+    // Ensure pause/resume button state is correct after processing loop iteration
+     this.updatePauseResumeButton(); // Call consolidated update logic
+
+  } // End processCaptureQueue
 
   async retryFailedUrls() {
     // Prevent starting retry if already processing
     if (this._processingQueue) {
-      console.log("Retry already in progress.");
-      UI.utils.showStatus("Retry is already in progress.", false, 3000);
+      console.log("Retry or Capture already in progress.");
+      UI.utils.showStatus("Process already running.", false, 3000);
       return;
     }
 
@@ -977,17 +1043,24 @@ class App {
     }
 
     const startTotalTime = performance.now();
-    let urlsToRetry = [...AppState.failedUrls];
+    let urlsToRetry = [...AppState.failedUrls]; // Copy the list
     let originalFailedCount = urlsToRetry.length;
-    let currentFailedUrlsSnapshot = [...AppState.failedUrls]; // Snapshot before clearing
-    AppState.failedUrls = []; // Clear failed list at the start of retry
+    let initialSuccessCount = AppState.screenshots.size; // Success count *before* retry
+
+    // --- Reset state for retry ---
     this._processingQueue = true; // Set processing flag for retry
+    this.isPaused = false; // Ensure not paused at start of retry
+    this.captureQueue = urlsToRetry.map((url, index) => ({ // Create a queue for retry items
+        url,
+        index: index, // Use retry index, original index isn't critical here
+        capturePreset: UI.elements.capturePreset.value || "fullHD",
+        actionSequences: [],
+      }));
+    this.currentCaptureIndex = 0;
+    // --- End Reset state ---
 
     try {
       this.usingActionSequences = false; // Always false in simple mode retry
-      const capturePreset = UI.elements.capturePreset.value || "fullHD";
-      // No action sequences in simple mode retry
-      let actionSequences = [];
 
       // Ensure correct wait time is used during retry
       const simpleWaitTimeEl = document.getElementById("simpleWaitTime");
@@ -999,8 +1072,9 @@ class App {
         UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
       }
 
-      let completed = 0;
-      let retriedSuccessCount = 0;
+       // Clear only the failed URLs from the *state* before starting retry process
+       AppState.failedUrls = [];
+
       UI.progress.updateProgressMessage(
         `Retrying ${urlsToRetry.length} failed URLs...`
       );
@@ -1008,180 +1082,68 @@ class App {
       UI.elements.retryFailedBtn.disabled = true; // Disable while retrying
       UI.elements.captureBtn.disabled = true; // Also disable main capture button
 
-      // Disable pause/resume button during retry
-      const pauseResumeBtn = document.getElementById("pauseResumeBtn");
-      if (pauseResumeBtn) {
-        pauseResumeBtn.disabled = true;
-        pauseResumeBtn.textContent = "Pause";
-        pauseResumeBtn.classList.remove("paused");
-      }
+      // Update pause/resume button for retry process
+      this.updatePauseResumeButton(); // Should be enabled now if queue has items
 
-      // --- Retry Loop ---
-      for (let i = 0; i < urlsToRetry.length; i++) {
-        const url = urlsToRetry[i];
-        // Check if URL is valid before attempting retry
-        if (!url) {
-          console.warn(`Skipping invalid URL in retry list at index ${i}`);
-          completed++;
-          continue;
-        }
-        UI.progress.updateProgressMessage(
-          `Retrying ${i + 1} of ${urlsToRetry.length}: ${url}`
-        );
-        try {
-          // Simple mode retry (single screenshot per URL)
-          // No need to check this.usingActionSequences
-          try {
-            console.log(`Retrying simple screenshot for URL: ${url}`);
-            const result = await ScreenshotCapture.takeScreenshot(
-              url,
-              capturePreset
-            );
+      // Process the retry queue (this will handle pause/resume internally)
+      await this.processCaptureQueue();
 
-            // Generate filename with Retry indicator and timestamp
-            const timestamp = URLProcessor.getTimestamp();
-            // Try to find the original index for filename generation if needed
-            const originalIndex = AppState.orderedUrls.indexOf(url);
-            const filenameIndex = originalIndex !== -1 ? originalIndex : i;
-
-            const fileName = URLProcessor.generateFilename(
-              url,
-              filenameIndex,
-              ""
-            ).replace(".png", `_Retry_${timestamp}.png`);
-
-            result.fileName = fileName; // Add filename to result object
-
-            // Add thumbnail for the retried screenshot
-            UI.thumbnails.addLiveThumbnail(result, fileName, null, true); // Pass true for isRetry
-            AppState.addScreenshot(url, result); // Mark URL as successful
-            retriedSuccessCount++; // Increment count for successfully retried URLs
-          } catch (error) {
-            // Handle errors specific to simple screenshot retry
-            console.error(
-              `Error retrying simple screenshot for ${url}:`,
-              error
-            );
-
-            const timestamp = URLProcessor.getTimestamp();
-            const originalIndex = AppState.orderedUrls.indexOf(url);
-            const filenameIndex = originalIndex !== -1 ? originalIndex : i;
-            const fileName = URLProcessor.generateFilename(
-              url,
-              filenameIndex,
-              ""
-            ).replace(".png", `_Error_Retry_${timestamp}.png`);
-
-            // Check for specific 'No view configured' or 'Mount definition' errors during retry
-            if (
-              error.message &&
-              (error.message.includes("No view configured") ||
-                error.message.includes("Mount definition"))
-            ) {
-              const errorResult = {
-                error: true,
-                errorMessage: error.message,
-                sequenceName: url + " (Retry Failed)", // Use URL as sequence name for error display
-              };
-
-              // Add an error thumbnail for the failed retry
-              UI.thumbnails.addLiveThumbnail(
-                errorResult,
-                fileName,
-                url + " (Retry)", // Pass URL + Retry for display name
-                true, // Is a retry
-                false // Not a toolbar action
-              );
-              UI.utils.showStatus(`✗ Retry Failed: ${url} (Mount error)`, true);
-              AppState.addFailedUrl(url); // Add back to failed list
-            } else {
-              // Handle other types of errors for simple screenshot retry
-              const errorResult = {
-                error: true,
-                errorMessage: error.message,
-                sequenceName: url + " (Retry Failed)",
-              };
-              UI.thumbnails.addLiveThumbnail(
-                errorResult,
-                fileName,
-                url + " (Retry)",
-                true,
-                false
-              );
-              AppState.addFailedUrl(url); // Add back to failed list
-              UI.utils.showStatus(
-                `✗ Retry Failed: ${url} (${error.message})`,
-                true
-              ); // Show the specific error message
-            }
-          }
-        } catch (error) {
-          // Catch any uncaught errors during the processing of this retry URL
-          console.error(`Unexpected error processing retry URL ${url}:`, error);
-          AppState.addFailedUrl(url); // Add URL back to failed list
-          UI.utils.showStatus(
-            `✗ Retry Failed: ${url} (Unexpected error)`,
-            true
-          );
-        }
-
-        completed++;
-        UI.progress.updateProgress(completed, urlsToRetry.length); // Update progress bar based on original failed list count
-
-        // Add a small delay between retrying URLs
-        if (i < urlsToRetry.length - 1) {
-          // Only wait if there are more items
-          await new Promise((resolve) => setTimeout(resolve, 500)); // 500ms delay
-        }
-      } // --- End Retry Loop ---
-
+      // --- Post-Retry Processing ---
       const endTotalTime = performance.now();
-      const totalTimeTaken = ((endTotalTime - startTotalTime) / 1000).toFixed(
-        2
-      );
-      const finalSuccessCount = AppState.screenshots.size;
-      const finalFailedCount = AppState.failedUrls.length;
+      const totalTimeTaken = ((endTotalTime - startTotalTime) / 1000).toFixed(2);
+      const finalSuccessCount = AppState.screenshots.size; // Success count *after* retry
+      const finalFailedCount = AppState.failedUrls.length; // Failed URLs *after* retry attempt
+      const retriedSuccessCount = finalSuccessCount - initialSuccessCount; // How many succeeded during retry
+      const totalAttempted = initialSuccessCount + originalFailedCount; // Initial success + original failures = total pages considered
 
-      // Determine the correct total count for stats (initial successes + originally failed)
-      // Need to get initial success count before retry started
-      const initialSuccessCount = AppState.orderedUrls.length; // This now includes successfully retried URLs
-      const totalAttempted = initialSuccessCount + finalFailedCount; // Total is current success + current fail
+       // Update final stats
+       UI.progress.updateStats(
+           totalAttempted,
+           finalSuccessCount,
+           finalFailedCount,
+           totalTimeTaken
+       );
 
-      // Update stats with final counts reflecting retry results
-      UI.progress.updateStats(
-        totalAttempted,
-        finalSuccessCount,
-        finalFailedCount,
-        totalTimeTaken
-      );
+       // Update final message based on retry results
+       if (this.isPaused) {
+           UI.progress.updateProgressMessage(
+               `Retry paused. ${retriedSuccessCount} of ${originalFailedCount} URLs retried successfully so far.`
+           );
+       } else {
+           UI.progress.updateProgressMessage(
+               `Retry complete. ${retriedSuccessCount} of ${originalFailedCount} URLs successfully retried. (Remaining Failed: ${finalFailedCount}, Time: ${totalTimeTaken}s)`
+           );
+       }
 
-      UI.progress.updateProgressMessage(
-        `Retry complete. ${retriedSuccessCount} of ${originalFailedCount} URLs successfully retried. (Remaining Failed: ${finalFailedCount}, Time: ${totalTimeTaken}s)`
-      );
     } catch (error) {
       // Catch setup errors for retry
       handleError(error, { logToConsole: true, showToUser: true });
-      AppState.failedUrls = currentFailedUrlsSnapshot; // Restore failed list on setup error
-      UI.progress.updateProgressMessage("Retry failed due to setup error.");
-    } finally {
-      this._processingQueue = false; // Clear processing flag
-      // Re-enable capture button based on URL selection state
-      UI.elements.captureBtn.disabled =
-        this.isPaused ||
-        this.captureQueue.length > 0 ||
-        this._processingQueue ||
-        urlSelector.selectedUrls.size === 0;
-      UI.elements.retryFailedBtn.disabled = AppState.failedUrls.length === 0;
-
-      // Ensure pause/resume button is disabled after retry is fully complete
-      const pauseResumeBtn = document.getElementById("pauseResumeBtn");
-      if (pauseResumeBtn) {
-        pauseResumeBtn.disabled = true;
-        pauseResumeBtn.textContent = "Pause"; // Reset text
-        pauseResumeBtn.classList.remove("paused"); // Reset class
+      // Restore original failed URLs if setup failed before clearing
+      if (AppState.failedUrls.length === 0) { // Check if it was cleared
+           AppState.failedUrls = urlsToRetry; // Restore original list
       }
+      UI.progress.updateProgressMessage("Retry failed due to setup error.");
+      this._processingQueue = false; // Ensure flag is cleared on setup error
+    } finally {
+      // This block runs after retry completes or pauses or errors
+      if (!this.isPaused) {
+          this._processingQueue = false; // Clear processing flag only if not paused
+      }
+      // Update buttons based on final state
+      this._checkCaptureButtonState();
+      UI.elements.retryFailedBtn.disabled = AppState.failedUrls.length === 0;
+      this.updatePauseResumeButton(); // Update pause/resume button state
+       // Ensure PDF button state is correct
+        if (AppState.screenshots.size > 0) {
+            const combineAllPdfBtn = UI.elements.liveThumbnails?.querySelector(".combine-all-pdf-btn");
+            if (combineAllPdfBtn) {
+                combineAllPdfBtn.style.display = "inline-block";
+                combineAllPdfBtn.disabled = false;
+            }
+        }
     }
-  }
+  } // End retryFailedUrls
+
 
   createPauseResumeButton() {
     const buttonContainer = UI.elements.buttonContainer;
@@ -1243,6 +1205,7 @@ class App {
         false,
         3000 // Auto-hide resume message
       );
+       this._processingQueue = true; // Set flag before starting
       this.processCaptureQueue(); // Start processing again
     } else if (this.isPaused) {
       // We just paused
@@ -1251,11 +1214,12 @@ class App {
         false,
         0
       ); // Keep message visible
-      this._processingQueue = false; // Ensure flag is cleared if paused externally
+      // Don't clear processing flag here, allows resume logic to work
     } else {
       // Attempted to resume but queue is empty or finished
       console.log("Resume clicked, but queue is empty or finished.");
       this.isPaused = false; // Ensure not stuck in paused state
+      this._processingQueue = false; // Clear flag if queue finished
     }
 
     this.updatePauseResumeButton();
@@ -1265,24 +1229,22 @@ class App {
     const pauseResumeBtn = document.getElementById("pauseResumeBtn");
     if (!pauseResumeBtn) return;
 
-    // Disable if processing is active (unless already paused)
-    // pauseResumeBtn.disabled = this._processingQueue && !this.isPaused; // This might disable resume too soon
+    const hasItemsToProcess = this.currentCaptureIndex < this.captureQueue.length;
 
     if (this.isPaused) {
-      pauseResumeBtn.textContent = "Resume";
-      pauseResumeBtn.classList.add("paused");
-      pauseResumeBtn.title = "Resume capture";
-      pauseResumeBtn.disabled = false; // Always enabled when paused to allow resuming
+        pauseResumeBtn.textContent = "Resume";
+        pauseResumeBtn.classList.add("paused");
+        pauseResumeBtn.title = "Resume capture";
+        pauseResumeBtn.disabled = false; // Always enable resume when paused
     } else {
-      pauseResumeBtn.textContent = "Pause";
-      pauseResumeBtn.classList.remove("paused");
-      pauseResumeBtn.title = "Pause capture";
-      // Disable button only if NOT currently processing OR if queue is finished
-      pauseResumeBtn.disabled =
-        !this._processingQueue ||
-        this.currentCaptureIndex >= this.captureQueue.length;
+        pauseResumeBtn.textContent = "Pause";
+        pauseResumeBtn.classList.remove("paused");
+        pauseResumeBtn.title = "Pause capture";
+        // Disable pause button if not currently processing OR if there are no items left
+        pauseResumeBtn.disabled = !this._processingQueue || !hasItemsToProcess;
     }
   }
+
 } // End App Class
 
 export default App;
