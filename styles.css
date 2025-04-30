@@ -1414,8 +1414,6 @@ body.advanced-mode .simple-mode-settings {
   padding: 10px 15px;
   background-color: #f0f7ff; /* Light blue background */
   border: 1px solid #cce4ff; /* Blue border */
-  border-top: none; /* Remove top border to visually connect */
-  border-radius: 0 0 4px 4px; /* Rounded bottom corners */
   margin-bottom: 15px; /* Restore bottom margin after the group */
   display: flex; /* Align label and input */
   align-items: center;
