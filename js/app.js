@@ -1,4 +1,6 @@
-// js/app.js
+// perspective_capture/js/app.js
+// Modify the _toggleCaptureSettings and _setCaptureSettingsCollapsed functions
+
 import config from "./config.js";
 import AppState from "./state.js";
 import UI from "./ui/index.js";
@@ -12,7 +14,7 @@ import {
   URLProcessingError,
   AppError,
 } from "./errors.js";
-import urlSelector from "./ui/url-selector.js";
+import urlSelector from "./ui/url-selector.js"; // Import urlSelector
 import LoginHandler from "./login-handler.js";
 import urlFetcher from "./url-fetcher.js";
 
@@ -20,7 +22,6 @@ class App {
   constructor() {
     this.currentMode = "simple";
     this.captureScreenshots = this.captureScreenshots.bind(this);
-    // this.retryFailedUrls = this.retryFailedUrls.bind(this); // REMOVED
     this._handleActionsInput = this._handleActionsInput.bind(this);
     this.generatePrefilledUrl = this.generatePrefilledUrl.bind(this);
     this.prefilledUrl = null;
@@ -36,7 +37,7 @@ class App {
     this._initiateUrlFetching = this._initiateUrlFetching.bind(this);
     this._processingQueue = false;
     this.startTotalTime = 0;
-    this._toggleCaptureSettings = this._toggleCaptureSettings.bind(this); // Add binding for new method
+    this._toggleCaptureSettings = this._toggleCaptureSettings.bind(this); // Binding for toggle method
   }
 
   initialize() {
@@ -190,7 +191,6 @@ class App {
       "click",
       this.captureScreenshots
     );
-    // REMOVED Listener for retry button
 
     if (UI.elements.actionsField) {
       // Keep for potential future use
@@ -204,33 +204,32 @@ class App {
       );
     }
 
-    // --- ADDED: Event listener for collapsible header WRAPPER ---
-    const titleToggleWrapper = document.getElementById("captureSettingsToggle"); // Target the wrapper div
+    // --- Attach listener to the toggle WRAPPER ---
+    const titleToggleWrapper = document.getElementById("captureSettingsToggle");
     if (titleToggleWrapper) {
       events.addDOMEventListener(
         titleToggleWrapper,
         "click",
-        this._toggleCaptureSettings
+        this._toggleCaptureSettings // This function will now toggle the URL selector
       );
     } else {
       console.error(
         "#captureSettingsToggle element not found for toggle listener."
       );
     }
-    // --- END ADDED ---
+    // --- END ---
   }
 
   _initializeUI() {
     if (UI.elements.waitTime) {
       UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
     }
-    // No retry button to disable
     if (UI.elements.captureBtn) {
       UI.elements.captureBtn.disabled = true;
     }
     this.createPauseResumeButton(); // Creates pause button
-    // Start collapsed by default
-    this._setCaptureSettingsCollapsed(true);
+    // Start expanded by default
+    this._setCaptureSettingsCollapsed(false);
   }
 
   _disableLoginOptions() {
@@ -283,18 +282,28 @@ class App {
 
     // Initialize URL selector if needed
     if (!document.getElementById("urlSelectorContainer")) {
-      setTimeout(() => {
-        urlSelector.initialize().catch((error) => {
-          console.error("Failed to initialize URL selector:", error);
-          if (typeof urlSelector.showFallbackUI === "function")
-            urlSelector.showFallbackUI();
-        });
-      }, 0);
+       // Initialize URL Selector HERE AFTER UI elements are ready
+        setTimeout(async () => { // Use setTimeout to ensure DOM is ready
+            try {
+                await urlSelector.initialize();
+                console.log("URL Selector initialized.");
+                // Set initial state after initialization
+                this._setCaptureSettingsCollapsed(false);
+            } catch (error) {
+                console.error("Failed to initialize URL selector:", error);
+                if (typeof urlSelector.showFallbackUI === "function")
+                urlSelector.showFallbackUI();
+            }
+        }, 0);
+    } else {
+        // If already initialized, ensure correct initial state
+        this._setCaptureSettingsCollapsed(false);
     }
+
 
     UI.utils.resetUI(); // Reset output areas
     this._checkCaptureButtonState();
-    this._setCaptureSettingsCollapsed(false); // Ensure expanded when UI mode updates
+    // Don't set collapsed state here, wait for selector init
   }
 
   /** Sets up simple mode wait time input and places it below screen size */
@@ -358,6 +367,11 @@ class App {
         simpleWaitTimeInput.value = UI.elements.waitTime.value;
       }
     }
+     // Store wait time input reference if available
+     const waitTimeInput = document.getElementById('simpleWaitTime');
+     if (waitTimeInput) {
+         UI.elements.waitTime = waitTimeInput;
+     }
   }
 
   _handleActionsInput() {
@@ -462,13 +476,30 @@ class App {
       }
       return;
     }
+    // Ensure URL selector is initialized before fetching
     if (!document.getElementById("urlSelectorContainer")) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      if (!document.getElementById("urlSelectorContainer")) {
-        UI.utils.showStatus("URL Selector UI failed to initialize.", true);
-        return;
-      }
+       console.log("Waiting for URL Selector initialization before fetching URLs...");
+        await new Promise(resolve => {
+            const checkInterval = setInterval(() => {
+                if (document.getElementById("urlSelectorContainer") && urlSelector.container) {
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 100);
+            // Timeout to prevent infinite loop
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                console.error("Timeout waiting for URL Selector initialization.");
+                UI.utils.showStatus("URL Selector UI failed to initialize.", true);
+                resolve(); // Resolve anyway to avoid hanging, but fetching might fail
+            }, 5000);
+        });
+
+       if (!document.getElementById("urlSelectorContainer")) {
+           return; // Stop if still not initialized after wait
+       }
     }
+
     urlSelector.showLoadingState();
     try {
       await urlFetcher.loadUrls();
@@ -524,7 +555,7 @@ class App {
       this.captureQueue = [];
       this.currentCaptureIndex = 0;
       this.updatePauseResumeButton();
-      this._setCaptureSettingsCollapsed(true); // Collapse settings on start
+      this._setCaptureSettingsCollapsed(true); // Collapse URL selector on start
 
       const capturePreset = UI.elements.capturePreset.value || "fullHD";
       const fullPageCheckbox = document.getElementById("fullPageCheckbox");
@@ -532,7 +563,7 @@ class App {
         ? fullPageCheckbox.checked
         : false;
 
-      // --- Wait time is read directly by takeScreenshot ---
+      // --- Wait time is read directly by takeScreenshot using UI.elements.waitTime ---
 
       if (typeof urlSelector.getSelectedUrlsForCapture === "function") {
         urlList = urlSelector.getSelectedUrlsForCapture();
@@ -569,8 +600,6 @@ class App {
       this._setCaptureSettingsCollapsed(false); // Expand on error
       this._checkCaptureButtonState();
       this.updatePauseResumeButton();
-      // Inside perspective_capture/js/app.js
-      // Within the captureScreenshots function...
     } finally {
       const isFinished = this.currentCaptureIndex >= this.captureQueue.length;
       const endTotalTime = performance.now();
@@ -580,7 +609,7 @@ class App {
 
       if (this.startTotalTime && isFinished) {
         UI.progress.updateStats(
-          AppState.orderedUrls.length + AppState.failedUrls.length,
+          this.captureQueue.length, // Use original queue length for total
           AppState.screenshots.size,
           AppState.failedUrls.length,
           totalTimeTaken
@@ -591,19 +620,17 @@ class App {
         // Finished naturally
         this._checkCaptureButtonState();
         this.updatePauseResumeButton(); // Should disable pause btn
-        // --- REMOVED LINE BELOW ---
-        // this._setPagesListCollapsed(false); // REMOVED: No longer expand automatically
-        // --- END REMOVED LINE ---
+        // Don't automatically expand on finish
+        // this._setCaptureSettingsCollapsed(false);
       } else if (!this.isPaused && !isFinished) {
         // Errored out
         this._checkCaptureButtonState();
         this.updatePauseResumeButton();
-        // --- REMOVED LINE BELOW ---
-        // this._setPagesListCollapsed(false); // REMOVED: No longer expand automatically on error
-        // --- END REMOVED LINE ---
+        // Expand on error
+        this._setCaptureSettingsCollapsed(false);
       } else if (this.isPaused) {
         // Paused mid-run
-        this._setPagesListCollapsed(true); // Keep collapsed if paused
+        this._setCaptureSettingsCollapsed(true); // Keep collapsed if paused
         if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
       }
 
@@ -777,13 +804,10 @@ class App {
     if (isFinished) {
       console.log("Queue processing complete.");
       if (!this.isPaused) {
-        // --- MODIFIED: Use showStatus for persistent completion message ---
         const failedCount = AppState.failedUrls.length;
         const successCount = totalUrls - failedCount;
         let completionMessage = `Capture complete. Processed ${totalUrls} pages (${successCount} success, ${failedCount} failed).`;
         UI.utils.showStatus(completionMessage, failedCount > 0, 0); // Use showStatus, error=true if fails>0, delay=0
-        // Removed the setTimeout that cleared the message
-        // --- END MODIFICATION ---
       }
       this._processingQueue = false; // Clear flag on natural completion
     } else if (this.isPaused) {
@@ -791,7 +815,6 @@ class App {
       if (this._processingQueue) {
         this._processingQueue = false;
       }
-      // Update status message to reflect which URL it paused *before*
       UI.utils.showStatus(
         `Capture paused. Click "Resume" to continue (next URL: ${
           this.currentCaptureIndex + 1
@@ -806,7 +829,6 @@ class App {
 
     // Final button state updates (always run this)
     this._checkCaptureButtonState();
-    // No retry button update needed
     this.updatePauseResumeButton();
   } // End processCaptureQueue
 
@@ -884,30 +906,50 @@ class App {
     }
   } // End updatePauseResumeButton
 
-  /** Toggles the visibility of the capture settings section */
+ /**
+  * Toggles the visibility of the URL selector container.
+  * This function is called when the header wrapper is clicked.
+  */
   _toggleCaptureSettings() {
-    const content = document.getElementById("captureSettingsContent");
-    const wrapper = document.getElementById("captureSettingsToggle"); // Target the wrapper
-    if (!content || !wrapper) return;
+    // Use the urlSelector reference to get its container
+    const content = urlSelector.container; // Get the main container from the urlSelector module
+    const wrapper = document.getElementById("captureSettingsToggle"); // Target the header wrapper
+
+    if (!content || !wrapper) {
+       console.warn("Could not toggle: URL selector container or header wrapper not found.");
+       return;
+    }
 
     const isCollapsed = content.classList.toggle("collapsed");
-    wrapper.classList.toggle("collapsed", isCollapsed); // Toggle class on wrapper too
-    // Indicator is now updated via CSS
+    wrapper.classList.toggle("collapsed", isCollapsed); // Toggle class on wrapper too for indicator styling
+
+    console.log(`URL Selector toggled. Collapsed: ${isCollapsed}`);
   }
 
-  /** Sets the collapsed state of the capture settings */
+
+ /**
+  * Sets the collapsed state of the URL selector container.
+  * @param {boolean} collapsed - True to collapse, false to expand.
+  */
   _setCaptureSettingsCollapsed(collapsed) {
-    const content = document.getElementById("captureSettingsContent");
-    const wrapper = document.getElementById("captureSettingsToggle"); // Target the wrapper
-    if (!content || !wrapper) return;
+    // Use the urlSelector reference to get its container
+    const content = urlSelector.container; // Get the main container from the urlSelector module
+    const wrapper = document.getElementById("captureSettingsToggle"); // Target the header wrapper
+
+    if (!content || !wrapper) {
+       // Might be called before urlSelector is fully initialized, log warning
+       // console.warn("Could not set collapsed state: URL selector container or header wrapper not found.");
+       return;
+    }
 
     // Only change if the state is different
     if (content.classList.contains("collapsed") !== collapsed) {
       content.classList.toggle("collapsed", collapsed);
-      wrapper.classList.toggle("collapsed", collapsed); // Toggle class on wrapper too
-      // Indicator is now updated via CSS
+      wrapper.classList.toggle("collapsed", collapsed); // Toggle class on wrapper too for indicator styling
+      console.log(`URL Selector collapsed state set to: ${collapsed}`);
     }
   }
+
 
   // --- retryFailedUrls FUNCTION REMOVED ---
 } // End App Class
