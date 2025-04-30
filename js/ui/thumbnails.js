@@ -338,8 +338,9 @@ export const thumbnails = {
 
       const categoryTitle = document.createElement("h4");
       categoryTitle.textContent = parentName
-        ? `${parentName} - ${categoryName}`
-        : categoryName;
+        ? `${parentName}${categoryName ? ` - ${categoryName}` : ""}` // Append sub-category only if it exists
+        : categoryName || "General"; // Fallback if no parentName provided
+
       categoryHeader.appendChild(categoryTitle);
 
       const thumbnailCount = document.createElement("span");
@@ -374,11 +375,11 @@ export const thumbnails = {
     return categoryContainer;
   },
 
-  // --- parseCategoryFromFileName remains the same ---
   parseCategoryFromFileName(fileName) {
     // Default to 'Other' if no pattern matches
     let parentCategory = "Other";
-    let category = "General";
+    // let category = "General"; // Default sub-category if needed elsewhere, but set to null initially here
+    let category = null; // << CHANGE: Default to null
 
     if (!fileName) return { parentCategory, category };
 
@@ -388,16 +389,20 @@ export const thumbnails = {
 
     if (parts.length >= 2) {
       parentCategory = parts[0].trim();
-      category = parts[1].trim();
+      category = parts[1].trim(); // Use the second part as category
       // Ignore further parts like button names for categorization
     } else if (parts.length === 1 && parts[0]) {
       parentCategory = parts[0].trim();
-      category = "Main"; // Assign a default child category if only one part
+      // category = "Main"; // << REMOVE THIS LINE or keep it null/empty
+      category = null; // << ENSURE category remains null or empty
+    } else {
+      // If splitting results in unexpected parts, use defaults or adjust logic
+      parentCategory = fileName.split("_")[0] || "Other"; // Use filename base as fallback parent
+      category = null; // No sub-category
     }
 
     // Handle cases where splitting might result in empty strings
     if (!parentCategory) parentCategory = "Other";
-    if (!category) category = "General";
 
     return { parentCategory, category };
   },
@@ -746,6 +751,13 @@ export const thumbnails = {
     }
   },
 
+  // NOTE: Ensure these imports exist at the top of js/ui/thumbnails.js
+  // import { utils } from "./utils.js";
+  // import urlFetcher from "../url-fetcher.js";
+  // import { elements } from "./elements.js"; // (if needed directly, though utils uses it)
+
+  // --- generateAllCategoriesPDF function ---
+  // (This function should be inside the `export const thumbnails = { ... };` block)
   generateAllCategoriesPDF(categoryContainers) {
     utils.showStatus(
       "Generating comprehensive PDF with all screenshots...",
@@ -754,12 +766,17 @@ export const thumbnails = {
     ); // Keep message visible
 
     try {
+      // Ensure jsPDF is loaded (this assumes it's globally available via CDN)
+      if (typeof jspdf === "undefined" || typeof jspdf.jsPDF === "undefined") {
+        throw new Error("jsPDF library not found. Please ensure it's loaded.");
+      }
+
       const pdf = new jspdf.jsPDF({
         orientation: "landscape",
         unit: "mm",
         format: "a4",
         compress: true,
-        precision: 4, // Higher precision can sometimes help rendering
+        precision: 4,
         putOnlyUsedFonts: true,
       });
 
@@ -774,29 +791,28 @@ export const thumbnails = {
       const pageContentWidth =
         pdf.internal.pageSize.width - leftMargin - rightMargin; // Usable width
 
-      // --- Add PDF Header - Compacted & Realigned ---
-      let currentY = 18; // Starting Y position near the top
+      // --- Add PDF Header - More Compact Title & Spaced Line ---
+      let currentY = 15; // Start Y position (can adjust slightly if needed)
 
-      // Main Title (Smaller)
-      pdf.setFontSize(14); // Reduced from 18
+      // Main Title (Even Smaller)
+      pdf.setFontSize(12); // Reduced from 14
       pdf.text("Ignition Perspective Screenshot Capture", leftMargin, currentY);
-      currentY += 6; // Move down for next line (adjust 6mm spacing as needed)
+      currentY += 5; // Move down for next line (adjust 5mm spacing if needed)
 
-      // Project URL (Smaller, Grey)
-      pdf.setFontSize(8); // Reduced from 10
-      pdf.setTextColor(100); // Keep it grey to de-emphasize slightly
+      // Project URL (Small)
+      pdf.setFontSize(8);
+      pdf.setTextColor(100); // Grey
       pdf.text(`Project URL: ${projectUrl}`, leftMargin, currentY);
-      // Note: We don't increment currentY here yet, placing "Generated on" on the same horizontal level
 
       // Generated On (Smallest, Aligned Right)
-      pdf.setFontSize(7); // Reduced from 10
-      pdf.setTextColor(150); // Optional: Lighter grey
-      const generatedWidth = pdf.getTextWidth(generatedDateString); // Calculate text width
+      pdf.setFontSize(7);
+      pdf.setTextColor(150); // Lighter Grey
+      const generatedWidth = pdf.getTextWidth(generatedDateString);
       const generatedX =
-        pdf.internal.pageSize.width - rightMargin - generatedWidth; // Calculate X for right alignment
-      pdf.text(generatedDateString, generatedX, currentY); // Add text at calculated X, same Y as URL
-      pdf.setTextColor(0); // Reset text color to black for subsequent text
-      currentY += 4; // Move down past the URL/Generated line
+        pdf.internal.pageSize.width - rightMargin - generatedWidth;
+      pdf.text(generatedDateString, generatedX, currentY); // Place on same level as URL
+      pdf.setTextColor(0); // Reset text color
+      currentY += 6; // << INCREASED space after text, before line (was 4)
 
       // --- Draw line below all header text ---
       pdf.setLineWidth(0.2);
@@ -805,15 +821,15 @@ export const thumbnails = {
         currentY,
         pdf.internal.pageSize.width - rightMargin,
         currentY
-      ); // Draw line
-      currentY += 4; // Add a little space below the line
+      ); // Draw line at new position
+      currentY += 5; // << INCREASED space below the line (was 4)
 
-      // --- Adjust top margin for actual page content (screenshots) ---
+      // --- Adjust top margin for actual page content ---
       const topMargin = currentY; // Content starts here now
 
       // Page dimensions for images (recalculate based on new topMargin)
       const bottomMargin = 20;
-      const pageWidth = pageContentWidth; // Use calculated content width
+      const pageWidth = pageContentWidth;
       const pageHeight =
         pdf.internal.pageSize.height - topMargin - bottomMargin;
 
@@ -843,6 +859,7 @@ export const thumbnails = {
         const categoryTitleElement = categoryContainer.querySelector(
           ".category-header h4"
         );
+        // Get the potentially modified category title (without " - Main")
         const categoryTitle = categoryTitleElement
           ? categoryTitleElement.textContent
           : `Category ${categoryIndex + 1}`;
@@ -879,22 +896,22 @@ export const thumbnails = {
           }
           hasAnyScreenshots = true; // Mark that we have content
 
-          // Add Category Title on the page (adjust Y position relative to new topMargin)
+          // Add Category Title on the page (uses updated topMargin and potentially updated title text)
           pdf.setFontSize(10); // Slightly smaller category title
           pdf.setTextColor(120); // Slightly darker grey
-          pdf.text(categoryTitle, leftMargin, topMargin - 4); // Position just above image start
           pdf.setTextColor(0); // Reset color
 
           try {
             // Optimize and add image (using await for Promises)
+            // Ensure 'this' refers to the 'thumbnails' object if these are methods within it
             const optimizedData = await this.optimizeImageForPDF(
               screenshotData
-            ); // Use 'this' as it's part of the thumbnails object
+            );
             const img = await new Promise((resolve, reject) => {
               const image = new Image();
               image.onload = () => resolve(image);
               image.onerror = (err) =>
-                reject(new Error("Image loading failed")); // Provide an Error object
+                reject(new Error("Image loading failed"));
               image.src = optimizedData;
             });
 
@@ -923,7 +940,7 @@ export const thumbnails = {
               imgHeightOnPage <= 0
             ) {
               console.error(
-                "Invalid calculated image dimensions:",
+                "Invalid calculated image dimensions for PDF:",
                 imgWidthOnPage,
                 imgHeightOnPage
               );
@@ -975,6 +992,7 @@ export const thumbnails = {
           } catch (error) {
             console.error(`Error processing screenshot ${filename}:`, error);
             // Optionally add a placeholder or note about the error on the PDF page
+            // Ensure pdf object is accessible here if adding text inside catch
             pdf.setFontSize(8);
             pdf.setTextColor(255, 0, 0); // Red color for error
             pdf.text(
@@ -1021,7 +1039,7 @@ export const thumbnails = {
         true
       );
     }
-  },
+  }, // End generateAllCategoriesPDF function
 };
 
 export default thumbnails;
