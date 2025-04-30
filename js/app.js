@@ -519,16 +519,22 @@ class App {
       UI.progress.updateProgressMessage(data.message)
     );
     events.on(events.events.SCREENSHOT_TAKEN, (data) => {
-      const preset = data.result?.preset || "N/A";
+      // --- MODIFIED: Construct description based on full page status ---
+      const presetName = config.screenshot.presets[data.result?.preset]?.name || data.result?.preset || 'N/A';
       const width = data.result?.width || "?";
       const height = data.result?.height || "?";
       const timeTaken = data.result?.timeTaken || "?";
+      const isFullPage = data.result?.isFullPage || false; // Assumes this property is added in core.js
+      const sizeDesc = isFullPage ? `Full Page (${width}x${height})` : `${presetName}`;
+
       UI.utils.showStatus(
-        `✓ Screenshot captured: ${data.url} (${preset} - ${width}x${height}) (Time: ${timeTaken}s)`,
+        `✓ Screenshot captured: ${data.url} (${sizeDesc}) (Time: ${timeTaken}s)`,
         false,
         5000
       );
+      // --- END MODIFICATION ---
     });
+
 
     events.on("CONTEXT_ACTIONS_GENERATED", () => {
       /* ... advanced mode only ... */
@@ -753,15 +759,20 @@ class App {
       this.captureQueue = [];
       this.currentCaptureIndex = 0;
 
+      // --- MODIFIED: Read preset and full page checkbox ---
       const capturePreset = UI.elements.capturePreset.value || "fullHD";
-      let actionSequences = [];
+      const fullPageCheckbox = document.getElementById("fullPageCheckbox");
+      const captureFullPage = fullPageCheckbox ? fullPageCheckbox.checked : false;
+      // --- END MODIFICATION ---
+
+      let actionSequences = []; // Remains empty in simple mode
       this.usingActionSequences = false;
 
       // Get URLs from the selector
       if (typeof urlSelector.getSelectedUrlsForCapture === "function") {
         urlList = urlSelector.getSelectedUrlsForCapture();
       } else {
-        /* ... fallback logic ... */
+          throw new Error("URL Selector component not available.");
       }
 
       if (urlList.length === 0) {
@@ -774,11 +785,9 @@ class App {
       // Get wait time from the SIMPLE MODE input field
       const simpleWaitTimeEl = document.getElementById("simpleWaitTime");
       if (simpleWaitTimeEl && UI.elements.waitTime) {
-        /* ... set wait time ... */
          UI.elements.waitTime.value = simpleWaitTimeEl.value; // Sync value
          console.log("Using Wait Time:", UI.elements.waitTime.value);
       } else {
-        /* ... handle missing element ... */
          console.error("Wait time input field not found!");
          UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
       }
@@ -790,12 +799,16 @@ class App {
       const pauseResumeBtn = document.getElementById("pauseResumeBtn");
       if (pauseResumeBtn) pauseResumeBtn.disabled = false;
 
+      // --- MODIFIED: Add captureFullPage to queue items ---
       this.captureQueue = urlList.map((url, index) => ({
         url,
         index,
         capturePreset,
-        actionSequences: [],
+        captureFullPage, // Add the checkbox state
+        actionSequences: [], // Still empty for simple mode
       }));
+      // --- END MODIFICATION ---
+
       this.currentCaptureIndex = 0;
 
       this._processingQueue = true;
@@ -867,7 +880,9 @@ class App {
         this.currentCaptureIndex++;
         continue; // Skip invalid item
       }
-      const { url, index, capturePreset, actionSequences } = item; // actionSequences will be empty in simple mode
+      // --- MODIFIED: Destructure captureFullPage ---
+      const { url, index, capturePreset, captureFullPage, actionSequences } = item;
+      // --- END MODIFICATION ---
 
       UI.progress.updateProgressMessage(
         `Processing ${this.currentCaptureIndex + 1} of ${totalUrls}: ${url}`
@@ -877,19 +892,23 @@ class App {
         // Simple mode processing (single screenshot per URL)
         // No need to check this.usingActionSequences as it's always false
         try {
-          console.log(`Taking single screenshot for URL: ${url}`);
+          console.log(`Taking simple screenshot for URL: ${url} (Preset: ${capturePreset}, FullPage: ${captureFullPage})`);
+          // --- MODIFIED: Pass captureFullPage to takeScreenshot ---
           const result = await ScreenshotCapture.takeScreenshot(
             url,
-            capturePreset
+            capturePreset,
+            captureFullPage, // Pass the boolean flag
+            actionSequences // Pass empty actions array
           );
+          // --- END MODIFICATION ---
 
           // Generate filename with timestamp
           const timestamp = URLProcessor.getTimestamp();
-          const fileName = URLProcessor.generateFilename(
-            url,
-            index,
-            "" // No regex pattern in simple mode
-          ).replace(".png", `_${timestamp}.png`);
+          let baseFileName = URLProcessor.generateFilename(url, index, ""); // No regex pattern
+          // Add suffix if full page was captured
+          const fullPageSuffix = captureFullPage ? "_FullPage" : "";
+          const fileName = baseFileName.replace(".png", `${fullPageSuffix}_${timestamp}.png`);
+
 
           result.fileName = fileName; // Add filename to result object
 
@@ -902,11 +921,10 @@ class App {
           console.error(`Error capturing simple screenshot for ${url}:`, error);
 
           const timestamp = URLProcessor.getTimestamp(); // Generate timestamp for error filename
-          const fileName = URLProcessor.generateFilename(
-            url,
-            index,
-            ""
-          ).replace(".png", `_Error_${timestamp}.png`);
+          let baseFileName = URLProcessor.generateFilename(url, index, "");
+          const fullPageSuffix = captureFullPage ? "_FullPage" : ""; // Include suffix even for errors
+          const fileName = baseFileName.replace(".png", `${fullPageSuffix}_Error_${timestamp}.png`);
+
 
           // Check for specific 'No view configured' or 'Mount definition' errors
           if (
@@ -1050,10 +1068,18 @@ class App {
     // --- Reset state for retry ---
     this._processingQueue = true; // Set processing flag for retry
     this.isPaused = false; // Ensure not paused at start of retry
+
+    // --- MODIFIED: Read preset and checkbox for retry ---
+    const capturePreset = UI.elements.capturePreset.value || "fullHD";
+    const fullPageCheckbox = document.getElementById("fullPageCheckbox");
+    const captureFullPage = fullPageCheckbox ? fullPageCheckbox.checked : false;
+    // --- END MODIFICATION ---
+
     this.captureQueue = urlsToRetry.map((url, index) => ({ // Create a queue for retry items
         url,
         index: index, // Use retry index, original index isn't critical here
-        capturePreset: UI.elements.capturePreset.value || "fullHD",
+        capturePreset,
+        captureFullPage, // Add checkbox state
         actionSequences: [],
       }));
     this.currentCaptureIndex = 0;
@@ -1086,7 +1112,7 @@ class App {
       this.updatePauseResumeButton(); // Should be enabled now if queue has items
 
       // Process the retry queue (this will handle pause/resume internally)
-      await this.processCaptureQueue();
+      await this.processCaptureQueue(); // Reuse the queue processing logic
 
       // --- Post-Retry Processing ---
       const endTotalTime = performance.now();

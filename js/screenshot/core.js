@@ -10,14 +10,15 @@ let _waitTimeout = null;
 
 /**
  * Capture a screenshot of a URL with optional actions.
- * This version properly handles full page height capture.
+ * This version handles full page height capture based on a flag.
  *
  * @param {string} url - The URL to capture.
- * @param {string} [preset='fullHD'] - The size preset to use.
+ * @param {string} [preset='fullHD'] - The base size preset key (e.g., 'fullHD', 'mobile').
+ * @param {boolean} [captureFullPage=false] - Flag to indicate if full page height should be captured.
  * @param {Array} [actionsList=[]] - Optional array of actions to perform before capturing.
  * @returns {Promise<Object>} - An object containing the screenshot, thumbnail, time taken, etc.
  */
-export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
+export async function takeScreenshot(url, preset = "fullHD", captureFullPage = false, actionsList = []) {
   // Clear any existing timeout
   if (_waitTimeout) {
     clearTimeout(_waitTimeout);
@@ -34,63 +35,44 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
       if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
         // Check each added node for error messages
         for (const node of mutation.addedNodes) {
-          if (node.nodeType === 1) {
-            // Element node
+          if (node.nodeType === 1) { // Element node
             const text = node.textContent || "";
-            if (
-              text.includes("No view configured for center mount") ||
-              text.includes("Mount definition should contain a property")
-            ) {
+            if (text.includes("No view configured for center mount") || text.includes("Mount definition should contain a property")) {
               mountErrorDetected = true;
               console.log("Mount error detected by observer:", text);
             }
-
-            // Check children for error messages too
-            const errorEls = node.querySelectorAll(
-              ".error-message, .warning-message, .error"
-            );
-            for (const el of errorEls) {
-              const elText = el.textContent || "";
-              if (
-                elText.includes("No view configured for center mount") ||
-                elText.includes("Mount definition should contain a property")
-              ) {
-                mountErrorDetected = true;
-                console.log("Mount error detected in child element:", elText);
-              }
-            }
+             // Check children for error messages too
+             const errorEls = node.querySelectorAll(".error-message, .warning-message, .error");
+             for(const el of errorEls) {
+                 const elText = el.textContent || "";
+                 if (elText.includes("No view configured for center mount") || elText.includes("Mount definition should contain a property")) {
+                     mountErrorDetected = true;
+                     console.log("Mount error detected in child element:", elText);
+                 }
+             }
           }
         }
       }
     }
   });
 
-  let width, height;
+  // --- MODIFIED: Get base dimensions from preset ---
+  const basePreset = config.screenshot.presets[preset] || config.screenshot.presets.fullHD;
+  let width = basePreset.width;
+  let initialHeight = basePreset.height; // Use preset height initially or if not capturing full page
+  let actualHeight = initialHeight; // This will be updated if captureFullPage is true
+  // --- END MODIFICATION ---
 
-  // Initialize with standard dimensions
-  if (preset === "fullPage") {
-    // For fullPage, use a fixed width but we'll determine the height later
-    width = 1920;
-    height = 1080; // initial height, will be updated
-  } else {
-    const sizePreset =
-      config.screenshot.presets[preset] || config.screenshot.presets.fullHD;
-    width = sizePreset.width;
-    height = sizePreset.height;
-  }
-
-  // Set initial dimensions for the iframe.
+  // Set initial dimensions for the iframe based on the *base* preset.
   iframe.style.width = `${width}px`;
-  iframe.style.height = `${height}px`;
+  iframe.style.height = `${initialHeight}px`; // Start with preset height
 
   try {
-    events.emit(events.events.CAPTURE_STARTED, { url, preset });
+    events.emit(events.events.CAPTURE_STARTED, { url, preset, captureFullPage });
 
     // Start observing the iframe for changes
-    observer.observe(iframe.contentDocument || iframe.contentWindow.document, {
-      childList: true,
-      subtree: true,
-    });
+     observer.observe(iframe.contentDocument || iframe.contentWindow.document, { childList: true, subtree: true });
+
 
     // Load the URL into the iframe and wait for it to render.
     await loadUrlInIframe(iframe, url);
@@ -100,25 +82,23 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
 
     // Check if a mount error was detected during loading
     if (mountErrorDetected) {
-      observer.disconnect();
-      throw new errorHandling.ScreenshotError(
-        "Failed to capture screenshot: No view configured for center mount error detected",
-        url,
-        "Mount error detected during loading"
-      );
-    }
+       observer.disconnect();
+       throw new errorHandling.ScreenshotError(
+         "Failed to capture screenshot: No view configured for center mount error detected",
+         url,
+         "Mount error detected during loading"
+       );
+     }
+
 
     const renderResult = await waitForRendering(url, iframe);
 
-    // If rendering failed due to specific errors, abort screenshot capture
-    if (!renderResult.success) {
-      observer.disconnect();
-      throw new errorHandling.ScreenshotError(
-        `Failed to capture screenshot: ${renderResult.error}`,
-        url,
-        renderResult.error
-      );
-    }
+     // If rendering failed due to specific errors, abort screenshot capture
+     if (!renderResult.success) {
+       observer.disconnect();
+       throw new errorHandling.ScreenshotError(`Failed to capture screenshot: ${renderResult.error}`, url, renderResult.error);
+     }
+
 
     // Perform any action sequences (e.g., navigating to submenus)
     if (actionsList && actionsList.length > 0) {
@@ -126,54 +106,58 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
 
       // Check again for mount errors after actions
       if (mountErrorDetected) {
-        observer.disconnect();
-        throw new errorHandling.ScreenshotError(
-          "Failed to capture screenshot: No view configured for center mount error detected after actions",
-          url,
-          "Mount error detected after actions"
-        );
+           observer.disconnect();
+           throw new errorHandling.ScreenshotError(
+             "Failed to capture screenshot: No view configured for center mount error detected after actions",
+             url,
+             "Mount error detected after actions"
+           );
       }
-      
+
       // Give the page a moment to settle after actions
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     // Stop observing now that we're past the error-prone part
-    observer.disconnect();
+     observer.disconnect();
+
 
     // Retrieve the current URL from the iframe after navigation.
     const currentUrl = iframe.contentWindow.location.href;
 
-    // For fullPage, calculate the accurate page height
-    let actualHeight = height;
-    
-    if (preset === "fullPage") {
+
+    // --- MODIFIED: Calculate height only if captureFullPage is true ---
+    if (captureFullPage) {
       const doc = iframe.contentDocument;
-      
       // Try multiple approaches to get the full page height
       const bodyScrollHeight = doc.body ? doc.body.scrollHeight : 0;
       const docScrollHeight = doc.documentElement ? doc.documentElement.scrollHeight : 0;
       const bodyOffsetHeight = doc.body ? doc.body.offsetHeight : 0;
       const docOffsetHeight = doc.documentElement ? doc.documentElement.offsetHeight : 0;
-      
-      // Find all elements and get their bottom positions
-      const allElements = doc.querySelectorAll('*');
-      let maxBottom = 0;
-      
-      for (const el of allElements) {
-        const rect = el.getBoundingClientRect();
-        const bottom = rect.bottom + window.pageYOffset;
-        if (bottom > maxBottom) {
-          maxBottom = bottom;
-        }
-      }
-      
+
+       // Find all elements and get their bottom positions
+       const allElements = doc.querySelectorAll('*');
+       let maxBottom = 0;
+       for (const el of allElements) {
+           try {
+               const rect = el.getBoundingClientRect();
+               // Need to account for potential scroll position within iframe
+               const scrollTop = iframe.contentWindow.pageYOffset || doc.documentElement.scrollTop || doc.body.scrollTop || 0;
+               const bottom = rect.bottom + scrollTop;
+               if (bottom > maxBottom) {
+                   maxBottom = bottom;
+               }
+           } catch(e) { /* ignore elements that might cause errors like SVG */ }
+       }
+
+
       console.log("Body scroll height:", bodyScrollHeight);
       console.log("Document scroll height:", docScrollHeight);
       console.log("Body offset height:", bodyOffsetHeight);
       console.log("Document offset height:", docOffsetHeight);
       console.log("Max element bottom:", maxBottom);
-      
+
+
       // Use the maximum of all these values to ensure we capture everything
       actualHeight = Math.max(
         bodyScrollHeight,
@@ -181,31 +165,35 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
         bodyOffsetHeight,
         docOffsetHeight,
         maxBottom,
-        1080 // Minimum height of 1080
+        initialHeight // Ensure minimum height is the preset height
       );
-      
-      console.log("Final calculated height for fullPage:", actualHeight);
-      
-      // Update the iframe height to the calculated height
+      console.log(`Final calculated height for Full Page (Width: ${width}):`, actualHeight);
+
+      // Update the iframe height *only* if capturing full page
       iframe.style.height = `${actualHeight}px`;
-      
-      // Ensure that the body and documentElement heights are set to allow full capture
-      try {
-        doc.body.style.height = 'auto';
-        doc.body.style.overflow = 'visible';
-        doc.documentElement.style.height = 'auto';
-        doc.documentElement.style.overflow = 'visible';
-      } catch (e) {
-        console.warn("Couldn't set document styles:", e);
-      }
-      
+
+       // Ensure that the body and documentElement heights are set to allow full capture
+       try {
+         doc.body.style.height = 'auto';
+         doc.body.style.overflow = 'visible';
+         doc.documentElement.style.height = 'auto';
+         doc.documentElement.style.overflow = 'visible';
+       } catch(e) { console.warn("Couldn't set document styles:", e); }
+
       // Wait for the resize to take effect
       await new Promise(resolve => setTimeout(resolve, 300));
+    } else {
+      // If not capturing full page, actualHeight remains the initial preset height
+      actualHeight = initialHeight;
+      console.log(`Using fixed height from preset ${preset}: ${actualHeight}`);
+       // Ensure iframe is set to the correct fixed height
+       iframe.style.height = `${actualHeight}px`;
     }
+    // --- END MODIFICATION ---
 
-    // Capture the screenshot
-    const { screenshotData, actualHeight: finalHeight } =
-      await captureScreenshot(iframe, currentUrl, preset, width, actualHeight);
+
+    // Capture the screenshot using the determined width and actualHeight
+    const { screenshotData } = await captureScreenshotInternal(iframe, currentUrl, width, actualHeight);
 
     // Create a thumbnail for display.
     const thumbnailData = await utils.createThumbnail(
@@ -217,37 +205,45 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
     const endTime = performance.now();
     const timeTaken = ((endTime - startTime) / 1000).toFixed(2);
 
+    // --- MODIFIED: Include final dimensions and full page flag in result ---
     const result = {
       screenshot: screenshotData,
       thumbnail: thumbnailData,
       timeTaken,
-      preset,
-      width,
-      height: preset === "fullPage" ? finalHeight : height,
+      preset: preset, // The base preset selected
+      isFullPage: captureFullPage, // Indicate if full page was captured
+      width: width, // Final width used
+      height: actualHeight, // Final height used (calculated or preset)
       url: currentUrl // Add the URL to the result
-
     };
+    // --- END MODIFICATION ---
+
 
     // Clean up by resetting the iframe and emit the completion event.
     iframe.src = "about:blank";
     events.emit(events.events.SCREENSHOT_TAKEN, { url: currentUrl, result });
 
     return result;
+
   } catch (error) {
     // Clean up observer
-    observer.disconnect();
+     observer.disconnect();
+
 
     // On error, reset the iframe and propagate the error.
     iframe.src = "about:blank";
+    // Ensure error includes relevant context
+    const errorMessage = error instanceof errorHandling.ScreenshotError ? error.message : `Failed to capture screenshot for ${url}: ${error.message}`;
     const captureError = new errorHandling.ScreenshotError(
-      `Failed to capture screenshot for ${url}: ${error.message}`,
+      errorMessage,
       url,
-      error.message
+      error.reason || error.message // Include original reason if available
     );
     events.emit(events.events.CAPTURE_FAILED, { url, error: captureError });
-    throw captureError;
+    throw captureError; // Rethrow the standardized error
   }
-}
+} // End takeScreenshot
+
 
 /**
  * Load a URL into the iframe.
@@ -258,23 +254,61 @@ export async function takeScreenshot(url, preset = "fullHD", actionsList = []) {
  */
 function loadUrlInIframe(iframe, url) {
   return new Promise((resolve, reject) => {
+    let loadFired = false;
+    const timeoutDuration = 30000; // 30 seconds timeout for load
+
+    const loadTimeout = setTimeout(() => {
+        if (!loadFired) {
+            console.error(`Iframe load timeout for ${url}`);
+            cleanup();
+            reject(new Error(`Timeout loading ${url} in iframe`));
+        }
+    }, timeoutDuration);
+
+
     const handleLoad = () => {
-      iframe.removeEventListener("load", handleLoad);
-      iframe.removeEventListener("error", handleError);
-      resolve();
+        if (loadFired) return; // Prevent multiple triggers
+        loadFired = true;
+        console.log(`Iframe load event fired for ${url}`);
+        cleanup();
+        // Even after load, wait a short moment for potential redirects or initial script exec
+        setTimeout(resolve, 200);
     };
 
-    const handleError = () => {
-      iframe.removeEventListener("load", handleLoad);
-      iframe.removeEventListener("error", handleError);
-      reject(new Error(`Failed to load ${url} in iframe`));
+
+    const handleError = (event) => {
+        console.error(`Iframe error event for ${url}:`, event);
+        cleanup();
+        reject(new Error(`Error loading ${url} in iframe`));
     };
 
-    iframe.addEventListener("load", handleLoad);
-    iframe.addEventListener("error", handleError);
+     const cleanup = () => {
+         clearTimeout(loadTimeout);
+         iframe.removeEventListener('load', handleLoad);
+         iframe.removeEventListener('error', handleError);
+     };
+
+
+    iframe.addEventListener('load', handleLoad);
+    iframe.addEventListener('error', handleError);
+
+
+    // Check if src is already the target URL and if it's loaded
+    try {
+        if (iframe.contentWindow?.location?.href === url && iframe.contentDocument?.readyState === 'complete') {
+            console.log(`Iframe already loaded with ${url}`);
+            handleLoad(); // Treat as loaded
+            return;
+        }
+    } catch (e) {
+        // Ignore cross-origin errors if just checking href
+        console.warn("Cross-origin check failed, proceeding with src assignment.");
+    }
+
+
     iframe.src = url;
   });
-}
+} // End loadUrlInIframe
 
 /**
  * Wait for the page to render.
@@ -284,84 +318,114 @@ function loadUrlInIframe(iframe, url) {
  * @param {HTMLIFrameElement} iframe - The iframe containing the page.
  * @returns {Promise<{success: boolean, error: string|null}>} - Resolves when the rendering wait time is complete.
  */
-function waitForRendering(url, iframe) {
+ function waitForRendering(url, iframe) {
   return new Promise((resolve) => {
-    const waitTimeInSeconds =
-      parseInt(document.getElementById("waitTime").value) || 10;
+    // --- MODIFIED: Get wait time from the input field directly ---
+    let waitTimeInSeconds = 10; // Default
+    try {
+        const waitTimeInput = document.getElementById("waitTime") || document.getElementById("simpleWaitTime");
+        if (waitTimeInput && waitTimeInput.value) {
+            waitTimeInSeconds = parseInt(waitTimeInput.value, 10);
+             if (isNaN(waitTimeInSeconds) || waitTimeInSeconds < 1) {
+               waitTimeInSeconds = 10; // Fallback to default if invalid
+             }
+        }
+    } catch(e) { console.warn("Error reading wait time, using default.", e); }
+    // --- END MODIFICATION ---
+
     let secondsLeft = waitTimeInSeconds;
     let consoleErrorFound = false;
+    let detectedErrorMsg = null; // Store specific error message found
+
+    // Clear previous timeout if exists
+    if (_waitTimeout) {
+        clearTimeout(_waitTimeout);
+        _waitTimeout = null;
+    }
+
 
     events.emit(events.events.CAPTURE_PROGRESS, {
       message: `Waiting for ${url} to render... (${secondsLeft}s remaining)`,
     });
 
-    // Override console.warn and console.error to catch mount errors
-    const originalWarn = console.warn;
-    const originalError = console.error;
 
-    console.warn = function (...args) {
-      originalWarn.apply(console, args);
+    // Override console.warn and console.error to catch mount errors (within the iframe context if possible)
+    const iframeWin = iframe.contentWindow;
+    const originalWarn = iframeWin ? iframeWin.console.warn : console.warn;
+    const originalError = iframeWin ? iframeWin.console.error : console.error;
+    let restoreConsoleNeeded = false;
 
-      // Check if this is a mount error
-      const warningText = args.join(" ");
-      if (
-        warningText.includes("No view configured for center mount") ||
-        warningText.includes("Mount definition should contain a property")
-      ) {
-        consoleErrorFound = true;
-        console.warn = originalWarn; // Restore original
-        resolve({
-          success: false,
-          error: "No view configured for center mount error in console",
-        });
-      }
-    };
 
-    console.error = function (...args) {
-      originalError.apply(console, args);
+    const checkAndRestoreConsole = () => {
+        if(restoreConsoleNeeded) {
+             if (iframeWin) {
+                 iframeWin.console.warn = originalWarn;
+                 iframeWin.console.error = originalError;
+             } else {
+                 console.warn = originalWarn;
+                 console.error = originalError;
+             }
+             restoreConsoleNeeded = false;
+             console.log("Restored console functions.");
+        }
+    }
 
-      // Check if this is a mount error
-      const errorText = args.join(" ");
-      if (
-        errorText.includes("No view configured for center mount") ||
-        errorText.includes("Mount definition should contain a property")
-      ) {
-        consoleErrorFound = true;
-        console.error = originalError; // Restore original
-        resolve({
-          success: false,
-          error: "No view configured for center mount error in console",
-        });
-      }
-    };
+
+    const consoleProxyHandler = (originalFunc, type) => (...args) => {
+         originalFunc.apply(console, args); // Log normally first
+
+
+         // Check if this is a mount error
+         const text = args.join(" ");
+         if (text.includes("No view configured for center mount") || text.includes("Mount definition should contain a property")) {
+           console.warn(`*** Mount Error Detected via console.${type} ***`);
+           consoleErrorFound = true;
+           detectedErrorMsg = "No view configured for center mount error detected in console";
+           // Resolve immediately if an error is found
+           checkAndRestoreConsole();
+           if (_waitTimeout) clearTimeout(_waitTimeout);
+           resolve({ success: false, error: detectedErrorMsg });
+         }
+       };
+
+
+     if (iframeWin) {
+         iframeWin.console.warn = consoleProxyHandler(originalWarn, 'warn');
+         iframeWin.console.error = consoleProxyHandler(originalError, 'error');
+         restoreConsoleNeeded = true;
+     } else {
+         console.warn = consoleProxyHandler(originalWarn, 'warn');
+         console.error = consoleProxyHandler(originalError, 'error');
+         restoreConsoleNeeded = true;
+     }
+
 
     // Wait for the DOM content to be fully loaded and images to be loaded
     const waitForImages = () => {
       try {
         if (!iframe.contentDocument) return false;
-        
+
         const imgElements = iframe.contentDocument.querySelectorAll('img');
-        const backgroundImgElements = Array.from(iframe.contentDocument.querySelectorAll('*')).filter(el => {
-          const style = window.getComputedStyle(el);
-          return style.backgroundImage && style.backgroundImage !== 'none';
-        });
-        
-        // Check if all images are loaded
-        const allImagesLoaded = Array.from(imgElements).every(img => {
-          return img.complete;
-        });
-        
+        // Check if all images are loaded (complete=true means loaded or error)
+        // Also check naturalWidth > 0 for successfully loaded images
+        const allImagesLoaded = Array.from(imgElements).every(img => img.complete && img.naturalWidth !== 0);
+
+        // Check for background images (basic check, less reliable)
+        // Note: This is harder to track reliably. Focus on <img> tags.
+
         return allImagesLoaded;
       } catch (e) {
         console.warn("Error checking image loading status:", e);
-        return true; // Assume images are loaded if there's an error
+        return true; // Assume images are loaded if there's an error checking
       }
     };
+
 
     // Function to check for specific error messages in the DOM
     const checkForErrors = () => {
       try {
         if (!iframe.contentDocument) return { found: false };
+
 
         // Check for "No view configured for center mount" warning
         const errorElements = iframe.contentDocument.querySelectorAll(
@@ -369,17 +433,14 @@ function waitForRendering(url, iframe) {
         );
         for (const el of errorElements) {
           const text = el.textContent || "";
-          if (
-            text.includes("No view configured for center mount") ||
-            text.includes("Mount definition should contain a property")
-          ) {
+          if (text.includes("No view configured for center mount") || text.includes("Mount definition should contain a property")) {
             return {
               found: true,
-              message:
-                "No view configured for center mount error detected in DOM",
+              message: "No view configured for center mount error detected in DOM",
             };
           }
         }
+
 
         // Check for other common error indicators
         const notFoundElements = iframe.contentDocument.querySelectorAll(
@@ -392,6 +453,7 @@ function waitForRendering(url, iframe) {
           };
         }
 
+
         return { found: false };
       } catch (e) {
         console.warn("Error checking for page errors:", e);
@@ -399,191 +461,204 @@ function waitForRendering(url, iframe) {
       }
     };
 
+
     const countdown = () => {
+       // Clear timeout if it's already resolved/rejected
+       if (!resolve) return;
+
+
       // Check for errors immediately
       const errorCheck = checkForErrors();
       if (errorCheck.found) {
-        // Restore original console methods
-        console.warn = originalWarn;
-        console.error = originalError;
-        resolve({ success: false, error: errorCheck.message });
+        checkAndRestoreConsole();
+        detectedErrorMsg = errorCheck.message;
+         if (_waitTimeout) clearTimeout(_waitTimeout);
+         _waitTimeout = null;
+         resolve({ success: false, error: detectedErrorMsg });
+         resolve = null; // Prevent multiple resolves
         return;
       }
+      // Check if console error was found by proxy
+      if (consoleErrorFound) {
+           // Already resolved in proxy, just ensure cleanup
+           checkAndRestoreConsole();
+            if (_waitTimeout) clearTimeout(_waitTimeout);
+            _waitTimeout = null;
+           resolve = null; // Prevent multiple resolves
+           return;
+      }
+
 
       // Check if all images are loaded
       const imagesLoaded = waitForImages();
 
-      // Check if countdown finished
-      if ((secondsLeft <= 0 && imagesLoaded) || consoleErrorFound) {
-        // Restore original console methods
-        console.warn = originalWarn;
-        console.error = originalError;
 
-        if (consoleErrorFound) {
-          resolve({
-            success: false,
-            error: "No view configured for center mount error detected",
-          });
-        } else {
-          // Give a little extra time after images are loaded for any JavaScript rendering
-          setTimeout(() => {
-            resolve({ success: true, error: null });
-          }, 500);
-        }
+      // Check if countdown finished or images loaded
+      if ((secondsLeft <= 0 && imagesLoaded)) {
+        checkAndRestoreConsole();
+        // Give a little extra time after images are loaded for any JavaScript rendering
+        setTimeout(() => {
+           if (resolve) { // Check if not already resolved by error
+             resolve({ success: true, error: null });
+             resolve = null; // Prevent multiple resolves
+           }
+        }, 500);
+        _waitTimeout = null;
         return;
       }
+
 
       events.emit(events.events.CAPTURE_PROGRESS, {
         message: `Waiting for ${url} to render... (${secondsLeft}s remaining)`,
       });
 
+
       secondsLeft--;
-      _waitTimeout = setTimeout(countdown, 1000);
+
+
+      // Ensure timeout isn't rescheduled if already resolved
+      if (resolve) {
+         _waitTimeout = setTimeout(countdown, 1000);
+      } else {
+           _waitTimeout = null; // Clear timeout ref if resolved
+      }
+
+
     };
 
-    _waitTimeout = setTimeout(countdown, 1000);
+
+    _waitTimeout = setTimeout(countdown, 1000); // Start the countdown
   });
-}
+} // End waitForRendering
+
 
 /**
- * Capture a screenshot using html2canvas and overlay the URL.
- * Enhanced to properly handle fullPage captures of any height.
+ * Internal function to capture screenshot using html2canvas.
  *
  * @param {HTMLIFrameElement} iframe - The iframe containing the page.
  * @param {string} url - The URL to overlay on the screenshot.
- * @param {string} preset - The size preset.
  * @param {number} width - The capture width.
- * @param {number} height - The capture height (may be recalculated).
- * @returns {Promise<Object>} - An object containing the screenshot data and the actual height.
+ * @param {number} height - The capture height.
+ * @returns {Promise<{screenshotData: string}>} - An object containing the screenshot data.
  */
-async function captureScreenshot(iframe, url, preset, width, height) {
+async function captureScreenshotInternal(iframe, url, width, height) {
   const doc = iframe.contentDocument;
-  const win = iframe.contentWindow;
-  
+
+
   events.emit(events.events.CAPTURE_PROGRESS, {
     message: `Capturing screenshot (${width}x${height})...`,
   });
 
-  if (preset === "fullPage") {
-    // For fullPage, we need special handling to capture the entire document
-    
-    // Temporarily remove any fixed elements or modify their positioning
-    // This prevents duplicated fixed elements in the screenshot
-    const fixedElements = Array.from(doc.querySelectorAll('*')).filter(el => {
-      const style = window.getComputedStyle(el);
-      return style.position === 'fixed';
-    });
-    
-    // Store original styles for restoration later
-    const originalStyles = fixedElements.map(el => ({
-      element: el,
-      position: el.style.position,
-      top: el.style.top,
-      left: el.style.left,
-      right: el.style.right,
-      bottom: el.style.bottom
-    }));
-    
-    // Modify fixed elements to ensure they're captured correctly
-    fixedElements.forEach(el => {
-      el.style.position = 'absolute';
-    });
-    
-    // Set up html2canvas options for fullPage
-    const options = {
-      ...config.screenshot.html2canvasOptions,
-      // Set explicit dimensions
-      width: width,
-      height: height,
-      // These ensure the entire page is captured
-      windowWidth: width,
-      windowHeight: height,
-      x: 0,
-      y: 0,
-      scrollX: 0,
-      scrollY: 0,
-      // Important for better rendering
-      scale: 1,
-      allowTaint: true,
-      useCORS: true,
-      logging: true,
-      // Use the entire document
-      ignoreElements: (element) => {
-        // Ignore any elements that might interfere with capture
-        return element.classList && 
-               (element.classList.contains('screenshot-ignore') || 
-                element.classList.contains('temp-element'));
-      },
-      onclone: (documentClone) => {
-        // This is called with the cloned document before rendering
-        // We can make additional adjustments here if needed
-        const clonedBody = documentClone.body;
-        if (clonedBody) {
-          clonedBody.style.height = `${height}px`;
-          clonedBody.style.overflow = 'visible';
+
+  // --- MODIFIED: Set html2canvas options based on determined width/height ---
+  const options = {
+    ...config.screenshot.html2canvasOptions,
+    width: width,
+    height: height,
+    windowWidth: width, // Important: Tell html2canvas the intended window size
+    windowHeight: height,
+    x: 0, // Start capture from top-left
+    y: 0,
+    scrollX: 0, // Ensure no scrolling offset is applied by html2canvas itself
+    scrollY: 0,
+    ignoreElements: (element) => {
+        // Example: Ignore elements specifically marked
+        return element.classList && element.classList.contains('screenshot-ignore');
+    },
+    onclone: (documentClone) => {
+        // Ensure the cloned document reflects the correct height for full page captures
+        if (documentClone.body) {
+          documentClone.body.style.height = `${height}px`;
+          documentClone.body.style.overflow = 'visible'; // Prevent potential scrollbars in clone
         }
-        documentClone.documentElement.style.height = `${height}px`;
-        documentClone.documentElement.style.overflow = 'visible';
-        return documentClone;
+        if (documentClone.documentElement) {
+            documentClone.documentElement.style.height = `${height}px`;
+            documentClone.documentElement.style.overflow = 'visible';
+        }
+    }
+  };
+  // --- END MODIFICATION ---
+
+
+  // --- Temporarily handle fixed elements for better full page capture ---
+  let originalStyles = [];
+  if (height > iframe.contentWindow.innerHeight) { // Simple check if likely full page
+      try {
+         const fixedElements = Array.from(doc.querySelectorAll('*')).filter(el => {
+             try {
+                 return iframe.contentWindow.getComputedStyle(el).position === 'fixed';
+             } catch (e) { return false; } // Ignore elements that error on getComputedStyle
+         });
+
+
+         originalStyles = fixedElements.map(el => ({
+             element: el,
+             position: el.style.position,
+             // Store other relevant styles if needed (top, bottom, etc.)
+         }));
+
+
+         fixedElements.forEach(item => {
+             item.element.style.position = 'absolute'; // Change to absolute during capture
+         });
+         console.log(`Temporarily changed position for ${fixedElements.length} fixed elements.`);
+      } catch (e) {
+          console.warn("Error handling fixed elements:", e);
       }
-    };
-
-    // Generate the canvas using html2canvas
-    const canvas = await html2canvas(doc.documentElement, options);
-    
-    // Restore original positioning for fixed elements
-    originalStyles.forEach(item => {
-      item.element.style.position = item.position;
-      item.element.style.top = item.top;
-      item.element.style.left = item.left;
-      item.element.style.right = item.right;
-      item.element.style.bottom = item.bottom;
-    });
-    
-    // Overlay the URL onto the canvas
-    const ctx = canvas.getContext("2d");
-    const overlayHeight = 30;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
-    ctx.font = "16px Arial";
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(url, 10, canvas.height - overlayHeight / 2);
-
-    const screenshotData = canvas.toDataURL("image/png");
-    return { screenshotData, actualHeight: canvas.height };
-  } else {
-    // For fixed size presets, keep the original approach
-    const options = {
-      ...config.screenshot.html2canvasOptions,
-      width: width,
-      height: height,
-      windowWidth: width,
-      windowHeight: height,
-      scale: 1,
-      allowTaint: true,
-      useCORS: true
-    };
-
-    // Generate the canvas using html2canvas
-    const canvas = await html2canvas(doc.documentElement, options);
-
-    // Overlay the URL onto the canvas
-    const ctx = canvas.getContext("2d");
-    const overlayHeight = 30;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-    ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
-    ctx.font = "16px Arial";
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(url, 10, canvas.height - overlayHeight / 2);
-
-    const screenshotData = canvas.toDataURL("image/png");
-    return { screenshotData, actualHeight: canvas.height };
   }
-}
+  // --- End fixed element handling ---
+
+
+  // Generate the canvas using html2canvas
+  const canvas = await html2canvas(doc.documentElement, options);
+
+
+   // --- Restore fixed elements ---
+   if (originalStyles.length > 0) {
+       try {
+         originalStyles.forEach(item => {
+             item.element.style.position = item.position; // Restore original position
+         });
+         console.log(`Restored position for ${originalStyles.length} fixed elements.`);
+       } catch (e) {
+           console.warn("Error restoring fixed elements:", e);
+       }
+   }
+   // --- End restore ---
+
+
+  // Overlay the URL onto the canvas
+  const ctx = canvas.getContext("2d");
+  const overlayHeight = 30; // Height of the URL overlay bar
+  const textY = canvas.height - overlayHeight / 2; // Center text vertically in the bar
+
+  // Draw overlay bar
+  ctx.fillStyle = "rgba(0, 0, 0, 0.6)"; // Slightly darker overlay
+  ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
+
+
+  // Draw URL text
+  ctx.font = "14px Arial"; // Slightly smaller font
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+
+
+  // Add padding to the text
+  const textX = 10;
+  ctx.fillText(url, textX, textY);
+
+  // Convert canvas to data URL
+  const screenshotData = canvas.toDataURL("image/png"); // Use PNG for better quality
+
+  // Clean up canvas to free memory
+  canvas.width = 1;
+  canvas.height = 1;
+
+
+  return { screenshotData };
+} // End captureScreenshotInternal
+
 
 /**
  * Download the screenshot as a file.
@@ -592,32 +667,78 @@ async function captureScreenshot(iframe, url, preset, width, height) {
  * @param {string} filename - The filename to save the screenshot as.
  */
 export function downloadScreenshot(screenshotData, filename) {
-  const link = document.createElement("a");
-  link.href = screenshotData;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  events.emit(events.events.SCREENSHOT_SAVED, { filename });
-}
+  try {
+      if (!screenshotData || !filename) {
+          console.error("Missing data or filename for download.");
+          return;
+      }
+      const link = document.createElement("a");
+      link.href = screenshotData;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      events.emit(events.events.SCREENSHOT_SAVED, { filename });
+  } catch (error) {
+      console.error("Error during screenshot download:", error);
+       // Optionally show an error to the user
+       // UI.utils.showStatus(`Error downloading ${filename}: ${error.message}`, true);
+  }
+} // End downloadScreenshot
 
 /**
  * Take sequential screenshots by executing different action sequences.
+ * NOTE: This function is primarily for Advanced Mode and might not be used
+ * in the Simple Mode implemented currently. Kept for potential future use.
  * Process results immediately after each capture.
  *
  * @param {string} url - The base URL to capture.
- * @param {string} [preset='fullHD'] - The size preset to use.
+ * @param {string} [preset='fullHD'] - The base size preset to use.
+ * @param {boolean} [captureFullPage=false] - Whether to capture full page height.
  * @param {Array} [actionSequences=[]] - An array of action sequences.
  * @param {Function} [processCallback=null] - Optional callback to process each result immediately
  * @returns {Promise<Array>} - An array of screenshot results.
  */
-export async function takeSequentialScreenshots(
+ export async function takeSequentialScreenshots(
   url,
   preset = "fullHD",
+  captureFullPage = false, // Added flag
   actionSequences = [],
   processCallback = null
 ) {
   const results = [];
+  if (!actionSequences || actionSequences.length === 0) {
+      console.warn("takeSequentialScreenshots called without action sequences. Taking single screenshot.");
+       // Fallback to taking a single screenshot if no sequences provided
+       try {
+           const singleResult = await takeScreenshot(url, preset, captureFullPage, []);
+            const timestamp = URLProcessor.getTimestamp();
+            const fullPageSuffix = captureFullPage ? "_FullPage" : "";
+            singleResult.fileName = URLProcessor.generateFilename(url, 0, "").replace(".png", `${fullPageSuffix}_${timestamp}.png`);
+            singleResult.sequenceName = "Base Page"; // Assign a default name
+            results.push(singleResult);
+            if (typeof processCallback === "function") {
+                 processCallback(singleResult);
+             }
+       } catch (error) {
+           console.error(`Error taking base screenshot for sequential capture: ${url}`, error);
+            const errorResult = {
+                sequenceName: "Base Page (Error)",
+                error: true,
+                errorMessage: error.message,
+                 url: url // Include URL in error result
+             };
+             results.push(errorResult);
+              if (typeof processCallback === "function") {
+                 processCallback(errorResult);
+             }
+           // Decide if the entire process should stop on base page error
+           throw new errorHandling.ScreenshotError(`Base screenshot failed for sequential capture: ${error.message}`, url, error.reason);
+       }
+      return results; // Return the single result or error
+  }
+
+
   try {
     for (let i = 0; i < actionSequences.length; i++) {
       const sequence = actionSequences[i];
@@ -630,12 +751,15 @@ export async function takeSequentialScreenshots(
           })`,
         });
 
-        // Take the screenshot
+        // Take the screenshot with the sequence actions
+        // --- MODIFIED: Pass captureFullPage ---
         const screenshotData = await takeScreenshot(
-          url,
+          url, // Use the base URL, actions should navigate
           preset,
+          captureFullPage,
           sequence.actions
         );
+        // --- END MODIFICATION ---
 
         // Add sequence info
         const result = {
@@ -643,6 +767,13 @@ export async function takeSequentialScreenshots(
           sequenceName: sequenceName,
           sequenceIndex: i,
         };
+
+         // Generate filename including sequence name and timestamp
+         const timestamp = URLProcessor.getTimestamp();
+          const safeSequenceName = URLProcessor.sanitizeFilename(sequenceName);
+          const fullPageSuffix = captureFullPage ? "_FullPage" : "";
+          result.fileName = `${safeSequenceName}${fullPageSuffix}_${timestamp}.png`;
+
 
         // Add to results array
         results.push(result);
@@ -666,16 +797,20 @@ export async function takeSequentialScreenshots(
           sequenceIndex: i,
           totalSequences: actionSequences.length,
         });
+
       } catch (sequenceError) {
-        // If this is a mount error, log it and continue with the next sequence
+           console.error(`Error in sequence "${sequenceName}":`, sequenceError);
+           const timestamp = URLProcessor.getTimestamp();
+           const safeSequenceName = URLProcessor.sanitizeFilename(sequenceName);
+            const fullPageSuffix = captureFullPage ? "_FullPage" : ""; // Include suffix even for errors
+           const errorFileName = `${safeSequenceName}${fullPageSuffix}_Error_${timestamp}.png`;
+
+
+        // If this is a mount error, log it and create an error result
         if (
           sequenceError.message &&
-          (sequenceError.message.includes(
-            "No view configured for center mount"
-          ) ||
-            sequenceError.message.includes(
-              "Mount definition should contain a property"
-            ))
+          (sequenceError.message.includes("No view configured") ||
+            sequenceError.message.includes("Mount definition"))
         ) {
           console.warn(
             `Skipping sequence "${sequenceName}" due to mount error:`,
@@ -693,10 +828,11 @@ export async function takeSequentialScreenshots(
             sequenceIndex: i,
             error: true,
             errorMessage: sequenceError.message,
+             fileName: errorFileName, // Add filename to error result
+             url: sequenceError.url || url // Add URL if available in error
           };
 
-          // Add to results array
-          results.push(errorResult);
+          results.push(errorResult); // Add error result to array
 
           // Process this error result immediately if callback provided
           if (typeof processCallback === "function") {
@@ -712,20 +848,54 @@ export async function takeSequentialScreenshots(
             totalSequences: actionSequences.length,
           });
 
-          continue; // Skip to next sequence
-        }
+          // Decide whether to continue or stop on mount errors
+          // continue; // Skip to next sequence if desired
 
-        // For other errors, propagate them up
-        throw sequenceError;
-      }
-    }
+          // OR: Stop the entire process on mount error
+           throw new errorHandling.ScreenshotError(`Mount error during sequence "${sequenceName}": ${sequenceError.message}`, url, sequenceError.reason);
+
+
+        } else {
+             // Handle other errors during a sequence
+             const errorResult = {
+                 sequenceName: sequenceName + " (Error)",
+                 sequenceIndex: i,
+                 error: true,
+                 errorMessage: sequenceError.message,
+                 fileName: errorFileName,
+                 url: sequenceError.url || url
+             };
+             results.push(errorResult);
+
+
+             if (typeof processCallback === "function") {
+                 processCallback(errorResult);
+             }
+             events.emit("SCREENSHOT_SEQUENCE_ERROR", { url, error: errorResult, sequenceName, sequenceIndex: i, totalSequences: actionSequences.length });
+
+
+             // Rethrow to stop the entire process on other sequence errors
+             throw sequenceError;
+        }
+      } // End catch sequenceError
+
+        // Optional delay between sequences
+        await new Promise(r => setTimeout(r, 200));
+
+
+    } // End for loop
+
     return results;
+
   } catch (error) {
+     // Catch errors that stop the entire sequential process
     const sequentialError = new errorHandling.ScreenshotError(
-      `Error in sequential screenshots for ${url}: ${error.message}`,
+      `Error during sequential screenshots for ${url}: ${error.message}`,
       url,
       error.message
     );
-    throw sequentialError;
+    // Emit a general failure event if the loop was aborted
+     events.emit(events.events.CAPTURE_FAILED, { url, error: sequentialError });
+    throw sequentialError; // Rethrow to be caught by the calling function (e.g., captureScreenshots in app.js)
   }
-}
+} // End takeSequentialScreenshots

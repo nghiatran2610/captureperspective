@@ -18,22 +18,24 @@ export const config = {
   // Screenshot related settings
   screenshot: {
     presets: {
+      // Presets define the base viewport size (width and height IF fullPage is not checked)
       fullHD: { width: 1920, height: 1080, name: "Full HD (1920x1080)" },
       mobile: { width: 375, height: 812, name: "Mobile (iPhone X/11/12)" },
       tablet: { width: 768, height: 1024, name: "Tablet (iPad)" },
-      fullPage: { width: 1920, height: 1080, name: "Full Page (Auto Height)" },
+      // Removed fullPage preset definition
     },
-    defaultPreset: "fullHD",
+    defaultPreset: "fullHD", // Default selection in the dropdown
     thumbnailSize: {
       width: 120,
       height: 90,
     },
     html2canvasOptions: {
       allowTaint: true,
-      backgroundColor: null,
+      backgroundColor: null, // Use null for transparency if needed, or '#ffffff' for white
       useCORS: true,
-      scale: 1,
-      logging: false,
+      scale: 1, // Use scale 1 for predictable sizing
+      logging: false, // Set to true for debugging html2canvas
+      // width/height/windowWidth/windowHeight are set dynamically in core.js
     },
   },
 

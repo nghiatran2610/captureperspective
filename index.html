@@ -52,18 +52,20 @@
           placeholder="Enter URLs (one per line)"
           rows="5"
           style="display: none;" ></textarea>
-        <div class="input-row screen-size-row">
-          <label>
+        <div class="input-row screen-size-row" style="display: flex; align-items: center; gap: 15px;">
+          <label style="margin-bottom: 0;">
             Screen Size:
             <select id="capturePreset">
               <option value="fullHD" selected>Full HD (1920x1080)</option>
               <option value="mobile">Mobile (375x812)</option>
               <option value="tablet">Tablet (768x1024)</option>
-              <option value="fullPage">Full Page (Auto Height)</option>
-            </select>
+              </select>
+          </label>
+          <label style="margin-bottom: 0; font-weight: normal;" title="Attempt to capture the entire vertical height of the page at the selected width.">
+            <input type="checkbox" id="fullPageCheckbox" style="margin-right: 5px;">Capture Full Page Height
           </label>
         </div>
-         </div><div id="advancedOptions" class="advanced-section" style="display: none;"> <h3>Advanced Options</h3>
+        </div><div id="advancedOptions" class="advanced-section" style="display: none;"> <h3>Advanced Options</h3>
           <div class="input-row">
             <label title="Maximum time to wait before capturing the screenshot">
               Max Wait Time (sec):
