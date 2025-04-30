@@ -59,7 +59,7 @@
               <option value="fullHD" selected>Full HD (1920x1080)</option>
               <option value="mobile">Mobile (375x812)</option>
               <option value="tablet">Tablet (768x1024)</option>
-              </select>
+            </select>
           </label>
           <label style="margin-bottom: 0; font-weight: normal;" title="Attempt to capture the entire vertical height of the page at the selected width.">
             <input type="checkbox" id="fullPageCheckbox" style="margin-right: 5px;">Capture Full Page Height
@@ -106,13 +106,11 @@
           </div>
         </div>
 
-
       <div class="btn-container" id="buttonContainer">
-        <button id="captureBtn" class="btn" disabled>Capture Screenshots</button> <button id="retryFailedBtn" class="btn" disabled>
-          Retry Failed URLs
-        </button>
+        <button id="captureBtn" class="btn icon-btn" disabled title="Capture Screenshots">📸</button>
+        <button id="retryFailedBtn" class="btn icon-btn" disabled title="Retry Failed URLs">🔄</button>
       </div>
-    </div>
+      </div>
 
     <div id="progressOutput" style="display: none">
       <div id="progress" class="status-message"></div>
@@ -124,7 +122,8 @@
         <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
         <p><strong>Total Time Taken:</strong> <span id="totalTime">0s</span></p>
       </div>
-      <div id="output" class="card"></div>
+      <div id="output" class="card">
+           </div>
     </div>
 
     <iframe id="screenshotIframe"></iframe>

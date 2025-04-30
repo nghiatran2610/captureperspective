@@ -2111,18 +2111,18 @@ body.simple-mode .stats {
 
 /* New style for the login option section */
 .login-option-section h2 {
-    margin-bottom: 15px;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
 }
 
 .login-option-section .input-row {
-    justify-content: flex-start;
-    gap: 30px; /* Increase gap between radio buttons */
+  justify-content: flex-start;
+  gap: 30px; /* Increase gap between radio buttons */
 }
 
 .login-option-section label {
-    font-size: 16px; /* Larger font size for radio labels */
+  font-size: 16px; /* Larger font size for radio labels */
 }
 
 /* Add this rule to styles.css */
@@ -2137,4 +2137,92 @@ body.simple-mode .stats {
 
 #stats {
   display: none !important;
+}
+/* Add these styles to your existing styles.css */
+
+/* Icon Button Styling */
+.icon-btn {
+  font-size: 1.5em; /* Adjust icon size */
+  padding: 8px 12px; /* Adjust padding for icons */
+  line-height: 1; /* Ensure icon centers vertically */
+  min-width: 50px; /* Give buttons a minimum width */
+  text-align: center;
+}
+
+/* Specific adjustments if needed */
+#captureBtn {
+  background-color: #27ae60; /* Green */
+  border-color: #27ae60;
+}
+#captureBtn:hover:not(:disabled) {
+  background-color: #219653;
+}
+
+#retryFailedBtn {
+  background-color: #f39c12; /* Orange */
+  border-color: #f39c12;
+}
+#retryFailedBtn:hover:not(:disabled) {
+  background-color: #e67e22;
+}
+
+.pause-resume-btn {
+  background-color: #f0ad4e; /* Amber color for the pause button */
+  color: white;
+  position: relative;
+  transition: background-color 0.3s ease;
+  /* Use existing icon-btn padding */
+}
+
+.pause-resume-btn:hover:not(:disabled) {
+  background-color: #ec971f; /* Darker amber on hover */
+}
+
+/* Style for when in paused state */
+.pause-resume-btn.paused {
+  background-color: #5cb85c; /* Green for resume */
+}
+
+.pause-resume-btn.paused:hover:not(:disabled) {
+  background-color: #449d44; /* Darker green on hover */
+}
+
+/* Hide Live Thumbnails container by default */
+#liveThumbnails {
+  display: none; /* Hide initially */
+  /* Keep other styles like flex-direction, gap, padding etc. from previous additions */
+  flex-direction: column;
+  gap: 15px;
+  margin: 15px 0;
+  background-color: #f5f7fa;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e1e5ea;
+}
+
+/* Adjust category header title spacing */
+.category-header h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #2d3748;
+  flex-grow: 1; /* Allow title to take available space */
+  margin-left: 8px; /* Space after toggle icon */
+  margin-right: 8px; /* Space before count */
+}
+
+/* Optional: Adjust category header padding if needed after removing icon */
+.url-category-header {
+  display: flex;
+  align-items: center;
+  padding: 10px; /* Keep padding or adjust as desired */
+  background-color: #f8f9fa;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.2s;
+}
+
+/* Ensure items container is always visible */
+.url-items-container {
+  max-height: none; /* Remove any max-height transition */
+  /* display: block; Ensure it's displayed if collapsing logic was hiding it */
 }

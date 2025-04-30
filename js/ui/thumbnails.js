@@ -5,13 +5,28 @@ import { modals } from "./modals.js";
 
 export const thumbnails = {
   /**
-   * Create container for live thumbnails
+   * Create container for live thumbnails (initially hidden via CSS)
    * @returns {HTMLElement} - The created container
    */
   createLiveThumbnailsContainer() {
+    // --- MODIFIED: Get output container reference ---
+    const outputContainer = elements.output;
+    if (!outputContainer) {
+        console.error("Cannot create thumbnails container: #output element not found.");
+        return null;
+    }
+    // --- END MODIFICATION ---
+
+    // Avoid creating multiple containers if already exists
+    if (document.getElementById("liveThumbnails")) {
+      elements.liveThumbnails = document.getElementById("liveThumbnails");
+      elements.thumbnailsContent = document.getElementById("thumbnailsContent");
+      return elements.liveThumbnails;
+    }
+
     const container = document.createElement("div");
     container.id = "liveThumbnails";
-    container.className = "live-thumbnails-container";
+    container.className = "live-thumbnails-container"; // CSS will hide this by default
 
     // Create header with more compact styling
     const headerSection = document.createElement("div");
@@ -28,11 +43,12 @@ export const thumbnails = {
 
     // Create footer for the PDF button (initially hidden)
     const footerSection = document.createElement("div");
-    footerSection.className = "combine-all-pdf-container";
+    footerSection.className = "combine-all-pdf-container"; // CSS might hide this too initially
 
     const combinePdfBtn = document.createElement("button");
     combinePdfBtn.className = "btn combine-all-pdf-btn";
-    combinePdfBtn.textContent = "Combine All Screenshots to PDF";
+    combinePdfBtn.textContent = "Combine All Screenshots to PDF"; // Keep text for this one
+    combinePdfBtn.disabled = true; // Start disabled
 
     // Fix the event listener to use a proper reference to the thumbnails object
     const self = this; // Store a reference to thumbnails
@@ -54,8 +70,9 @@ export const thumbnails = {
     container.appendChild(contentSection);
     container.appendChild(footerSection);
 
-    // Add to output before any status messages
-    elements.output.appendChild(container);
+    // --- MODIFIED: Append to output container ---
+    outputContainer.appendChild(container);
+    // --- END MODIFICATION ---
 
     // Keep references
     elements.liveThumbnails = container;
@@ -80,9 +97,20 @@ export const thumbnails = {
     isRetry = false,
     isToolbarAction = false
   ) {
-    if (!elements.liveThumbnails) {
-      this.createLiveThumbnailsContainer();
+    // --- MODIFIED: Ensure container exists and make it visible on first thumbnail ---
+    let liveThumbnailsContainer = elements.liveThumbnails || document.getElementById("liveThumbnails");
+    if (!liveThumbnailsContainer) {
+      liveThumbnailsContainer = this.createLiveThumbnailsContainer();
+      if (!liveThumbnailsContainer) return null; // Stop if container creation failed
     }
+
+    // Check if the container is currently hidden (using computed style for reliability)
+    const isHidden = window.getComputedStyle(liveThumbnailsContainer).display === 'none';
+    if (isHidden) {
+       console.log("First thumbnail added, making thumbnails container visible.");
+       liveThumbnailsContainer.style.display = 'flex'; // Or 'block', depending on your desired layout
+    }
+    // --- END MODIFICATION ---
 
     // Parse category info from fileName or sequenceName
     const { parentCategory, category } = this.parseCategoryFromFileName(
@@ -94,6 +122,7 @@ export const thumbnails = {
       category,
       parentCategory
     );
+    if (!categoryContainer) return null; // Stop if category container failed
     const categoryContent =
       categoryContainer.querySelector(".category-content");
 
@@ -133,6 +162,7 @@ export const thumbnails = {
       thumbImg.src =
         'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90" viewBox="0 0 120 90"><rect width="120" height="90" fill="%23f8d7da"/><text x="60" y="45" font-family="Arial" font-size="12" fill="%23721c24" text-anchor="middle">Mount Error</text></svg>';
       thumbImg.className = "thumbnail-image error-image";
+      thumbImg.title = result.errorMessage || "Error capturing screenshot"; // Add error message as tooltip
     } else {
       thumbImg.src = result.thumbnail;
       thumbImg.className = "thumbnail-image";
@@ -145,7 +175,7 @@ export const thumbnails = {
           result.width,
           result.height,
           result.timeTaken,
-          result.url || currentUrl // Pass the URL of the screenshot
+          result.url || "N/A" // Pass the URL of the screenshot
         );
       });
     }
@@ -157,7 +187,7 @@ export const thumbnails = {
     nameLabel.className = "thumbnail-filename";
 
     // Add sequence name if provided
-    if (sequenceName) {
+    if (sequenceName && sequenceName !== fileName) { // Only add if different from filename
       const seqLabel = document.createElement("div");
       seqLabel.textContent = utils.truncateText(sequenceName, 20);
       seqLabel.title = sequenceName;
@@ -181,12 +211,12 @@ export const thumbnails = {
     }
 
     // Add download button only for non-error thumbnails
-    if (!result.error) {
+    if (!result.error && result.screenshot) { // Also check if screenshot data exists
       const downloadBtn = document.createElement("button");
       downloadBtn.className = "thumbnail-download-btn";
       downloadBtn.title = "Download this screenshot";
       downloadBtn.innerHTML =
-        '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"></path></svg>';
+        '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>';
       downloadBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         this.downloadSingleScreenshot(result.screenshot, fileName);
@@ -203,31 +233,39 @@ export const thumbnails = {
 
     // Update the count of thumbnails in this category
     const countElement = categoryContainer.querySelector(".thumbnail-count");
-    const newCount = categoryContent.querySelectorAll(
-      ".thumbnail-container"
-    ).length;
-    countElement.textContent = `(${newCount})`;
-
-    // Show the Combine All PDF button now that we have content
-    const pdfContainer = elements.liveThumbnails.querySelector(
-      ".combine-all-pdf-container"
-    );
-    if (pdfContainer) {
-      pdfContainer.style.display = "flex";
+    if(countElement){
+        const newCount = categoryContent.querySelectorAll(
+          ".thumbnail-container"
+        ).length;
+        countElement.textContent = `(${newCount})`;
     }
+
+
+    // --- MODIFIED: Show and Enable Combine All PDF button ---
+    const pdfContainer = liveThumbnailsContainer?.querySelector(".combine-all-pdf-container");
+    if (pdfContainer) {
+        pdfContainer.style.display = "flex"; // Ensure container is visible
+        const pdfButton = pdfContainer.querySelector(".combine-all-pdf-btn");
+        if (pdfButton) {
+            pdfButton.disabled = false; // Enable the button
+        }
+    }
+    // --- END MODIFICATION ---
+
 
     // Smart scroll: only scroll if the new thumbnail would be out of view
     const thumbnailRect = thumbnailContainer.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
+    const outputRect = liveThumbnailsContainer.getBoundingClientRect(); // Use container bounds
 
-    // If the thumbnail is below the viewport, scroll just enough to show it
-    if (thumbnailRect.bottom > viewportHeight) {
-      const scrollAdjustment = thumbnailRect.bottom - viewportHeight + 20; // 20px padding
-      window.scrollBy({
-        top: scrollAdjustment,
-        behavior: "smooth",
-      });
+     // If the thumbnail is below the visible part of the output container
+     if (thumbnailRect.bottom > outputRect.bottom) {
+        // Scroll the container itself, not the window
+        liveThumbnailsContainer.scrollTop += (thumbnailRect.bottom - outputRect.bottom + 20); // 20px padding
+    } else if (thumbnailRect.top < outputRect.top) {
+         // Scroll up if thumbnail is above the visible area
+         liveThumbnailsContainer.scrollTop -= (outputRect.top - thumbnailRect.top + 20);
     }
+
 
     return thumbnailContainer;
   },
@@ -236,20 +274,28 @@ export const thumbnails = {
    * Create or get a category container for organizing thumbnails
    * @param {string} categoryName - Name of the category (page name)
    * @param {string} parentName - Name of the parent category (e.g., module name)
-   * @returns {HTMLElement} - The category container
+   * @returns {HTMLElement | null} - The category container or null if creation fails
    */
   getCategoryContainer(categoryName, parentName = null) {
-    if (!elements.liveThumbnails) {
-      this.createLiveThumbnailsContainer();
+    // --- MODIFIED: Ensure main container exists first ---
+    let liveThumbnailsContainer = elements.liveThumbnails || document.getElementById("liveThumbnails");
+    if (!liveThumbnailsContainer) {
+      liveThumbnailsContainer = this.createLiveThumbnailsContainer();
+       if (!liveThumbnailsContainer) return null; // Stop if container creation failed
     }
+    // --- END MODIFICATION ---
 
-    const contentSection =
-      elements.thumbnailsContent || elements.liveThumbnails;
+    const contentSection = document.getElementById("thumbnailsContent"); // Get content section dynamically
+     if (!contentSection) {
+       console.error("Cannot find thumbnailsContent section");
+       return null;
+     }
+
 
     const categoryId = `category-${
       parentName ? `${parentName}-` : ""
     }${categoryName}`
-      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9-_]/g, "-") // Allow underscore and hyphen
       .toLowerCase();
     let categoryContainer = document.getElementById(categoryId);
 
@@ -264,12 +310,25 @@ export const thumbnails = {
       categoryHeader.className = "category-header";
 
       // Add collapsible functionality
-      categoryHeader.addEventListener("click", () => {
+      categoryHeader.addEventListener("click", (e) => {
+          // Prevent collapsing if the PDF button was clicked
+          if (e.target.closest('.combine-pdf-btn')) return;
+
         const content = categoryContainer.querySelector(".category-content");
         const isCollapsed = content.style.display === "none";
         content.style.display = isCollapsed ? "flex" : "none";
         categoryHeader.classList.toggle("collapsed", !isCollapsed);
+         // Update toggle icon
+         const toggleIcon = categoryHeader.querySelector('.toggle-icon');
+         if (toggleIcon) toggleIcon.innerHTML = isCollapsed ? '▼' : '►';
       });
+
+      // --- Add Toggle Icon ---
+      const toggleIcon = document.createElement("span");
+      toggleIcon.className = "toggle-icon";
+      toggleIcon.innerHTML = "▼"; // Default to expanded
+      categoryHeader.appendChild(toggleIcon);
+      // --- End Add ---
 
       const categoryTitle = document.createElement("h4");
       categoryTitle.textContent = parentName
@@ -289,17 +348,17 @@ export const thumbnails = {
       // Add PDF button for this category
       const combinePdfBtn = document.createElement("button");
       combinePdfBtn.className = "btn btn-small combine-pdf-btn";
-      combinePdfBtn.textContent = "Combine to PDF";
+      combinePdfBtn.textContent = "Combine to PDF"; // Keep text label
 
       // Fix the event listener using a reference to the thumbnails object
       const self = this;
       combinePdfBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
+        e.stopPropagation(); // Prevent header click when clicking button
         // Use the stored reference to call the method
         self.generatePDF(categoryContainer);
       });
 
-      categoryHeader.appendChild(combinePdfBtn);
+      categoryHeader.appendChild(combinePdfBtn); // Add button to header
       categoryContainer.appendChild(categoryHeader);
       categoryContainer.appendChild(categoryContent);
 
@@ -309,94 +368,40 @@ export const thumbnails = {
     return categoryContainer;
   },
 
-  /**
-   * Extract module and page information from filename
-   * @param {string} fileName - Filename to parse
-   * @returns {Object} - Contains parentCategory and category
-   */
+  // --- parseCategoryFromFileName remains the same ---
   parseCategoryFromFileName(fileName) {
-    // Default to 'Other' if no pattern matches
-    let parentCategory = "Other";
-    let category = "General";
+      // Default to 'Other' if no pattern matches
+      let parentCategory = "Other";
+      let category = "General";
 
-    // Try to extract module and page from the filename
-    // Pattern for toolbar button pages: Refrigeration - Fridge 1 - Settings Button_20250403_120000.png
-    const toolbarPattern = /^([^-]+)\s*-\s*([^-]+)\s*-\s*([^_]+)/;
-    // Pattern for regular pages: Refrigeration - Fridge 1_20250403_120000.png
-    const regularPattern = /^([^-]+)\s*-\s*([^_]+)/;
-    // Pattern for single page: Refrigeration_20250403_120000.png
-    const singlePattern = /^([^_]+)/;
+      if (!fileName) return { parentCategory, category };
 
-    let match = fileName.match(toolbarPattern);
-    if (match && match.length >= 4) {
-      parentCategory = match[1].trim();
-      category = match[2].trim();
-      // We're ignoring the button name for categorization purposes
-      return { parentCategory, category };
-    }
+      // Try to extract module and page from the filename
+      // Pattern like: Parent - Child - Details_timestamp.png OR Parent - Child_timestamp.png
+      const parts = fileName.split('_')[0].split(' - '); // Split before timestamp, then by ' - '
 
-    match = fileName.match(regularPattern);
-    if (match && match.length >= 3) {
-      parentCategory = match[1].trim();
-      category = match[2].trim();
-      return { parentCategory, category };
-    }
-
-    match = fileName.match(singlePattern);
-    if (match && match.length >= 2) {
-      parentCategory = match[1].trim();
-      category = "Main";
-      return { parentCategory, category };
-    }
-
-    return { parentCategory, category };
-  },
-
-  /**
-   * Add a "Combine All to PDF" button to the thumbnails container
-   */
-  addCombineAllToPDFButton() {
-    // This function is now redundant since we create the button in createLiveThumbnailsContainer
-    // But keep it for backward compatibility
-    if (!elements.liveThumbnails) {
-      this.createLiveThumbnailsContainer();
-    }
-
-    // If the button already exists, don't create another one
-    if (elements.liveThumbnails.querySelector(".combine-all-pdf-container")) {
-      return;
-    }
-
-    const combinePdfContainer = document.createElement("div");
-    combinePdfContainer.className = "combine-all-pdf-container";
-
-    const combinePdfBtn = document.createElement("button");
-    combinePdfBtn.className = "btn combine-all-pdf-btn";
-    combinePdfBtn.textContent = "Combine All Screenshots to PDF";
-
-    // Store a reference to this
-    const self = this;
-    combinePdfBtn.addEventListener("click", function () {
-      // Get all categories
-      const allCategories = document.querySelectorAll(".thumbnail-category");
-      if (allCategories.length === 0) {
-        utils.showStatus("No screenshots available", true);
-        return;
+      if (parts.length >= 2) {
+          parentCategory = parts[0].trim();
+          category = parts[1].trim();
+          // Ignore further parts like button names for categorization
+      } else if (parts.length === 1 && parts[0]) {
+          parentCategory = parts[0].trim();
+          category = "Main"; // Assign a default child category if only one part
       }
 
-      // Combine all screenshots from all categories
-      self.generateAllCategoriesPDF(allCategories);
-    });
+      // Handle cases where splitting might result in empty strings
+      if (!parentCategory) parentCategory = "Other";
+      if (!category) category = "General";
 
-    combinePdfContainer.appendChild(combinePdfBtn);
-    elements.liveThumbnails.appendChild(combinePdfContainer);
-  },
 
-  /**
-   * Download a single screenshot
-   * @param {string} screenshotData - The Base64 screenshot data
-   * @param {string} fileName - The filename for the download
-   */
+      return { parentCategory, category };
+    },
+
+
+  // --- addCombineAllToPDFButton is redundant, combine button is created in createLiveThumbnailsContainer ---
+  // addCombineAllToPDFButton() { ... }
+
+  // --- downloadSingleScreenshot remains the same ---
   downloadSingleScreenshot(screenshotData, fileName) {
     const link = document.createElement("a");
     link.href = screenshotData;
@@ -406,15 +411,11 @@ export const thumbnails = {
     document.body.removeChild(link);
 
     // Show status message
-    utils.showStatus(`Downloaded: ${fileName}`, false);
+    utils.showStatus(`Downloaded: ${fileName}`, false, 3000); // Auto-hide success message
   },
 
-  /**
-   * Helper function to optimize image for PDF with higher quality
-   * @param {string} dataURL - Data URL of the image
-   * @returns {Promise<string>} - Promise that resolves to optimized data URL
-   */
-  optimizeImageForPDF(dataURL) {
+  // --- optimizeImageForPDF remains the same ---
+   optimizeImageForPDF(dataURL) {
     return new Promise((resolve, reject) => {
       try {
         const img = new Image();
@@ -507,12 +508,8 @@ export const thumbnails = {
     });
   },
 
-  /**
-   * Helper function to get valid image dimensions
-   * @param {Image} img - Image element
-   * @returns {Object} - Object with width and height properties
-   */
-  getValidImageDimensions(img) {
+  // --- getValidImageDimensions remains the same ---
+   getValidImageDimensions(img) {
     let width = img.width || img.naturalWidth;
     let height = img.height || img.naturalHeight;
 
@@ -530,15 +527,12 @@ export const thumbnails = {
     };
   },
 
-  /**
-   * Generate PDF from screenshots in a category
-   * @param {HTMLElement} categoryContainer - The category container element
-   */
+  // --- generatePDF remains the same ---
   generatePDF(categoryContainer) {
     // Get category name for PDF title
-    const categoryTitle = categoryContainer.querySelector(
-      ".category-header h4"
-    ).textContent;
+    const categoryTitleElement = categoryContainer.querySelector(".category-header h4");
+    const categoryTitle = categoryTitleElement ? categoryTitleElement.textContent : 'Screenshots'; // Fallback title
+
     const thumbnailContainers = categoryContainer.querySelectorAll(
       ".category-content .thumbnail-container"
     );
@@ -548,8 +542,18 @@ export const thumbnails = {
       return;
     }
 
+    // Filter out error thumbnails for PDF generation
+    const validThumbnails = Array.from(thumbnailContainers).filter(
+      (container) => !container.classList.contains("error-thumbnail") && container.dataset.screenshot
+    );
+
+     if (validThumbnails.length === 0) {
+      utils.showStatus("No valid screenshots to generate PDF in this category", true);
+      return;
+    }
+
     // Show status message
-    utils.showStatus(`Generating PDF for ${categoryTitle}...`, false);
+    utils.showStatus(`Generating PDF for ${categoryTitle}...`, false, 0); // Keep message visible
 
     // Create new jsPDF instance with better quality settings
     const pdf = new jspdf.jsPDF({
@@ -562,60 +566,67 @@ export const thumbnails = {
     });
 
     // Add title to first page
-    pdf.setFontSize(22);
+    pdf.setFontSize(18); // Slightly smaller title
     pdf.text(categoryTitle, 20, 20);
-    pdf.setFontSize(12);
-    pdf.text(`Generated on ${new Date().toLocaleString()}`, 20, 30);
-    pdf.line(20, 35, pdf.internal.pageSize.width - 20, 35);
+    pdf.setFontSize(10); // Smaller subtitle
+    pdf.text(`Generated on ${new Date().toLocaleString()}`, 20, 28);
+    pdf.setLineWidth(0.2);
+    pdf.line(20, 32, pdf.internal.pageSize.width - 20, 32); // Line below subtitle
 
     // Define page dimensions
-    const pageWidth = pdf.internal.pageSize.width - 40; // 20mm margins on each side
-    const pageHeight = pdf.internal.pageSize.height - 60; // 30mm margins top and bottom
+    const leftMargin = 15;
+    const rightMargin = 15;
+    const topMargin = 40; // Increased top margin for title/header
+    const bottomMargin = 20;
+    const pageWidth = pdf.internal.pageSize.width - leftMargin - rightMargin;
+    const pageHeight = pdf.internal.pageSize.height - topMargin - bottomMargin;
 
     // Process each screenshot one at a time to avoid memory issues
     let currentIndex = 0;
     let pageCount = 1;
 
     // Start processing
-    const self = this;
+    const self = this; // Reference to thumbnails object
     processNextScreenshot();
 
     function processNextScreenshot() {
-      if (currentIndex >= thumbnailContainers.length) {
+      if (currentIndex >= validThumbnails.length) {
         // All screenshots processed, save the PDF
         try {
           const sanitizedTitle = categoryTitle.replace(/[^a-zA-Z0-9]/g, "_");
           pdf.save(
             `${sanitizedTitle}_${new Date().toISOString().slice(0, 10)}.pdf`
           );
-          utils.showStatus(`PDF generated with ${pageCount} pages`, false);
+          utils.showStatus(`PDF generated for ${categoryTitle} with ${pageCount} pages`, false, 5000);
         } catch (error) {
           console.error("Error saving PDF:", error);
           utils.showStatus("Error saving PDF", true);
+        } finally {
+            // Hide the "Generating..." message
+             utils.showStatus("", false, 1); // Show empty message with short delay to clear
         }
         return;
       }
 
-      const container = thumbnailContainers[currentIndex];
+      const container = validThumbnails[currentIndex];
       const screenshotData = container.dataset.screenshot;
-      const filename = container.dataset.filename;
+      const filename = container.dataset.filename || `Page ${currentIndex + 1}`; // Fallback filename
 
       if (!screenshotData) {
-        // Skip this one and move to next
+        // Skip this one and move to next (shouldn't happen due to filtering, but good practice)
         currentIndex++;
         processNextScreenshot();
         return;
       }
 
-      // Create a new page for each screenshot after the first
+      // Add a new page for each screenshot *after* the first one
       if (currentIndex > 0) {
         pdf.addPage();
         pageCount++;
       }
 
-      // Use the thumbnails object's method
-      self
-        .optimizeImageForPDF(screenshotData)
+      // Optimize the image first
+      self.optimizeImageForPDF(screenshotData)
         .then((optimizedData) => {
           // Create an image element to get dimensions
           const img = new Image();
@@ -624,74 +635,57 @@ export const thumbnails = {
               // Get valid image dimensions
               const imgDimensions = self.getValidImageDimensions(img);
 
-              // Calculate dimensions to fit on page with validation
-              let imgWidth = Math.min(pageWidth, imgDimensions.width);
-              let imgHeight = Math.min(pageHeight, imgDimensions.height);
-
-              // Calculate aspect ratio correctly
+              // Calculate dimensions to fit on page while maintaining aspect ratio
+              let imgWidthOnPage, imgHeightOnPage;
               const imgRatio = imgDimensions.width / imgDimensions.height;
+              const pageRatio = pageWidth / pageHeight;
 
-              // Recalculate dimensions based on aspect ratio
-              if (imgWidth / imgHeight !== imgRatio) {
-                if (imgWidth / imgRatio > pageHeight) {
-                  // Height-constrained
-                  imgHeight = pageHeight;
-                  imgWidth = imgHeight * imgRatio;
-                } else {
-                  // Width-constrained
-                  imgWidth = pageWidth;
-                  imgHeight = imgWidth / imgRatio;
-                }
-              }
+               if (imgRatio > pageRatio) {
+                  // Image is wider than page area relative to height
+                  imgWidthOnPage = pageWidth;
+                  imgHeightOnPage = pageWidth / imgRatio;
+               } else {
+                  // Image is taller than page area relative to width
+                  imgHeightOnPage = pageHeight;
+                  imgWidthOnPage = pageHeight * imgRatio;
+               }
 
-              // Ensure all dimensions are valid numbers and not too close to zero
-              imgWidth = Math.max(
-                10,
-                Math.min(pageWidth, Math.round(imgWidth))
-              );
-              imgHeight = Math.max(
-                10,
-                Math.min(pageHeight, Math.round(imgHeight))
-              );
 
-              // Validate one more time before adding to PDF
-              if (
-                isNaN(imgWidth) ||
-                isNaN(imgHeight) ||
-                imgWidth <= 0 ||
-                imgHeight <= 0
-              ) {
-                console.error(
-                  "Invalid image dimensions for PDF:",
-                  imgWidth,
-                  imgHeight
-                );
-                // Skip this image
+              // Ensure dimensions are valid numbers and > 0
+              imgWidthOnPage = Math.max(1, Math.round(imgWidthOnPage));
+              imgHeightOnPage = Math.max(1, Math.round(imgHeightOnPage));
+
+              if (isNaN(imgWidthOnPage) || isNaN(imgHeightOnPage) || imgWidthOnPage <= 0 || imgHeightOnPage <= 0) {
+                console.error("Invalid calculated image dimensions for PDF:", imgWidthOnPage, imgHeightOnPage);
                 currentIndex++;
-                setTimeout(processNextScreenshot, 10);
+                setTimeout(processNextScreenshot, 10); // Process next even on error
                 return;
               }
+
+               // Calculate position to center the image (optional, default is top-left placement)
+               const xPos = leftMargin; // + (pageWidth - imgWidthOnPage) / 2; // Center horizontally
+               const yPos = topMargin; // Place image starting at top margin
 
               // Add the image to the PDF
               pdf.addImage(
                 optimizedData,
                 optimizedData.includes("data:image/png") ? "PNG" : "JPEG",
-                20, // X position (left margin)
-                40, // Y position (below the title)
-                imgWidth,
-                imgHeight
+                xPos,
+                yPos,
+                imgWidthOnPage,
+                imgHeightOnPage,
+                 null, // alias
+                 'FAST' // compression FAST is usually good enough visually and faster
               );
 
               // Add caption below the image
-              pdf.setFontSize(10);
+              pdf.setFontSize(8); // Smaller font for caption
+              const captionY = yPos + imgHeightOnPage + 5; // Position caption below image
 
               // Truncate filename if too long
-              const truncatedFilename =
-                filename.length > 80
-                  ? filename.substring(0, 77) + "..."
-                  : filename;
+              const truncatedFilename = filename.length > 120 ? filename.substring(0, 117) + "..." : filename;
 
-              pdf.text(truncatedFilename, 20, imgHeight + 45);
+              pdf.text(truncatedFilename, leftMargin, captionY, { maxWidth: pageWidth }); // Add max width
 
               // Process next screenshot
               currentIndex++;
@@ -706,349 +700,192 @@ export const thumbnails = {
           };
 
           img.onerror = () => {
-            console.error("Failed to load image for PDF");
+            console.error("Failed to load optimized image for PDF");
             currentIndex++;
             processNextScreenshot();
           };
 
-          img.src = optimizedData;
+          img.src = optimizedData; // Start loading the optimized image
         })
         .catch((error) => {
           console.error("Error optimizing image:", error);
           currentIndex++;
-          processNextScreenshot();
+          processNextScreenshot(); // Continue even if optimization fails
         });
     }
   },
 
-  /**
-   * Generate PDF with all screenshots from all categories
-   * @param {NodeList} categoryContainers - All category containers
-   */
-  generateAllCategoriesPDF(categoryContainers) {
-    // Show status message
-    utils.showStatus(
-      "Generating comprehensive PDF with all screenshots...",
-      false
-    );
+
+  // --- generateAllCategoriesPDF remains largely the same, but uses the improved generatePDF logic ---
+  // Minor adjustments might be needed for progress reporting if generatePDF becomes async completely
+   generateAllCategoriesPDF(categoryContainers) {
+    utils.showStatus("Generating comprehensive PDF with all screenshots...", false, 0); // Keep message visible
 
     try {
-      // Create new jsPDF instance with better quality settings
-      const pdf = new jspdf.jsPDF({
+       const pdf = new jspdf.jsPDF({
         orientation: "landscape",
         unit: "mm",
         format: "a4",
         compress: true,
-        precision: 4, // Higher precision for better quality
+        precision: 4,
         putOnlyUsedFonts: true,
       });
 
-      // Add title to first page
-      pdf.setFontSize(22);
-      pdf.text("Complete Screenshot Documentation", 20, 20);
-      pdf.setFontSize(12);
-      pdf.text(`Generated on ${new Date().toLocaleString()}`, 20, 30);
-      pdf.line(20, 35, pdf.internal.pageSize.width - 20, 35);
+       pdf.setFontSize(18);
+       pdf.text("Complete Screenshot Documentation", 15, 20);
+       pdf.setFontSize(10);
+       pdf.text(`Generated on ${new Date().toLocaleString()}`, 15, 28);
+       pdf.setLineWidth(0.2);
+       pdf.line(15, 32, pdf.internal.pageSize.width - 15, 32);
 
-      // Count total screenshots to show progress
-      let totalScreenshots = 0;
-      Array.from(categoryContainers).forEach((categoryContainer) => {
-        const thumbnailContainers = categoryContainer.querySelectorAll(
-          ".category-content .thumbnail-container"
-        );
-        totalScreenshots += thumbnailContainers.length;
-      });
+        const leftMargin = 15;
+        const rightMargin = 15;
+        const topMargin = 40;
+        const bottomMargin = 20;
+        const pageWidth = pdf.internal.pageSize.width - leftMargin - rightMargin;
+        const pageHeight = pdf.internal.pageSize.height - topMargin - bottomMargin;
 
-      // Define page dimensions once for reuse
-      const pageWidth = pdf.internal.pageSize.width - 40; // 20mm margins on each side
-      const pageHeight = pdf.internal.pageSize.height - 60; // 30mm margins top and bottom
+        let pageCount = 1;
+        let totalScreenshotsProcessed = 0;
+        let hasAnyScreenshots = false; // Track if any valid screenshot is added
 
-      // Process categories and screenshots sequentially to prevent memory issues
-      let pageCount = 1;
-      let processedScreenshots = 0;
-      let currentCategory = 0;
-      const totalCategories = categoryContainers.length;
-      let hasScreenshots = false; // Flag to track if any screenshot was added
-
-      // Process one category at a time
-      const self = this;
-      processNextCategory();
-
-      function processNextCategory() {
-        if (currentCategory >= totalCategories) {
-          // All categories processed - save the PDF if any screenshots were added
-          if (hasScreenshots) {
-            finalizePDF();
-          } else {
-            utils.showStatus("No screenshots available to generate PDF.", true);
-          }
-          return;
-        }
-
-        const categoryContainer = categoryContainers[currentCategory];
-        const categoryTitle =
-          categoryContainer.querySelector(".category-header h4")?.textContent ||
-          `Category ${currentCategory + 1}`;
-
-        const thumbnailContainers = categoryContainer.querySelectorAll(
-          ".category-content .thumbnail-container"
-        );
-
-        if (thumbnailContainers.length === 0) {
-          // Skip empty categories
-          currentCategory++;
-          processNextCategory();
-          return;
-        }
-
-        // Process screenshots sequentially
-        let currentScreenshot = 0;
-
-        processNextScreenshot();
-
-        function processNextScreenshot() {
-          if (currentScreenshot >= thumbnailContainers.length) {
-            // All screenshots in this category processed
-            currentCategory++;
-            processNextCategory();
-            return;
-          }
-
-          const container = thumbnailContainers[currentScreenshot];
-          const screenshotData = container.dataset.screenshot;
-          const filename = container.dataset.filename;
-
-          if (!screenshotData) {
-            // Skip if no screenshot data
-            currentScreenshot++;
-            processedScreenshots++;
-            processNextScreenshot();
-            return;
-          }
-
-          // Add a new page for the screenshot
-          pdf.addPage();
-          pageCount++;
-          hasScreenshots = true; // Mark that at least one screenshot has been added
-
-          // Process and optimize image
-          self
-            .optimizeImageForPDF(screenshotData)
-            .then((optimizedData) => {
-              try {
-                // Create image element to get dimensions
-                const img = new Image();
-                img.onload = () => {
-                  try {
-                    // Get valid image dimensions
-                    const imgDimensions = self.getValidImageDimensions(img);
-
-                    // Calculate dimensions to fit on page with validation
-                    let imgWidth = Math.min(pageWidth, imgDimensions.width);
-                    let imgHeight = Math.min(pageHeight, imgDimensions.height);
-
-                    // Calculate aspect ratio correctly
-                    const imgRatio = imgDimensions.width / imgDimensions.height;
-
-                    // Recalculate dimensions based on aspect ratio
-                    if (imgWidth / imgHeight !== imgRatio) {
-                      if (imgWidth / imgRatio > pageHeight) {
-                        // Height-constrained
-                        imgHeight = pageHeight;
-                        imgWidth = imgHeight * imgRatio;
-                      } else {
-                        // Width-constrained
-                        imgWidth = pageWidth;
-                        imgHeight = imgWidth / imgRatio;
-                      }
-                    }
-
-                    // Ensure all dimensions are valid numbers and not too close to zero
-                    imgWidth = Math.max(
-                      10,
-                      Math.min(pageWidth, Math.round(imgWidth))
-                    );
-                    imgHeight = Math.max(
-                      10,
-                      Math.min(pageHeight, Math.round(imgHeight))
-                    );
-
-                    // Validate one more time before adding to PDF
-                    if (
-                      isNaN(imgWidth) ||
-                      isNaN(imgHeight) ||
-                      imgWidth <= 0 ||
-                      imgHeight <= 0
-                    ) {
-                      console.error(
-                        "Invalid image dimensions for PDF:",
-                        imgWidth,
-                        imgHeight
-                      );
-                      // Skip this image
-                      processedScreenshots++;
-                      currentScreenshot++;
-                      setTimeout(processNextScreenshot, 10);
-                      return;
-                    }
-
-                    // Add the image to the PDF
-                    pdf.addImage(
-                      optimizedData,
-                      optimizedData.includes("data:image/png") ? "PNG" : "JPEG",
-                      20, // X position
-                      40, // Y position
-                      imgWidth,
-                      imgHeight
-                    );
-
-                    // Add caption below the image
-                    pdf.setFontSize(14);
-                    pdf.text(`Category: ${categoryTitle}`, 20, 30);
-                    pdf.setFontSize(10);
-
-                    // Truncate filename if too long to avoid PDF issues
-                    const truncatedFilename =
-                      filename.length > 80
-                        ? filename.substring(0, 77) + "..."
-                        : filename;
-
-                    pdf.text(truncatedFilename, 20, imgHeight + 45);
-
-                    // Update progress
-                    processedScreenshots++;
-                    utils.showStatus(
-                      `Generating PDF: ${processedScreenshots}/${totalScreenshots} screenshots processed`,
-                      false
-                    );
-
-                    // Continue with next screenshot after a brief delay
-                    setTimeout(() => {
-                      currentScreenshot++;
-                      processNextScreenshot();
-                    }, 10); // Small delay to prevent UI freezing
-                  } catch (error) {
-                    console.error("Error adding image to PDF:", error);
-                    // Continue with next screenshot despite error
-                    processedScreenshots++;
-                    currentScreenshot++;
-                    processNextScreenshot();
-                  }
-                };
-
-                img.onerror = () => {
-                  console.error("Failed to load image for PDF");
-                  processedScreenshots++;
-                  currentScreenshot++;
-                  processNextScreenshot();
-                };
-
-                img.src = optimizedData;
-              } catch (error) {
-                console.error("Error processing image:", error);
-                processedScreenshots++;
-                currentScreenshot++;
-                processNextScreenshot();
-              }
-            })
-            .catch((error) => {
-              console.error("Error optimizing image:", error);
-              processedScreenshots++;
-              currentScreenshot++;
-              processNextScreenshot();
-            });
-        }
-      }
-
-      function finalizePDF() {
-        try {
-          // Split into multiple PDFs if large
-          if (pageCount > 50) {
-            utils.showStatus(
-              "Large document detected, splitting into multiple PDFs...",
-              false
-            );
-
-            // Save in smaller chunks of 40 pages
-            const pagesPerPDF = 40;
-            const totalPDFs = Math.ceil(pageCount / pagesPerPDF);
-
-            for (let i = 0; i < totalPDFs; i++) {
-              const startPage = i * pagesPerPDF + 1;
-              const endPage = Math.min((i + 1) * pagesPerPDF, pageCount);
-
-              try {
-                // Extract pages to a new PDF
-                const pdfOutput = pdf.output("arraybuffer");
-
-                // Create a new PDF document
-                const newPdf = new jspdf.jsPDF({
-                  orientation: "landscape",
-                  unit: "mm",
-                  format: "a4",
-                  compress: true,
-                });
-
-                // Add a title page to each split PDF
-                newPdf.setFontSize(16);
-                newPdf.text(
-                  `Screenshots Collection - Part ${i + 1} of ${totalPDFs}`,
-                  20,
-                  20
-                );
-                newPdf.setFontSize(12);
-                newPdf.text(
-                  `Pages ${startPage} to ${endPage} of ${pageCount} total pages`,
-                  20,
-                  30
-                );
-                newPdf.text(
-                  `Generated on ${new Date().toLocaleString()}`,
-                  20,
-                  40
-                );
-
-                // Save this chunk
-                newPdf.save(
-                  `Screenshots_Part${i + 1}_of_${totalPDFs}_${new Date()
-                    .toISOString()
-                    .slice(0, 10)}.pdf`
-                );
-              } catch (splitError) {
-                console.error(
-                  `Error creating split PDF part ${i + 1}:`,
-                  splitError
-                );
-              }
+        const processCategory = async (categoryIndex) => {
+            if (categoryIndex >= categoryContainers.length) {
+                // All categories done
+                if (hasAnyScreenshots) {
+                    finalizeAndSaveAll();
+                } else {
+                    utils.showStatus("No valid screenshots found to generate PDF.", true);
+                }
+                return;
             }
 
-            utils.showStatus(
-              `PDF generation complete: Split into ${totalPDFs} files`,
-              false
-            );
-          } else {
-            // Single PDF for smaller documents
-            pdf.save(
-              `Screenshots_${new Date().toISOString().slice(0, 10)}.pdf`
-            );
-            utils.showStatus(`PDF generated with ${pageCount} pages`, false);
-          }
-        } catch (error) {
-          console.error("Error saving PDF:", error);
-          utils.showStatus(
-            "Error saving PDF. Try with fewer screenshots or individually.",
-            true
-          );
-        }
-      }
+            const categoryContainer = categoryContainers[categoryIndex];
+            const categoryTitleElement = categoryContainer.querySelector(".category-header h4");
+            const categoryTitle = categoryTitleElement ? categoryTitleElement.textContent : `Category ${categoryIndex + 1}`;
+
+            const validThumbnails = Array.from(
+                categoryContainer.querySelectorAll(".category-content .thumbnail-container")
+            ).filter(container => !container.classList.contains("error-thumbnail") && container.dataset.screenshot);
+
+             if (validThumbnails.length === 0) {
+                // Skip empty categories
+                await processCategory(categoryIndex + 1);
+                return;
+            }
+
+            // Process screenshots in this category
+             for (let i = 0; i < validThumbnails.length; i++) {
+                 const container = validThumbnails[i];
+                 const screenshotData = container.dataset.screenshot;
+                 const filename = container.dataset.filename || `Page ${i + 1}`;
+
+                 if (!screenshotData) continue;
+
+                 // Add page (except for the very first image overall)
+                 if (totalScreenshotsProcessed > 0) {
+                     pdf.addPage();
+                     pageCount++;
+                 }
+                 hasAnyScreenshots = true; // Mark that we have content
+
+                 // Add Category Title on the page
+                 pdf.setFontSize(12);
+                 pdf.setTextColor(100); // Grey color for category title
+                 pdf.text(categoryTitle, leftMargin, topMargin - 8); // Position above image
+                 pdf.setTextColor(0); // Reset color
+
+                 try {
+                     const optimizedData = await this.optimizeImageForPDF(screenshotData);
+                     const img = await new Promise((resolve, reject) => {
+                         const image = new Image();
+                         image.onload = () => resolve(image);
+                         image.onerror = reject;
+                         image.src = optimizedData;
+                     });
+
+                     const imgDimensions = this.getValidImageDimensions(img);
+                     let imgWidthOnPage, imgHeightOnPage;
+                     const imgRatio = imgDimensions.width / imgDimensions.height;
+                     const pageRatio = pageWidth / pageHeight;
+
+                     if (imgRatio > pageRatio) {
+                         imgWidthOnPage = pageWidth;
+                         imgHeightOnPage = pageWidth / imgRatio;
+                     } else {
+                         imgHeightOnPage = pageHeight;
+                         imgWidthOnPage = pageHeight * imgRatio;
+                     }
+
+                     imgWidthOnPage = Math.max(1, Math.round(imgWidthOnPage));
+                     imgHeightOnPage = Math.max(1, Math.round(imgHeightOnPage));
+
+                      if (isNaN(imgWidthOnPage) || isNaN(imgHeightOnPage) || imgWidthOnPage <= 0 || imgHeightOnPage <= 0) {
+                           console.error("Invalid calculated image dimensions:", imgWidthOnPage, imgHeightOnPage);
+                           continue; // Skip this image
+                       }
+
+                      const xPos = leftMargin;
+                      const yPos = topMargin;
+
+                     pdf.addImage(
+                        optimizedData,
+                        optimizedData.includes("data:image/png") ? "PNG" : "JPEG",
+                        xPos, yPos, imgWidthOnPage, imgHeightOnPage, null, 'FAST'
+                     );
+
+                     pdf.setFontSize(8);
+                     const captionY = yPos + imgHeightOnPage + 5;
+                     const truncatedFilename = filename.length > 120 ? filename.substring(0, 117) + "..." : filename;
+                     pdf.text(truncatedFilename, leftMargin, captionY, { maxWidth: pageWidth });
+
+                     totalScreenshotsProcessed++;
+                      utils.showStatus(`Generating PDF: Processed ${totalScreenshotsProcessed} screenshots...`, false, 0);
+
+
+                 } catch (error) {
+                     console.error(`Error processing screenshot ${filename}:`, error);
+                     // Optionally add a placeholder page for the error?
+                 }
+                  // Brief delay
+                  await new Promise(res => setTimeout(res, 5));
+
+             } // End loop through thumbnails in category
+
+             // Move to next category
+             await processCategory(categoryIndex + 1);
+        };
+
+
+        const finalizeAndSaveAll = () => {
+            try {
+                 // Remove the first blank page if content started on page 2
+                 if (pageCount > 1 && totalScreenshotsProcessed > 0) {
+                     // pdf.deletePage(1); // This might cause issues if title page is needed
+                 }
+
+                 pdf.save(`All_Screenshots_${new Date().toISOString().slice(0, 10)}.pdf`);
+                 utils.showStatus(`Combined PDF generated with ${pageCount} pages`, false, 5000);
+            } catch (error) {
+                console.error("Error saving combined PDF:", error);
+                utils.showStatus("Error saving combined PDF", true);
+            } finally {
+                 utils.showStatus("", false, 1); // Clear status
+            }
+        };
+
+
+        // Start processing the first category
+        processCategory(0);
+
+
     } catch (error) {
       console.error("Error generating comprehensive PDF:", error);
-      utils.showStatus(
-        "Error generating comprehensive PDF: " + error.message,
-        true
-      );
+      utils.showStatus("Error generating comprehensive PDF: " + error.message, true);
     }
   },
-};
+
+
+}; // End thumbnails object
 
 export default thumbnails;
