@@ -1322,13 +1322,50 @@ body.advanced-mode .simple-mode-settings {
   min-width: 50px;
   text-align: center;
 }
+/* styles.css */
+
+/* --- Capture Button (#captureBtn) - Enhanced Standard Style --- */
 #captureBtn {
-  background-color: #27ae60;
-  border-color: #27ae60;
-} /* Green */
-#captureBtn:hover:not(:disabled) {
-  background-color: #219653;
+  /* Inherits .btn and .icon-btn base styles */
+  background: linear-gradient(145deg, var(--secondary-color-bright), var(--secondary-color)); /* Keep vibrant green */
+  border: 2px solid var(--secondary-color-dark); /* << THICKER border */
+  color: white;
+  padding: 14px 24px; /* << INCREASED padding */
+  font-size: 2em;     /* << INCREASED icon size */
+  box-shadow: 0 5px 10px rgba(46, 204, 113, 0.45); /* << STRONGER shadow */
+  font-weight: 600;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+  line-height: 1;
+  /* Optional: Add subtle pulse animation - uncomment below and @keyframes if desired */
+  /* animation: subtlePulse 2s infinite ease-in-out; */
 }
+
+/* Adjust hover/active states slightly */
+#captureBtn:hover:not(:disabled) {
+  background: linear-gradient(145deg, var(--secondary-color), var(--secondary-color-dark));
+  box-shadow: 0 7px 14px rgba(46, 204, 113, 0.55); /* Enhanced hover shadow */
+  transform: translateY(-3px); /* More lift */
+}
+
+#captureBtn:active:not(:disabled) {
+  transform: translateY(-1px); /* Press effect */
+  box-shadow: 0 3px 6px rgba(46, 204, 113, 0.4);
+}
+
+/* Keep standard disabled state */
+#captureBtn:disabled {
+  background: #e9ecef;
+  border-color: #ced4da;
+  color: #adb5bd;
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+  opacity: 0.65;
+  /* animation: none; */ /* Disable animation when disabled */
+}
+
+
 
 /* --- Collapsible Header Logic (applies only to Pages header) --- */
 .card-header-toggle-wrapper {
