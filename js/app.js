@@ -143,12 +143,12 @@ class App {
       events.addDOMEventListener(UI.elements.actionsField, "paste", () => setTimeout(() => this._handleActionsInput(), 0));
     }
 
-    // --- ADDED: Event listener for collapsible header ---
-    const titleHeader = UI.elements.urlInputTitle;
-     if (titleHeader) {
-         events.addDOMEventListener(titleHeader, "click", this._toggleCaptureSettings);
+    // --- ADDED: Event listener for collapsible header WRAPPER ---
+    const titleToggleWrapper = document.getElementById("captureSettingsToggle"); // Target the wrapper div
+     if (titleToggleWrapper) {
+         events.addDOMEventListener(titleToggleWrapper, "click", this._toggleCaptureSettings);
      } else {
-          console.error("#urlInputTitle element not found for toggle listener.");
+          console.error("#captureSettingsToggle element not found for toggle listener.");
      }
      // --- END ADDED ---
   }
@@ -158,8 +158,8 @@ class App {
     // No retry button to disable
     if (UI.elements.captureBtn) { UI.elements.captureBtn.disabled = true; }
     this.createPauseResumeButton(); // Creates pause button
-     // Ensure settings content is expanded initially
-     this._setCaptureSettingsCollapsed(false);
+     // Start collapsed by default
+     this._setCaptureSettingsCollapsed(true);
   }
 
 
@@ -389,7 +389,7 @@ class App {
       const fullPageCheckbox = document.getElementById("fullPageCheckbox");
       const captureFullPage = fullPageCheckbox ? fullPageCheckbox.checked : false;
 
-      // --- Lines attempting to set UI.elements.waitTime.value REMOVED ---
+      // --- Wait time is read directly by takeScreenshot ---
 
       if (typeof urlSelector.getSelectedUrlsForCapture === "function") {
         urlList = urlSelector.getSelectedUrlsForCapture();
@@ -426,16 +426,16 @@ class App {
             UI.progress.updateStats( AppState.orderedUrls.length + AppState.failedUrls.length, AppState.screenshots.size, AppState.failedUrls.length, totalTimeTaken );
         }
 
-        if (!this.isPaused && isFinished) {
+        if (!this.isPaused && isFinished) { // Finished naturally
+             this._checkCaptureButtonState();
+             this.updatePauseResumeButton(); // Should disable pause btn
+             this._setCaptureSettingsCollapsed(false); // Expand settings when finished
+        } else if (!this.isPaused && !isFinished) { // Errored out
              this._checkCaptureButtonState();
              this.updatePauseResumeButton();
-             this._setCaptureSettingsCollapsed(false);
-        } else if (!this.isPaused && !isFinished) {
-             this._checkCaptureButtonState();
-             this.updatePauseResumeButton();
-             this._setCaptureSettingsCollapsed(false);
-        } else if (this.isPaused) {
-             this._setCaptureSettingsCollapsed(true);
+             this._setCaptureSettingsCollapsed(false); // Expand settings
+        } else if (this.isPaused) { // Paused mid-run
+             this._setCaptureSettingsCollapsed(true); // Keep collapsed
              if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
         }
 
@@ -515,16 +515,26 @@ class App {
     const isFinished = this.currentCaptureIndex >= totalUrls;
     if (isFinished) {
       console.log("Queue processing complete.");
-      if (!this.isPaused) { UI.progress.updateProgressMessage(`Capture complete. Processed ${totalUrls} pages.`); setTimeout(() => UI.utils.showStatus("", false, 1), 3000); }
-      this._processingQueue = false;
+      if (!this.isPaused) {
+          // --- MODIFIED: Use showStatus for persistent completion message ---
+          const failedCount = AppState.failedUrls.length;
+          const successCount = totalUrls - failedCount;
+          let completionMessage = `Capture complete. Processed ${totalUrls} pages (${successCount} success, ${failedCount} failed).`;
+          UI.utils.showStatus(completionMessage, failedCount > 0, 0); // Use showStatus, error=true if fails>0, delay=0
+          // Removed the setTimeout that cleared the message
+          // --- END MODIFICATION ---
+      }
+      this._processingQueue = false; // Clear flag on natural completion
     } else if (this.isPaused) {
         console.log("Queue processing paused.");
         if (this._processingQueue) { this._processingQueue = false; }
-         UI.utils.showStatus( `Capture paused. Click "Resume" to continue (next URL: ${this.currentCaptureIndex + 1} of ${totalUrls})`, false, 0 );
+         // Update status message to reflect which URL it paused *before*
+         UI.utils.showStatus( `Capture paused. Click "Resume" to continue (next URL: ${this.currentCaptureIndex + 1} of ${totalUrls})`, false, 0 ); // Keep pause message visible
     } else {
-       console.warn("Queue loop finished unexpectedly."); this._processingQueue = false;
+       console.warn("Queue loop finished unexpectedly."); this._processingQueue = false; // Ensure flag is cleared
     }
 
+    // Final button state updates (always run this)
     this._checkCaptureButtonState();
     // No retry button update needed
     this.updatePauseResumeButton();
@@ -591,28 +601,26 @@ class App {
 
   /** Toggles the visibility of the capture settings section */
   _toggleCaptureSettings() {
-      const content = document.getElementById("captureSettingsContent"); // Use ID directly
-      const header = UI.elements.urlInputTitle;
-      if (!content || !header) return;
+      const content = document.getElementById("captureSettingsContent");
+      const wrapper = document.getElementById("captureSettingsToggle"); // Target the wrapper
+      if (!content || !wrapper) return;
 
       const isCollapsed = content.classList.toggle('collapsed');
-      header.classList.toggle('collapsed', isCollapsed);
-       const indicator = header.querySelector('.collapse-indicator');
-       if(indicator) indicator.textContent = isCollapsed ? '►' : '▲';
+      wrapper.classList.toggle('collapsed', isCollapsed); // Toggle class on wrapper too
+      // Indicator is now updated via CSS
   }
 
    /** Sets the collapsed state of the capture settings */
    _setCaptureSettingsCollapsed(collapsed) {
        const content = document.getElementById("captureSettingsContent");
-       const header = UI.elements.urlInputTitle;
-       if (!content || !header) return;
+       const wrapper = document.getElementById("captureSettingsToggle"); // Target the wrapper
+       if (!content || !wrapper) return;
 
        // Only change if the state is different
        if (content.classList.contains('collapsed') !== collapsed) {
            content.classList.toggle('collapsed', collapsed);
-           header.classList.toggle('collapsed', collapsed);
-            const indicator = header.querySelector('.collapse-indicator');
-            if(indicator) indicator.textContent = collapsed ? '►' : '▲';
+           wrapper.classList.toggle('collapsed', collapsed); // Toggle class on wrapper too
+            // Indicator is now updated via CSS
        }
    }
 
