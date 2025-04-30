@@ -32,9 +32,6 @@ export const thumbnails = {
     const headerSection = document.createElement("div");
     headerSection.className = "thumbnails-header";
 
-    const title = document.createElement("h3");
-    title.textContent = "Live Thumbnails";
-    headerSection.appendChild(title);
 
     // Create content area that will hold the thumbnails
     const contentSection = document.createElement("div");

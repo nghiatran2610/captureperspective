@@ -629,13 +629,18 @@ body.simple-mode #actionsField {
 body.simple-mode .context-actions-header {
   display: none;
 } /* Hide Generate/Load/Save buttons */
-body.simple-mode .stats {
+/* body.simple-mode .stats {
   display: flex !important;
 } /* Show stats in simple mode */
 
+#stats {
+  display: none !important; /* Use !important to override any other display rules */
+}
+
+
 body.advanced-mode #urlList {
   height: 50px;
-}
+} */
 body.advanced-mode #advancedOptions {
   display: block;
   border-top: 1px solid #eee;
