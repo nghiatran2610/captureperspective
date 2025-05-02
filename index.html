@@ -11,10 +11,11 @@
   </head>
   <body>
     <h1>Ignition Perspective Screenshot Capture</h1>
+
     <div id="tabVisibilityWarning" class="warning-message">
-      ⚠️ This tool works best in a separate browser window or an active browser
-      tab.
+      ⚠️ This tool works best in a separate browser window or an active browser tab.
     </div>
+
     <div id="baseUrlSection" class="card">
       <div class="base-url-container">
         <label for="baseUrlInput" class="base-url-label">Project URL</label>
@@ -23,69 +24,67 @@
           placeholder="http://localhost:8088/data/perspective/client/PROJECT_NAME"
           class="base-url-input"
           id="baseUrlInput"
+          aria-describedby="baseUrlStatus"
         />
+        <div id="baseUrlStatus" class="input-status-message"></div>
       </div>
     </div>
 
-    <div
-      id="loginOptionSection"
-      class="card login-option-section"
-      style="display: none"
-    >
-      <div class="input-row">
-        <label>
-          <input
-            type="radio"
-            name="loginOption"
-            value="continueWithoutLogin"
-            id="optionContinueWithoutLogin"
-          />
-          Continue as Guest
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="loginOption"
-            value="login"
-            id="optionLogin"
-          />
-          Continue with Authentication
-        </label>
-      </div>
+    <div id="loginOptionSection" class="card login-option-section" style="display: none">
+       <div class="input-row">
+          <label>
+             <input
+                type="radio"
+                name="loginOption"
+                value="continueWithoutLogin"
+                id="optionContinueWithoutLogin"
+                disabled />
+             Continue as Guest
+          </label>
+          <label>
+             <input
+                type="radio"
+                name="loginOption"
+                value="login"
+                id="optionLogin"
+                 disabled />
+             Continue with Authentication
+          </label>
+       </div>
     </div>
 
-    <div id="loginSection" class="card" style="display: none"></div>
+
+    <div id="loginSection" class="card" style="display: none">
+        </div>
+
 
     <div id="captureForm" style="display: none">
       <div class="card" id="url-input-container">
-        <div
-          class="card-header-toggle-wrapper"
-          id="captureSettingsToggle"
-          title="Toggle Settings Visibility"
-        >
-          <h2 id="urlInputTitle">Pages</h2>
-          <span class="collapse-indicator">▼</span>
-        </div>
-        <div id="captureSettingsContent" class="collapsed">
-          <div
-            id="urlHelpText"
-            class="help-text"
-            style="margin-top: 5px; margin-bottom: 10px; display: none"
-          >
-            Note that this is the home page with menu
-          </div>
-          <textarea
-            id="urlList"
-            placeholder="Enter URLs (one per line)"
-            rows="5"
-            style="display: none"
-          ></textarea>
+        <div class="card-header-toggle-wrapper" id="captureSettingsToggle" title="Toggle Settings Visibility">
+          <h2 id="urlInputTitle">Pages & Settings</h2> <span class="collapse-indicator">▼</span> </div>
 
-          <div
-            class="input-row screen-size-row setting-container important-setting-group"
-            style="display: flex; align-items: center; gap: 15px"
-          >
-            <label style="margin-bottom: 0">
+        <div id="captureSettingsContent" class=""> <div id="pageSourceSelection" class="setting-container important-setting-group page-source-selector" style="display: none;"> <label style="font-weight: bold; margin-bottom: 5px; display: block;">Page Source:</label>
+            <div class="input-row">
+                <label>
+                    <input type="radio" name="pageSourceOption" value="automatic" id="sourceAutomatic" checked>
+                    Load Automatically (from Project URL)
+                </label>
+                <label>
+                    <input type="radio" name="pageSourceOption" value="manual" id="sourceManual">
+                    Load Manually (from JSON)
+                </label>
+            </div>
+          </div>
+          <div id="manualJsonInputArea" class="setting-container" style="display: none;">
+             <label for="manualJsonText" style="display: block; margin-bottom: 5px;">Paste JSON Content:</label>
+             <textarea id="manualJsonText" rows="6" placeholder='Paste JSON here, e.g., { "pages": { "/path": { "title": "Title" } } }'></textarea>
+             <button id="loadManualJsonBtn" class="btn btn-small" style="margin-top: 5px;">Load Pages from JSON</button>
+             <div id="manualJsonStatus" class="input-status-message" style="margin-top: 5px;"></div>
+          </div>
+          <div id="urlSelectorPlaceholder">
+              </div>
+
+          <div class="input-row screen-size-row setting-container important-setting-group" style="display: flex; align-items: center; gap: 15px; margin-top: 15px;"> <label style="margin-bottom: 0;">
               Screen Size:
               <select id="capturePreset">
                 <option value="fullHD" selected>🖥️ Full HD (1920x1080)</option>
@@ -93,67 +92,62 @@
                 <option value="tablet">▭ Tablet (768x1024)</option>
               </select>
             </label>
-            <label
-              style="margin-bottom: 0; font-weight: normal"
-              title="Attempt to capture the entire vertical height of the page at the selected width."
-            >
-              <input
-                type="checkbox"
-                id="fullPageCheckbox"
-                style="margin-right: 5px"
-              />Full Page Height
+            <label style="margin-bottom: 0; font-weight: normal;" title="Attempt to capture the entire vertical height of the page at the selected width.">
+              <input type="checkbox" id="fullPageCheckbox" style="margin-right: 5px;"/>
+              Full Page Height
             </label>
           </div>
-        </div>
-      </div>
+           <div id="simpleWaitTimeContainer" class="setting-container important-setting-group">
+               <label for="simpleWaitTime">Max Wait Time (sec):</label>
+               <input type="number" id="simpleWaitTime" class="wait-time-input" min="1" max="120" value="5">
+           </div>
+        </div> </div>
 
-      <div
-        id="advancedOptions"
-        class="advanced-section"
-        style="display: none"
-      ></div>
+      <div id="advancedOptions" class="advanced-section" style="display: none;">
+         </div>
 
       <div class="btn-container" id="buttonContainer">
-        <button
-          id="captureBtn"
-          class="btn icon-btn"
-          disabled
-          title="Capture Screenshots"
-        >
-          📸
-        </button>
-      </div>
+        <button id="captureBtn" class="btn icon-btn" disabled title="Capture Screenshots">
+          📸 </button>
+         </div>
     </div>
 
-    <div id="progressOutput" style="display: none">
+
+    <div id="progressOutput" style="display: none;">
       <div class="progress-container">
         <div id="progressBar" class="progress-bar"></div>
       </div>
-      <div id="progress" class="status-message"></div>
-
-      <div class="card stats" id="stats" style="display: none !important">
+      <div id="progress" class="status-message"></div> <div class="card stats" id="stats" style="display: none !important;">
         <p><strong>Total URLs:</strong> <span id="totalCount">0</span></p>
         <p><strong>Processed:</strong> <span id="processedCount">0</span></p>
         <p><strong>Failed:</strong> <span id="failedCount">0</span></p>
         <p><strong>Total Time Taken:</strong> <span id="totalTime">0s</span></p>
       </div>
-      <div id="output" class=""></div>
+
+      <div id="output" class="">
+          </div>
     </div>
 
     <iframe id="screenshotIframe"></iframe>
+
     <script>
       // Determine if we're in development mode
-      // You can customize this logic based on your needs
-      const isDev = window.location.hostname === 'localhost' || 
+      const isDev = window.location.hostname === 'localhost' ||
                     window.location.hostname === '127.0.0.1' ||
                     window.location.search.includes('dev=true');
-      
-      // Create script element with appropriate source
+
       const script = document.createElement('script');
-      script.src = isDev 
-        ? 'dist/perspective-screenshot-capture.js' 
-        : 'dist/perspective-screenshot-capture.min.js';
-      
-      // Append to document
+      // Load the non-minified version for development, minified for production
+      script.src = isDev
+        ? 'dist/perspective-screenshot-capture.js' // Assumes non-minified bundle
+        : 'dist/perspective-screenshot-capture.min.js'; // Assumes minified bundle
+
       document.body.appendChild(script);
-    </script></html>
+
+       // NOTE: Remove or comment out window.perspectiveCapturePages if using the UI controls
+       /*
+       window.perspectiveCapturePages = { ... };
+       */
+    </script>
+  </body>
+</html>
