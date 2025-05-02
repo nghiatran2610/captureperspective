@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ignition Perspective Screenshot Capture</title>
+    <title>Ignition Perspective Screenshot Capture!</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -141,6 +141,19 @@
     </div>
 
     <iframe id="screenshotIframe"></iframe>
-    <script type="module" src="js/index.js"></script>
-  </body>
-</html>
+    <script>
+      // Determine if we're in development mode
+      // You can customize this logic based on your needs
+      const isDev = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' ||
+                    window.location.search.includes('dev=true');
+      
+      // Create script element with appropriate source
+      const script = document.createElement('script');
+      script.src = isDev 
+        ? 'dist/perspective-screenshot-capture.js' 
+        : 'dist/perspective-screenshot-capture.min.js';
+      
+      // Append to document
+      document.body.appendChild(script);
+    </script></html>
