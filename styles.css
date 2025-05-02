@@ -1501,6 +1501,26 @@ body.advanced-mode .simple-mode-settings {
   /* It should now just be a simple container div */
 }
 
+/* In styles.css */
+
+#captureSettingsContent.collapsed {
+  display: none;
+  /* You might also want transition effects for smoothness */
+  /* e.g., transition: opacity 0.3s ease-out, max-height 0.3s ease-out; */
+  /* opacity: 0; */
+  /* max-height: 0; */
+  /* overflow: hidden; */
+}
+
+/* Optional: Style for the indicator in the header */
+#captureSettingsToggle.collapsed .collapse-indicator {
+  transform: rotate(-90deg); /* Rotates ▼ to ► */
+}
+#captureSettingsToggle .collapse-indicator {
+  display: inline-block; /* Ensure transform works */
+  transition: transform 0.3s ease-in-out;
+}
+
 /* Ensure the main card container has correct padding */
 #url-input-container.card {
   padding: var(--spacing-xl);
