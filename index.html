@@ -63,47 +63,62 @@
         <div class="card-header-toggle-wrapper" id="captureSettingsToggle" title="Toggle Settings Visibility">
           <h2 id="urlInputTitle">Pages & Settings</h2> <span class="collapse-indicator">▼</span> </div>
 
-        <div id="captureSettingsContent" class=""> <div id="pageSourceSelection" class="setting-container important-setting-group page-source-selector" style="display: none;"> <label style="font-weight: bold; margin-bottom: 5px; display: block;">Page Source:</label>
-            <div class="input-row">
-                <label>
-                    <input type="radio" name="pageSourceOption" value="automatic" id="sourceAutomatic" checked>
-                    Load Automatically (from Project URL)
+        <div id="captureSettingsContent" class="">
+            <div id="pageSourceSelection" class="setting-container important-setting-group page-source-selector" style="display: none;">
+                <label style="font-weight: bold; margin-bottom: 5px; display: block;">Page Source:</label>
+                <div class="input-row">
+                    <label>
+                        <input type="radio" name="pageSourceOption" value="automatic" id="sourceAutomatic" checked>
+                        Load Automatically (from Project URL)
+                    </label>
+                    <label>
+                        <input type="radio" name="pageSourceOption" value="manual" id="sourceManual">
+                        Load Manually (from JSON)
+                    </label>
+                </div>
+            </div>
+
+            <div id="manualJsonInputArea" class="setting-container manual-input-options" style="display: none;">
+              <label style="display: block; margin-bottom: 10px; font-weight: bold;">Manual Page Input:</label>
+              <div class="manual-input-group">
+                <div class="manual-paste-group">
+                  <label for="manualJsonText" class="manual-input-label">Paste JSON Content:</label>
+                  <textarea id="manualJsonText" rows="5" placeholder='{ "pages": { "/path": { "title": "Title" } } }'></textarea>
+                </div>
+                <div class="manual-or-divider">OR</div>
+                <div class="manual-file-group">
+                  <label for="manualJsonFile" class="manual-input-label">Upload JSON File:</label>
+                  <div class="file-input-wrapper">
+                    <input type="file" id="manualJsonFile" accept=".json">
+                    <span id="fileNameDisplay" class="file-name-display">No file chosen</span>
+                  </div>
+                </div>
+              </div>
+              <button id="loadManualJsonBtn" class="btn btn-small load-manual-btn" style="margin-top: 10px;">Load Manual Pages</button>
+              <div id="manualJsonStatus" class="input-status-message" style="margin-top: 5px;"></div>
+            </div>
+            <div id="urlSelectorPlaceholder">
+                </div>
+
+            <div class="input-row screen-size-row setting-container important-setting-group" style="display: flex; align-items: center; gap: 15px; margin-top: 15px;">
+                <label style="margin-bottom: 0;">
+                    Screen Size:
+                    <select id="capturePreset">
+                        <option value="fullHD" selected>🖥️ Full HD (1920x1080)</option>
+                        <option value="mobile">📱 Mobile (375x812)</option>
+                        <option value="tablet">▭ Tablet (768x1024)</option>
+                    </select>
                 </label>
-                <label>
-                    <input type="radio" name="pageSourceOption" value="manual" id="sourceManual">
-                    Load Manually (from JSON)
+                <label style="margin-bottom: 0; font-weight: normal;" title="Attempt to capture the entire vertical height of the page at the selected width.">
+                    <input type="checkbox" id="fullPageCheckbox" style="margin-right: 5px;"/>
+                    Full Page Height
                 </label>
             </div>
-          </div>
-          <div id="manualJsonInputArea" class="setting-container" style="display: none;">
-             <label for="manualJsonText" style="display: block; margin-bottom: 5px;">Paste JSON Content:</label>
-             <textarea id="manualJsonText" rows="6" placeholder='Paste JSON here, e.g., { "pages": { "/path": { "title": "Title" } } }'></textarea>
-             <button id="loadManualJsonBtn" class="btn btn-small" style="margin-top: 5px;">Load Pages from JSON</button>
-             <div id="manualJsonStatus" class="input-status-message" style="margin-top: 5px;"></div>
-          </div>
-          <div id="urlSelectorPlaceholder">
-              </div>
-
-          <div class="input-row screen-size-row setting-container important-setting-group" style="display: flex; align-items: center; gap: 15px; margin-top: 15px;"> <label style="margin-bottom: 0;">
-              Screen Size:
-              <select id="capturePreset">
-                <option value="fullHD" selected>🖥️ Full HD (1920x1080)</option>
-                <option value="mobile">📱 Mobile (375x812)</option>
-                <option value="tablet">▭ Tablet (768x1024)</option>
-              </select>
-            </label>
-            <label style="margin-bottom: 0; font-weight: normal;" title="Attempt to capture the entire vertical height of the page at the selected width.">
-              <input type="checkbox" id="fullPageCheckbox" style="margin-right: 5px;"/>
-              Full Page Height
-            </label>
-          </div>
-           <div id="simpleWaitTimeContainer" class="setting-container important-setting-group">
-               <label for="simpleWaitTime">Max Wait Time (sec):</label>
-               <input type="number" id="simpleWaitTime" class="wait-time-input" min="1" max="120" value="5">
-           </div>
-        </div> </div>
-
-      <div id="advancedOptions" class="advanced-section" style="display: none;">
+             <div id="simpleWaitTimeContainer" class="setting-container important-setting-group">
+                 <label for="simpleWaitTime">Max Wait Time (sec):</label>
+                 <input type="number" id="simpleWaitTime" class="wait-time-input" min="1" max="120" value="5">
+             </div>
+          </div> </div> <div id="advancedOptions" class="advanced-section" style="display: none;">
          </div>
 
       <div class="btn-container" id="buttonContainer">

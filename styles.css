@@ -2,6 +2,8 @@
   --primary-color: #2980b9;
   --primary-color-dark: #1f6391;
   --secondary-color: #27ae60;
+  --secondary-color-bright: #2ecc71; /* Added for gradient */
+  --secondary-color-dark: #218c53; /* Added */
   --text-color: #333;
   --text-color-light: #2c3e50;
   --bg-color: #f7f9fc;
@@ -52,19 +54,25 @@ h2 {
 }
 
 textarea,
-input {
+input[type="text"], /* Apply default styles only to text/number inputs initially */
+input[type="number"],
+select {
   border: 1px solid #ccc;
   border-radius: 4px;
   box-sizing: border-box;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+input[type="checkbox"] {
+  margin: 0; /* Remove default margin */
 }
 
 textarea {
   width: 100%;
-  padding: 12px;
-  font-size: 15px;
+  /* Removed fixed padding/font-size, set in specific rules now */
   margin-bottom: var(--spacing-lg);
   resize: vertical;
-  height: 150px;
+  /* Removed fixed height */
 }
 
 .input-row {
@@ -80,11 +88,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-}
-
-.input-row input {
-  padding: 8px;
-  font-size: 14px;
+  cursor: pointer; /* Make label clickable for radio/checkbox */
 }
 
 .input-row input[type="number"] {
@@ -106,23 +110,28 @@ textarea {
 
 .btn {
   padding: 12px 24px;
-  background-color: #9d4545;
+  background-color: var(--primary-color); /* Updated default button color */
   color: #ffffff;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 16px;
   margin: var(--spacing-sm);
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, transform 0.1s ease;
 }
 
-.btn:hover {
-  background-color: #71c374;
+.btn:hover:not(:disabled) {
+  background-color: var(--primary-color-dark); /* Updated hover */
 }
 
 .btn:disabled {
   background-color: #ccc;
   cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .btn-small {
@@ -136,6 +145,10 @@ textarea {
   border-radius: 4px;
   text-align: center;
   transition: opacity 0.5s ease-out; /* Added transition */
+  opacity: 1; /* Start visible */
+}
+.status-message:empty {
+  display: none; /* Hide if empty */
 }
 
 .success {
@@ -219,6 +232,9 @@ textarea {
   position: absolute;
   top: -9999px;
   left: -9999px;
+  border: 1px solid #ccc; /* Make it visible for debugging if needed */
+  /* Uncomment below to see the iframe during development */
+  /* position: relative; top: 0; left: 0; width: 100%; height: 500px; */
 }
 
 .modal {
@@ -486,6 +502,18 @@ textarea {
   font-style: italic;
   margin-bottom: 3px;
 }
+.thumbnail-subcategory-name {
+  /* Added Style */
+  font-size: 11px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  color: #2c3e50; /* Darker than filename */
+  font-weight: 500;
+  margin-bottom: 2px; /* Space before filename */
+}
 
 .thumbnail-download-btn {
   /* Download button on thumbnail */
@@ -637,11 +665,10 @@ body.simple-mode .context-actions-header {
   display: none !important; /* Use !important to override any other display rules */
 }
 
-
 body.advanced-mode #urlList {
   height: 50px;
-} */
-body.advanced-mode #advancedOptions {
+}
+*/ body.advanced-mode #advancedOptions {
   display: block;
   border-top: 1px solid #eee;
   padding-top: var(--spacing-md);
@@ -1151,6 +1178,12 @@ body.advanced-mode .simple-mode-settings {
   outline: none;
   box-shadow: 0 0 0 2px rgba(41, 128, 185, 0.2);
 }
+.input-status-message {
+  font-size: 0.85em;
+  margin-left: 5px;
+  flex-shrink: 0; /* Prevent shrinking */
+  white-space: nowrap;
+}
 
 /* Simple Mode Settings (Screen Size, Wait Time) */
 .simple-mode-settings {
@@ -1169,7 +1202,8 @@ body.advanced-mode .simple-mode-settings {
   /* Container for one setting (e.g., wait time) */
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  /* Removed padding - handled by parent */
+  /* margin-bottom: 10px; Remove margin between items if wrapped */
 }
 .setting-container label {
   font-weight: 500;
@@ -1287,12 +1321,12 @@ body.advanced-mode .simple-mode-settings {
   background-color: #449d44;
 }
 .pause-resume-btn:disabled {
-  background-color: #f8d5ae;
+  background-color: #f8d5ae; /* Light amber disabled */
   cursor: not-allowed;
   opacity: 0.7;
 }
 .pause-resume-btn.paused:disabled {
-  background-color: #a3d7a3;
+  background-color: #a3d7a3; /* Light green paused disabled */
   cursor: not-allowed;
   opacity: 0.7;
 }
@@ -1327,11 +1361,15 @@ body.advanced-mode .simple-mode-settings {
 /* --- Capture Button (#captureBtn) - Enhanced Standard Style --- */
 #captureBtn {
   /* Inherits .btn and .icon-btn base styles */
-  background: linear-gradient(145deg, var(--secondary-color-bright), var(--secondary-color)); /* Keep vibrant green */
+  background: linear-gradient(
+    145deg,
+    var(--secondary-color-bright),
+    var(--secondary-color)
+  ); /* Keep vibrant green */
   border: 2px solid var(--secondary-color-dark); /* << THICKER border */
   color: white;
   padding: 14px 24px; /* << INCREASED padding */
-  font-size: 2em;     /* << INCREASED icon size */
+  font-size: 2em; /* << INCREASED icon size */
   box-shadow: 0 5px 10px rgba(46, 204, 113, 0.45); /* << STRONGER shadow */
   font-weight: 600;
   transition: all 0.2s ease;
@@ -1343,7 +1381,11 @@ body.advanced-mode .simple-mode-settings {
 
 /* Adjust hover/active states slightly */
 #captureBtn:hover:not(:disabled) {
-  background: linear-gradient(145deg, var(--secondary-color), var(--secondary-color-dark));
+  background: linear-gradient(
+    145deg,
+    var(--secondary-color),
+    var(--secondary-color-dark)
+  );
   box-shadow: 0 7px 14px rgba(46, 204, 113, 0.55); /* Enhanced hover shadow */
   transform: translateY(-3px); /* More lift */
 }
@@ -1364,8 +1406,6 @@ body.advanced-mode .simple-mode-settings {
   opacity: 0.65;
   /* animation: none; */ /* Disable animation when disabled */
 }
-
-
 
 /* --- Collapsible Header Logic (applies only to Pages header) --- */
 .card-header-toggle-wrapper {
@@ -1408,59 +1448,51 @@ body.advanced-mode .simple-mode-settings {
   margin-bottom: 0; /* Remove margin below header when collapsed */
 }
 
-/* --- Collapsible Content Logic (applies ONLY to URL Selector) --- */
-#urlSelectorContainer {
-  /* The container for the URL selector */
+/* --- Collapsible Content Logic (applies ONLY to captureSettingsContent) --- */
+#captureSettingsContent {
   overflow: hidden;
   transition: max-height 0.4s ease-out, opacity 0.4s ease-out,
-    margin-top 0.4s ease-out, margin-bottom 0.4s ease-out,
-    padding-top 0.4s ease-out, padding-bottom 0.4s ease-out,
-    border-width 0.4s ease-out;
-  max-height: 500px; /* Max height when expanded */
+    margin-top 0.4s ease-out, border-top-width 0.4s ease-out,
+    padding-top 0.4s ease-out;
+  max-height: 1000px; /* Adjust max-height to fit content */
   opacity: 1;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  background-color: var(--card-color);
-  margin-top: 10px; /* Margin above when expanded */
-  margin-bottom: var(--spacing-md); /* Margin below when expanded */
-  padding: 0; /* Padding handled by inner elements */
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eee; /* Separator line when expanded */
 }
-#urlSelectorContainer.collapsed {
-  /* Collapsed state */
+
+#captureSettingsContent.collapsed {
   max-height: 0;
   opacity: 0;
   margin-top: 0;
-  margin-bottom: 0;
-  border-width: 0;
   padding-top: 0;
-  padding-bottom: 0;
+  border-top-width: 0;
 }
 
 /* --- Important Settings (Screen Size, Wait Time) --- */
-/* Ensure these are NOT affected by the collapse and visually grouped */
-.screen-size-row {
-  /* Row containing screen size select and full page checkbox */
-  padding: 10px 15px;
-  background-color: #f0f7ff; /* Light blue background */
-  border: 1px solid #cce4ff; /* Blue border */
-  border-radius: 4px 4px 0 0; /* Rounded top corners */
-  margin-bottom: 0 !important; /* Remove bottom margin to connect with wait time */
-  display: flex;
-  flex-wrap: wrap; /* Allow wrapping on smaller screens */
-  align-items: center;
-  gap: 15px; /* Spacing between elements in the row */
-  margin-top: 15px; /* Margin above the important settings group */
-}
+/* Ensure these are visually grouped */
 .important-setting-group {
-  /* Container for Max Wait Time */
+  /* Applies to screen size row and wait time container */
   padding: 10px 15px;
   background-color: #f0f7ff; /* Light blue background */
   border: 1px solid #cce4ff; /* Blue border */
-  margin-bottom: 15px; /* Restore bottom margin after the group */
+  margin-bottom: 0; /* Remove bottom margin to connect if needed */
   display: flex; /* Align label and input */
   align-items: center;
+  flex-wrap: wrap; /* Allow wrapping */
+  gap: 15px;
 }
-.screen-size-row label,
+.screen-size-row.important-setting-group {
+  border-radius: 4px 4px 0 0; /* Rounded top corners */
+  border-bottom: none; /* Remove bottom border if wait time is below */
+  margin-top: 15px; /* Margin above the important settings group */
+}
+#simpleWaitTimeContainer.important-setting-group {
+  border-radius: 0 0 4px 4px; /* Rounded bottom corners */
+  margin-bottom: 15px; /* Restore bottom margin after the group */
+  border-top: none; /* Remove top border */
+}
+
 .important-setting-group label {
   /* Labels within important settings */
   font-weight: 600; /* Bolder labels */
@@ -1472,13 +1504,14 @@ body.advanced-mode .simple-mode-settings {
   font-weight: normal;
   color: var(--text-color-light);
 }
-.screen-size-row select,
+.important-setting-group select,
 .important-setting-group input {
   /* Inputs/Selects within important settings */
   border-color: #99caff;
   box-shadow: 0 0 0 1px rgba(0, 123, 255, 0.1);
+  background-color: white; /* Ensure white background */
 }
-.screen-size-row select:focus,
+.important-setting-group select:focus,
 .important-setting-group input:focus {
   border-color: #0056b3;
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
@@ -1488,43 +1521,28 @@ body.advanced-mode .simple-mode-settings {
   width: 60px;
 }
 
-/* --- Original #captureSettingsContent - Remove Collapse Styles --- */
-#captureSettingsContent {
-  /* Remove transition, max-height, padding, border, margin related to collapsing */
-  overflow: visible;
-  max-height: none;
-  transition: none;
-  padding-top: 0;
-  padding-bottom: 0;
-  border-top: none;
-  margin-top: 0;
-  /* It should now just be a simple container div */
+/* Page Source Selection Styling */
+.page-source-selector {
+  background-color: #f8f9fa; /* Subtle background */
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 10px 15px;
+  margin-bottom: 15px; /* Space below */
 }
-
-/* In styles.css */
-
-#captureSettingsContent.collapsed {
-  display: none;
-  /* You might also want transition effects for smoothness */
-  /* e.g., transition: opacity 0.3s ease-out, max-height 0.3s ease-out; */
-  /* opacity: 0; */
-  /* max-height: 0; */
-  /* overflow: hidden; */
+.page-source-selector > label {
+  /* Main "Page Source:" label */
+  font-weight: 600 !important; /* Override general label style */
+  color: var(--text-color-light) !important;
 }
-
-/* Optional: Style for the indicator in the header */
-#captureSettingsToggle.collapsed .collapse-indicator {
-  transform: rotate(-90deg); /* Rotates ▼ to ► */
+.page-source-selector .input-row {
+  margin-bottom: 0; /* Remove default margin */
+  gap: 20px;
 }
-#captureSettingsToggle .collapse-indicator {
-  display: inline-block; /* Ensure transform works */
-  transition: transform 0.3s ease-in-out;
-}
-
-/* Ensure the main card container has correct padding */
-#url-input-container.card {
-  padding: var(--spacing-xl);
-  overflow: visible; /* Allow absolutely positioned elements if any */
+.page-source-selector .input-row label {
+  /* Radio button labels */
+  font-size: 14px;
+  font-weight: normal !important;
+  color: var(--text-color) !important;
 }
 
 /* Responsive adjustments for smaller screens */
@@ -1547,14 +1565,11 @@ body.advanced-mode .simple-mode-settings {
   }
   .url-selector-actions {
     /* Container for Toggle Button/Count */
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-left: 15px;
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
   }
-  .url-path {
-    display: none;
-  } /* Hide URL paths on mobile */
+
   .simple-mode-settings {
     flex-direction: column;
     align-items: flex-start;
@@ -1565,6 +1580,9 @@ body.advanced-mode .simple-mode-settings {
   }
   .setting-container:last-child {
     margin-bottom: 0;
+  }
+  .important-setting-group {
+    gap: 10px; /* Reduce gap on small screens */
   }
 }
 
@@ -1602,4 +1620,147 @@ body.advanced-mode .simple-mode-settings {
   border-color: #bdc3c7;
   color: #7f8c8d;
   cursor: not-allowed;
+}
+
+/* --- ADDED: Styles for Manual JSON Input Area --- */
+.manual-input-options {
+  flex-direction: column; /* Stack elements vertically */
+  align-items: flex-start; /* Align items to the start */
+  border: 1px solid #eee; /* Add border */
+  border-radius: 4px; /* Add radius */
+  padding: 15px; /* Add padding */
+  background-color: #fdfdff; /* Slightly off-white background */
+  margin-top: 10px; /* Space above */
+}
+
+.manual-input-group {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  align-items: stretch; /* Make groups equal height */
+  margin-bottom: 10px;
+}
+
+.manual-paste-group,
+.manual-file-group {
+  flex: 1; /* Each group takes half the space */
+  display: flex;
+  flex-direction: column;
+}
+
+.manual-input-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 5px;
+}
+
+#manualJsonText {
+  flex-grow: 1; /* Allow textarea to grow */
+  min-height: 80px; /* Adjust min height */
+  font-size: 13px;
+  padding: 8px;
+  border: 1px solid #ccc; /* Restore border */
+  border-radius: 4px; /* Restore radius */
+}
+
+.manual-or-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #aaa;
+  writing-mode: vertical-lr; /* Vertical text */
+  text-orientation: mixed;
+  padding: 0 5px;
+  flex-shrink: 0;
+}
+
+.file-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 5px 10px;
+  background-color: #f9f9f9;
+  min-height: 34px; /* Match input height approx */
+  flex-grow: 1; /* Allow wrapper to take height */
+}
+
+#manualJsonFile {
+  flex-grow: 1;
+  font-size: 13px;
+  cursor: pointer;
+  /* Hide default browser file input appearance */
+  opacity: 0;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+}
+.file-input-wrapper {
+  /* Add position relative */
+  position: relative;
+  padding: 0; /* Remove padding, handled by button/span */
+  overflow: hidden; /* Hide the actual input */
+}
+.file-input-wrapper::before {
+  /* Style a fake button */
+  content: "Choose File";
+  display: inline-block;
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 4px 8px;
+  outline: none;
+  white-space: nowrap;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 12px;
+  margin: 5px;
+}
+.file-input-wrapper:hover::before {
+  background-color: #ddd;
+}
+
+.file-name-display {
+  font-size: 12px;
+  color: #666;
+  margin-left: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px; /* Limit filename display width */
+  padding: 5px 0; /* Align text vertically */
+  flex-grow: 1; /* Take remaining space */
+}
+
+.load-manual-btn {
+  align-self: flex-start; /* Align button to the left */
+  background-color: var(--secondary-color); /* Green button */
+  color: white; /* Ensure text is white */
+  border: none; /* Remove border if .btn adds one */
+}
+.load-manual-btn:hover:not(:disabled) {
+  background-color: #218c53; /* Darker green */
+}
+
+/* Responsive adjustments for manual input */
+@media (max-width: 768px) {
+  .manual-input-group {
+    flex-direction: column; /* Stack vertically on small screens */
+    gap: 10px;
+    align-items: stretch;
+  }
+  .manual-or-divider {
+    writing-mode: horizontal-tb; /* Horizontal text */
+    padding: 5px 0;
+    width: 100%;
+    text-align: center;
+  }
+ 
+  .file-name-display {
+    max-width: calc(100% - 100px); /* Adjust max width relative to button */
+  }
 }
