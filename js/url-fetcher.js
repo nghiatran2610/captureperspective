@@ -13,52 +13,95 @@ class URLFetcher {
     this.categorizedUrls = {};
     this.isLoading = false;
     this.error = null;
-    this.baseClientUrl = '';
-    this.projectName = '';
-    this.webdevFolder = 'RF_Main_STG'; // <-- fixed WebDev resource name
-    this.urlEndpoint = ''; // Will be constructed when baseClientUrl is set
-    this.dataLoadedDirectly = false; // New flag
+    this.baseClientUrl = ''; // Target perspective client URL (from input)
+    this.projectName = '';   // Target project name (from input)
+    this.apiBasePath = '';   // Base path for API calls (derived from window.location)
+    this.urlEndpoint = '';   // The final constructed API endpoint
+    this.dataLoadedDirectly = false;
+
+    // --- Determine API base path ONCE on initialization ---
+    this._determineApiBasePath();
   }
 
   /**
-   * Set the base client URL and build the endpoint
-   * @param {string} url - e.g. http://localhost:8088/data/perspective/client/RF_Main
-   * @returns {boolean}
+   * Determines the base path for API calls from the current window URL.
+   * Example: If window URL is http://host/system/webdev/ProjectA/tool/index.html,
+   * this should extract "http://host/system/webdev/ProjectA/"
+   * Adjust the regex if your tool's path structure is different.
+   */
+  _determineApiBasePath() {
+    try {
+      const currentHref = window.location.href;
+      // Regex to capture the part up to and including /system/webdev/ProjectName/
+      // Assumes the tool path follows the project name segment.
+      const match = currentHref.match(/^(.*\/system\/webdev\/[^\/]+\/)/);
+      if (match && match[1]) {
+        this.apiBasePath = match[1]; // Store the extracted base path
+        console.log(`API Base Path determined from window.location: ${this.apiBasePath}`);
+      } else {
+        console.warn('Could not determine API base path from window.location.href:', currentHref);
+        this.apiBasePath = ''; // Fallback or indicate error
+      }
+    } catch (e) {
+      console.error('Error determining API base path:', e);
+      this.apiBasePath = '';
+    }
+  }
+
+  /**
+   * Sets the target client URL and extracts the project name from user input.
+   * Constructs the final API endpoint using the determined apiBasePath and the extracted projectName.
+   * @param {string} url - e.g. http://localhost:8088/data/perspective/client/ProjectName
+   * @returns {boolean} - True if project name extraction was successful.
    */
   setBaseClientUrl(url) {
     if (!url || typeof url !== 'string') {
-      console.error('Invalid base client URL');
+      console.error('Invalid base client URL provided');
+      this.projectName = '';
+      this.urlEndpoint = '';
       return false;
     }
 
     try {
-      // Remove trailing slash if present
+      // Store the target client URL (from input)
       this.baseClientUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-      console.log(`Base client URL set to: ${this.baseClientUrl}`);
+      console.log(`Target Base client URL set to: ${this.baseClientUrl}`);
 
-      // Extract project name from /client/ segment
+      // Extract project name from the target client URL (this is for the query parameter)
       const match = this.baseClientUrl.match(/\/client\/([^\/]+)/);
       if (match && match[1]) {
-        this.projectName = match[1];
-        const urlObj = new URL(this.baseClientUrl);
-        // Construct the endpoint URL
-        this.urlEndpoint = `${urlObj.origin}/system/webdev/${this.webdevFolder}/PerspectiveCapture/getUrls?projectName=${encodeURIComponent(this.projectName)}`;
-        console.log(`Project name: ${this.projectName}`);
-        console.log(`URL endpoint: ${this.urlEndpoint}`);
-        return true;
+        this.projectName = match[1]; // This projectName is from the INPUT field
+        console.log(`Target Project name extracted (for query param): ${this.projectName}`);
+
+        // --- Construct the API endpoint using apiBasePath (from window.location) and projectName (from input) ---
+        if (this.apiBasePath && this.projectName) {
+           // Combine the base path from window.location with the fixed API route and the project parameter from input
+           this.urlEndpoint = `${this.apiBasePath}PerspectiveCapture/getUrls?projectName=${encodeURIComponent(this.projectName)}`;
+           console.log(`API URL endpoint constructed: ${this.urlEndpoint}`); // Check this log carefully
+        } else {
+             console.warn(`Cannot construct API endpoint. API Base Path: '${this.apiBasePath}', Project Name: '${this.projectName}'`);
+             this.urlEndpoint = '';
+        }
+        // --- End Endpoint Construction ---
+
+        return true; // Project name extracted successfully
       } else {
-        console.warn('Could not extract project name from base client URL');
-        this.projectName = ''; // Clear project name if extraction fails
-        this.urlEndpoint = ''; // Clear endpoint
+        console.warn('Could not extract project name from base client URL input');
+        this.projectName = '';
+        this.urlEndpoint = '';
         return false;
       }
     } catch (e) {
-      console.error('Error parsing base client URL:', e);
-      this.projectName = ''; // Clear project name on error
-      this.urlEndpoint = ''; // Clear endpoint
+      console.error('Error processing base client URL input:', e);
+      this.projectName = '';
+      this.urlEndpoint = '';
       return false;
     }
   }
+
+  // --- Methods _processData, setDataDirectly, loadUrls, categorizeUrls, generateFullUrls, extractProjectNameFromBaseUrl remain unchanged from the previous correct version ---
+  // (Code for these methods omitted for brevity, ensure they are the same as in the previous response where they were confirmed correct)
+
 
   /**
    * Process the raw page data (either fetched or provided directly)
@@ -156,18 +199,15 @@ class URLFetcher {
 
 
   /**
-   * Load URLs from the endpoint or use already set data.
+   * Load URLs from the constructed endpoint or use already set data.
    * @returns {Promise<Array>} List of URL objects ({path, title, viewPath})
    */
   async loadUrls() {
-    // --- MODIFICATION: Check if data was loaded directly ---
     // If data was successfully loaded directly earlier, return the existing list
     if (this.dataLoadedDirectly) {
       console.log("Using directly loaded URL data (loadUrls).");
-      // Return a resolved promise with the list for consistency
       return Promise.resolve(this.urlsList);
     }
-    // --- END MODIFICATION ---
 
     // Proceed with fetching if data wasn't loaded directly
     this.isLoading = true;
@@ -177,23 +217,22 @@ class URLFetcher {
     // Wrap fetch logic in a promise
     return new Promise(async (resolve, reject) => {
         try {
-          // Validate required conditions for fetching
-          if (!this.baseClientUrl || !this.projectName) {
-            throw new Error('Base client URL or project name not set for fetching');
-          }
+          // Check if the FINAL urlEndpoint is constructed
           if (!this.urlEndpoint) {
-            throw new Error('URL endpoint not constructed');
+            throw new Error('API URL endpoint has not been constructed yet. Ensure Base URL is set and API path was determined.');
           }
 
           events.emit(events.events.URL_PROCESSING_STARTED, { message: 'Fetching available URLs...' });
+          // --- Corrected Log Message ---
           console.log(`Workspaceing URLs from endpoint: ${this.urlEndpoint}`);
+          // --- End Correction ---
+
 
           // Perform the fetch request
           const response = await fetch(this.urlEndpoint);
 
           // Check if the response was successful
           if (!response.ok) {
-            // Throw an error with status details
             throw new URLProcessingError(`Failed to fetch URLs: ${response.status} ${response.statusText}`, this.urlEndpoint);
           }
 
@@ -206,16 +245,12 @@ class URLFetcher {
              this.isLoading = false;
             resolve(this.urlsList); // Resolve with processed list
           } else {
-             // _processData handles error reporting via events
              this.isLoading = false;
-             // Resolve with empty array on processing failure
-             resolve([]);
+             resolve([]); // Resolve with empty array on processing failure
           }
 
         } catch (error) {
-          // Handle fetch or processing errors
           console.error('Error loading URLs via fetch:', error);
-          // Ensure the error is an instance of URLProcessingError
           this.error = error instanceof URLProcessingError ? error : new URLProcessingError(error.message, this.urlEndpoint || 'Fetch Error');
           events.emit(events.events.CAPTURE_FAILED, {
             url: this.urlEndpoint || 'Fetch Error',
@@ -233,60 +268,45 @@ class URLFetcher {
   categorizeUrls() {
     this.categorizedUrls = {};
     this.urlsList.forEach(urlInfo => {
-      // Use the first segment of the path as the category key
-      // If path is "/" or empty, use "Home"
       const firstSegment = urlInfo.path.split('/').filter(Boolean)[0] || 'Home';
       if (!this.categorizedUrls[firstSegment]) {
         this.categorizedUrls[firstSegment] = [];
       }
       this.categorizedUrls[firstSegment].push(urlInfo);
     });
-    // Optional: Sort categories alphabetically if needed
-    // const sortedCategories = {};
-    // Object.keys(this.categorizedUrls).sort().forEach(key => {
-    //   sortedCategories[key] = this.categorizedUrls[key];
-    // });
-    // this.categorizedUrls = sortedCategories;
     console.log('URLs categorized:', Object.keys(this.categorizedUrls));
   }
 
   /**
-   * Transform selected URLs into full URLs for the tool
+   * Transform selected URLs into full perspective client URLs for the tool
    * @param {Array} selectedPaths - Array of page paths (e.g., ["/Overview", "Section/Page"])
-   * @returns {Array<string>} - Array of full URLs
+   * @returns {Array<string>} - Array of full target perspective client URLs
    */
   generateFullUrls(selectedPaths) {
-    // Ensure input is valid and baseClientUrl is set
+    // Ensure input is valid and baseClientUrl (target URL) is set
     if (!Array.isArray(selectedPaths) || selectedPaths.length === 0 || !this.baseClientUrl) {
         return [];
     }
 
     return selectedPaths.map(path => {
-      // Handle parameterized paths by replacing segments like /:param with /PARAM
-      // This is a simple replacement; adjust the logic or 'PARAM' if needed.
       const processedPath = path.replace(/\/:[^\/]+/g, '/PARAM');
-
-      // Construct the full URL
-      // Handle root path ('/' or '') correctly
       if (path === '/' || path === '') {
          return this.baseClientUrl;
       }
-
-      // Ensure there's exactly one slash between base URL and the path segment
       const pathSegment = processedPath.startsWith('/') ? processedPath.substring(1) : processedPath;
-      // Prevent double slashes if baseClientUrl already ends with one (though setBaseClientUrl removes it)
       return `${this.baseClientUrl}/${pathSegment}`;
     });
   }
 
 
   /**
-   * Get the detected project name
+   * Get the detected project name (from target URL input)
    * @returns {string|null}
    */
   extractProjectNameFromBaseUrl() {
     return this.projectName || null;
   }
+
 }
 
 export default new URLFetcher();

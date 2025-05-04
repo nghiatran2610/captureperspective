@@ -42,13 +42,17 @@ class App {
     this._handleLoadManualSource = this._handleLoadManualSource.bind(this); // Renamed from _handleManualLoad
     this._handleFileUpload = this._handleFileUpload.bind(this);
   }
-
   initialize() {
-    // Generate and set prefilled URL if applicable
-    this.prefilledUrl = this.generatePrefilledUrl();
+    // Generate and set prefilled URL if applicable << REMOVE/COMMENT THIS BLOCK
+    // this.prefilledUrl = this.generatePrefilledUrl(); // << REMOVE/COMMENT
     const baseUrlInput = document.getElementById("baseUrlInput");
+    // if (baseUrlInput) {                                  // << REMOVE/COMMENT
+    //   baseUrlInput.value = this.prefilledUrl || config.prefill.fallbackUrl; // << REMOVE/COMMENT
+    // }                                                    // << REMOVE/COMMENT
+
+    // Ensure the input is empty initially (optional, usually default)
     if (baseUrlInput) {
-      baseUrlInput.value = this.prefilledUrl || config.prefill.fallbackUrl; // Use fallback if prefill fails
+      baseUrlInput.value = ""; // Explicitly set to empty
     }
 
     // Setup listeners and initial UI state
@@ -77,7 +81,7 @@ class App {
       !loginSection ||
       !captureForm ||
       !progressOutput ||
-      !baseUrlInput
+      !baseUrlInput // Check moved here
     ) {
       console.error(
         "Initialization Error: One or more critical UI elements not found."
@@ -88,18 +92,9 @@ class App {
     // Make base URL section visible
     baseUrlSection.style.display = "";
 
-    // Trigger initial validation based on potentially prefilled value
-    if (baseUrlInput.value) {
-      this._handleBaseUrlInput({ target: baseUrlInput });
-    } else {
-      // Explicitly handle empty initial state if needed
-      this.baseUrlValid = false;
-      this._disableLoginOptions();
-      loginOptionSection.style.display = "none";
-      loginSection.style.display = "none";
-      captureForm.style.display = "none";
-      progressOutput.style.display = "none";
-    }
+    // Trigger initial validation based on the now empty value
+    // This will correctly set the initial disabled state for subsequent sections
+    this._handleBaseUrlInput({ target: baseUrlInput });
 
     console.log("Application initialized.");
   }
