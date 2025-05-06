@@ -38,50 +38,38 @@ class App {
     this.startTotalTime = 0; // For overall timing
     this._toggleCaptureSettings = this._toggleCaptureSettings.bind(this);
     this._handleSourceChange = this._handleSourceChange.bind(this);
-    // Bind new handlers
-    this._handleLoadManualSource = this._handleLoadManualSource.bind(this); // Renamed from _handleManualLoad
+    this._handleLoadManualSource = this._handleLoadManualSource.bind(this);
     this._handleFileUpload = this._handleFileUpload.bind(this);
   }
-  initialize() {
-    // Generate and set prefilled URL if applicable << REMOVE/COMMENT THIS BLOCK
-    // this.prefilledUrl = this.generatePrefilledUrl(); // << REMOVE/COMMENT
-    const baseUrlInput = document.getElementById("baseUrlInput");
-    // if (baseUrlInput) {                                  // << REMOVE/COMMENT
-    //   baseUrlInput.value = this.prefilledUrl || config.prefill.fallbackUrl; // << REMOVE/COMMENT
-    // }                                                    // << REMOVE/COMMENT
 
-    // Ensure the input is empty initially (optional, usually default)
+  initialize() {
+    const baseUrlInput = document.getElementById("baseUrlInput");
     if (baseUrlInput) {
       baseUrlInput.value = ""; // Explicitly set to empty
     }
 
-    // Setup listeners and initial UI state
-    this._setupEventListeners(); // Includes new listeners now
+    this._setupEventListeners();
     this._initializeUI();
-    this._setupEventHandlers(); // Includes new handlers now
+    this._setupEventHandlers();
 
-    // Set initial mode class on body
     document.body.classList.add("simple-mode");
     document.body.classList.remove("advanced-mode");
 
-    // Initialize Login Handler
     this.loginHandler.initialize();
 
-    // Initial UI Visibility Control based on prefilled URL state
     const baseUrlSection = document.getElementById("baseUrlSection");
     const loginOptionSection = document.getElementById("loginOptionSection");
     const loginSection = document.getElementById("loginSection");
     const captureForm = UI.elements.captureForm;
     const progressOutput = UI.elements.progressOutput;
 
-    // Ensure all necessary elements exist before manipulating styles
     if (
       !baseUrlSection ||
       !loginOptionSection ||
       !loginSection ||
       !captureForm ||
       !progressOutput ||
-      !baseUrlInput // Check moved here
+      !baseUrlInput
     ) {
       console.error(
         "Initialization Error: One or more critical UI elements not found."
@@ -89,12 +77,8 @@ class App {
       return;
     }
 
-    // Make base URL section visible
     baseUrlSection.style.display = "";
-
-    // Trigger initial validation based on the now empty value
-    // This will correctly set the initial disabled state for subsequent sections
-    this._handleBaseUrlInput({ target: baseUrlInput });
+    this._handleBaseUrlInput({ target: baseUrlInput }); // Trigger initial validation
 
     console.log("Application initialized.");
   }
@@ -153,7 +137,7 @@ class App {
       statusElement.style.color = "green";
       loginOptionSection.style.display = "block";
       this._enableLoginOptions();
-      captureForm.style.display = "none";
+      // captureForm remains hidden until login choice is made
     } else {
       this.baseUrlValid = false;
       this.baseUrl = url;
@@ -162,7 +146,7 @@ class App {
       statusElement.style.color = "red";
       urlFetcher.projectName = "";
       this._disableLoginOptions();
-      captureForm.style.display = "none";
+      // captureForm remains hidden
       urlSelector.cleanup();
     }
     this._checkCaptureButtonState();
@@ -213,7 +197,6 @@ class App {
       events.addDOMEventListener(radio, "change", this._handleSourceChange);
     });
 
-    // "Load Manual Pages" button listener
     const loadManualBtn = document.getElementById("loadManualJsonBtn");
     if (loadManualBtn) {
       events.addDOMEventListener(
@@ -225,7 +208,6 @@ class App {
       console.error("#loadManualJsonBtn not found!");
     }
 
-    // File input listener
     const fileInput = document.getElementById("manualJsonFile");
     if (fileInput) {
       events.addDOMEventListener(fileInput, "change", this._handleFileUpload);
@@ -236,15 +218,21 @@ class App {
 
   _initializeUI() {
     this._ensureHiddenWaitTimeStorage();
-    if (UI.elements.waitTime) {
-      UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
+    if (UI.elements.waitTime && UI.elements.waitTime.id === "simpleWaitTime") {
+        UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
+        const hiddenWaitTime = document.getElementById("hiddenWaitTime");
+        if(hiddenWaitTime) hiddenWaitTime.value = UI.elements.waitTime.value;
+
+    } else if (UI.elements.waitTime) {
+        UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
     }
+
 
     if (UI.elements.captureBtn) {
       UI.elements.captureBtn.disabled = true;
     }
     this.createPauseResumeButton();
-    this._setCaptureSettingsCollapsed(false);
+    this._setCaptureSettingsCollapsed(false); // Start expanded
 
     const manualArea = document.getElementById("manualJsonInputArea");
     if (manualArea) manualArea.style.display = "none";
@@ -261,17 +249,12 @@ class App {
       hiddenWaitTime.id = "hiddenWaitTime";
       hiddenWaitTime.value = config.ui.defaultWaitTime || 5;
       document.body.appendChild(hiddenWaitTime);
-      if (
-        !UI.elements.waitTime ||
-        UI.elements.waitTime.id !== "simpleWaitTime"
-      ) {
+    }
+    if (!UI.elements.waitTime || (UI.elements.waitTime.id !== "simpleWaitTime" && this.currentMode === "simple")) {
+        const simpleWaitTimeInput = document.getElementById("simpleWaitTime");
+        UI.elements.waitTime = simpleWaitTimeInput || hiddenWaitTime;
+    } else if (!UI.elements.waitTime) {
         UI.elements.waitTime = hiddenWaitTime;
-      }
-    } else if (
-      !UI.elements.waitTime ||
-      UI.elements.waitTime.id !== "simpleWaitTime"
-    ) {
-      UI.elements.waitTime = hiddenWaitTime;
     }
   }
 
@@ -283,8 +266,11 @@ class App {
     });
     const loginSection = document.getElementById("loginSection");
     const captureForm = UI.elements.captureForm;
+    const pageSourceSelection = document.getElementById("pageSourceSelection");
+
     if (loginSection) loginSection.style.display = "none";
     if (captureForm) captureForm.style.display = "none";
+    if (pageSourceSelection) pageSourceSelection.style.display = "none";
   }
 
   _enableLoginOptions() {
@@ -296,23 +282,6 @@ class App {
     if (!config.prefill.enabled) {
       return config.prefill.fallbackUrl;
     }
-    const currentUrl = window.location.href;
-    const regex = config.prefill.sourcePattern;
-    const match = currentUrl.match(regex);
-    if (match && match.length >= 4) {
-      try {
-        const prefilledUrl = config.prefill.targetTemplate
-          .replace("$1", match[1] || "")
-          .replace("$2", match[2])
-          .replace("$3", match[3]);
-        console.log("Generated prefilled URL:", prefilledUrl);
-        return prefilledUrl;
-      } catch (e) {
-        console.error("Error generating prefilled URL:", e);
-        return config.prefill.fallbackUrl;
-      }
-    }
-    console.log("URL pattern not matched for prefill, using fallback.");
     return config.prefill.fallbackUrl;
   }
 
@@ -331,11 +300,10 @@ class App {
     this._setupSimpleModeSettings();
 
     setTimeout(async () => {
-      if (!document.getElementById("urlSelectorContainer")) {
+      if (!document.getElementById("urlSelectorContainer") && typeof urlSelector.initialize === 'function') {
         console.log("Initializing URL Selector for Simple Mode...");
         try {
           await urlSelector.initialize();
-          this._setCaptureSettingsCollapsed(false);
           this._handleSourceChange();
         } catch (error) {
           console.error("Failed to initialize URL selector:", error);
@@ -343,9 +311,7 @@ class App {
             urlSelector.showFallbackUI();
           }
         }
-      } else {
-        urlSelector.clearRenderedUrls();
-        this._setCaptureSettingsCollapsed(false);
+      } else if (urlSelector.container) {
         this._handleSourceChange();
       }
       this._checkCaptureButtonState();
@@ -358,16 +324,17 @@ class App {
     const parentElement = UI.elements.captureSettingsContent;
     const urlInputContainer = UI.elements.urlInputContainer;
     if (!parentElement || !urlInputContainer) {
-      console.error("Cannot setup simple settings...");
+      console.error("Cannot setup simple settings: Parent or URL input container not found.");
       return;
     }
-    const screenSizeRow = parentElement.querySelector(
-      ".screen-size-row.important-setting-group"
-    );
+
+    const screenSizeRow = parentElement.querySelector(".screen-size-row.important-setting-group");
     if (!screenSizeRow) {
-      console.error(".screen-size-row... not found.");
+      console.error("Critical UI Error: .screen-size-row.important-setting-group not found within captureSettingsContent.");
       return;
     }
+     screenSizeRow.style.display = 'flex';
+
 
     let waitTimeContainer = document.getElementById("simpleWaitTimeContainer");
     let simpleWaitTimeInput = document.getElementById("simpleWaitTime");
@@ -388,32 +355,33 @@ class App {
       simpleWaitTimeInput.className = "wait-time-input";
       simpleWaitTimeInput.min = "1";
       simpleWaitTimeInput.max = config.timing.maxWaitTime / 1000 || 120;
-      const hiddenWait =
-        document.getElementById("hiddenWaitTime") || UI.elements.waitTime;
-      simpleWaitTimeInput.value =
-        hiddenWait?.value || config.ui.defaultWaitTime || 5;
+      
+      const hiddenWait = document.getElementById("hiddenWaitTime") || UI.elements.waitTime;
+      simpleWaitTimeInput.value = hiddenWait?.value || config.ui.defaultWaitTime || 5;
       waitTimeContainer.appendChild(simpleWaitTimeInput);
 
       events.addDOMEventListener(simpleWaitTimeInput, "change", (event) => {
-        const hidden =
-          document.getElementById("hiddenWaitTime") || UI.elements.waitTime;
+        const hidden = document.getElementById("hiddenWaitTime");
         if (hidden) hidden.value = event.target.value;
       });
-
       screenSizeRow.insertAdjacentElement("afterend", waitTimeContainer);
     } else {
-      waitTimeContainer.style.display = "";
+      waitTimeContainer.style.display = "flex";
       if (!waitTimeContainer.classList.contains("important-setting-group")) {
-        waitTimeContainer.classList.add("important-setting-group");
+         waitTimeContainer.classList.add("important-setting-group");
       }
     }
     if (simpleWaitTimeInput && UI.elements.waitTime !== simpleWaitTimeInput) {
       UI.elements.waitTime = simpleWaitTimeInput;
+      const hiddenWaitTime = document.getElementById("hiddenWaitTime");
+      if(hiddenWaitTime && simpleWaitTimeInput.value) {
+          hiddenWaitTime.value = simpleWaitTimeInput.value;
+      }
     }
   }
 
   _handleActionsInput() {
-    console.log("Actions input changed (Simple Mode - No Action)");
+    console.log("Actions input changed (No direct action in simple mode UI)");
   }
 
   _handleSourceChange() {
@@ -421,9 +389,7 @@ class App {
       'input[name="pageSourceOption"]:checked'
     )?.value;
     const manualArea = document.getElementById("manualJsonInputArea");
-    const urlSelectorContainer = document.getElementById(
-      "urlSelectorContainer"
-    );
+    const urlSelectorContainer = document.getElementById("urlSelectorContainer");
     const manualJsonStatus = document.getElementById("manualJsonStatus");
     const jsonTextArea = document.getElementById("manualJsonText");
     const fileInput = document.getElementById("manualJsonFile");
@@ -433,65 +399,55 @@ class App {
       console.error("Manual JSON input area not found.");
       return;
     }
-    if (
-      !urlSelectorContainer &&
-      typeof urlSelector.initialize === "function" &&
-      !document.getElementById("urlSelectorContainer")
-    ) {
-      console.warn(
-        "URL Selector container not ready for source change handling yet."
-      );
-      return;
-    }
 
     if (manualJsonStatus) manualJsonStatus.textContent = "";
 
     if (selectedSource === "manual") {
       manualArea.style.display = "";
       if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
-      urlSelector.clearRenderedUrls();
+      if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
+
       urlFetcher.dataLoadedDirectly = false;
       urlFetcher.urlsList = [];
       urlFetcher.categorizedUrls = {};
       this.captureQueue = [];
       AppState.reset();
       UI.utils.resetUI();
-      if (jsonTextArea) jsonTextArea.value = "";
-      if (fileInput) fileInput.value = "";
-      if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
-      UI.elements.captureBtn.disabled = true;
-    } else {
-      // 'automatic' selected
+      if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+
+    } else { 
       manualArea.style.display = "none";
-      if (urlSelectorContainer) urlSelectorContainer.style.display = "";
-      urlSelector.clearRenderedUrls();
+      if (urlSelectorContainer) {
+          urlSelectorContainer.style.display = "";
+      } else if (typeof urlSelector.initialize === 'function' && !document.getElementById("urlSelectorContainer")) {
+          console.warn("URL Selector container not ready for 'automatic' source change handling yet.");
+      }
+
+      if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
       if (jsonTextArea) jsonTextArea.value = "";
       if (fileInput) fileInput.value = "";
       if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
 
       if (this.baseUrlValid && this.loginHandler.isAuthenticatedForCapture()) {
-        console.log("Automatic source selected, initiating fetch...");
+        console.log("Automatic source selected, initiating URL fetching...");
         this._initiateUrlFetching();
       } else {
-        console.log("Automatic source selected, but prerequisites not met.");
-        if (urlSelector.container) {
-          urlSelector.showLoadingState("Waiting for Base URL/Login...");
+        console.log("Automatic source selected, but prerequisites (Base URL/Login) not met.");
+        if (urlSelector.container && typeof urlSelector.showLoadingState === 'function') {
+            urlSelector.showLoadingState("Waiting for Base URL & Authentication...");
         }
-        UI.elements.captureBtn.disabled = true;
+        if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
       }
     }
     this._checkCaptureButtonState();
   }
 
-  // --- UPDATED: Handles file selection ---
-  // Now only reads file and populates textarea. Does NOT trigger load.
   async _handleFileUpload(event) {
     const fileInput = event.target;
     const fileNameDisplay = document.getElementById("fileNameDisplay");
     const manualJsonStatus = document.getElementById("manualJsonStatus");
     const jsonTextArea = document.getElementById("manualJsonText");
 
-    // Clear status and file display first
     if (manualJsonStatus) {
       manualJsonStatus.textContent = "";
       manualJsonStatus.style.color = "";
@@ -499,43 +455,30 @@ class App {
     if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
 
     if (!fileInput.files || fileInput.files.length === 0) {
-      return; // No file selected
+      return;
     }
-
     const file = fileInput.files[0];
-
-    if (
-      !file.type ||
-      (file.type !== "application/json" &&
-        !file.name.toLowerCase().endsWith(".json"))
-    ) {
+    if (!file.type || (file.type !== "application/json" && !file.name.toLowerCase().endsWith(".json"))) {
       if (manualJsonStatus) {
-        manualJsonStatus.textContent =
-          "Error: Please select a valid .json file.";
+        manualJsonStatus.textContent = "Error: Please select a valid .json file.";
         manualJsonStatus.style.color = "red";
       }
-      fileInput.value = ""; // Clear the invalid selection
+      fileInput.value = "";
       return;
     }
 
-    if (fileNameDisplay) {
-      fileNameDisplay.textContent = file.name; // Show selected file name
-    }
+    if (fileNameDisplay) fileNameDisplay.textContent = file.name;
 
-    // Read the file content and put it into the textarea
     try {
       const fileContent = await this._readFileContent(file);
       if (jsonTextArea) {
-        jsonTextArea.value = fileContent; // Populate textarea
+        jsonTextArea.value = fileContent;
         console.log(`File "${file.name}" content loaded into textarea.`);
         if (manualJsonStatus) {
-          manualJsonStatus.textContent = `File "${file.name}" ready to load. Click "Load Manual Pages".`;
-          manualJsonStatus.style.color = "blue"; // Use a neutral/info color
+          manualJsonStatus.textContent = `File "${file.name}" ready. Click "Load Manual Pages" to process.`;
+          manualJsonStatus.style.color = "blue";
         }
       }
-      // Optionally clear the file input after successful read?
-      // fileInput.value = '';
-      // if(fileNameDisplay) fileNameDisplay.textContent = 'File content loaded to textarea';
     } catch (readError) {
       console.error("Error reading file:", readError);
       if (manualJsonStatus) {
@@ -543,50 +486,38 @@ class App {
         manualJsonStatus.style.color = "red";
       }
       if (fileNameDisplay) fileNameDisplay.textContent = "Error reading file";
-      fileInput.value = ""; // Clear selection on error
+      fileInput.value = "";
     }
-    // Update button state - might enable load button if textarea now has content
     this._checkCaptureButtonState();
   }
 
-  // --- UPDATED: Handles the click on the "Load Manual Pages" button ---
-  // Now ONLY reads from the textarea.
   async _handleLoadManualSource() {
     const jsonTextArea = document.getElementById("manualJsonText");
     const manualJsonStatus = document.getElementById("manualJsonStatus");
-    const urlSelectorContainer = document.getElementById(
-      "urlSelectorContainer"
-    );
+    const urlSelectorContainer = document.getElementById("urlSelectorContainer");
     const loadBtn = document.getElementById("loadManualJsonBtn");
-    const fileInput = document.getElementById("manualJsonFile"); // Added ref
-    const fileNameDisplay = document.getElementById("fileNameDisplay"); // Added ref
+    const fileInput = document.getElementById("manualJsonFile");
+    const fileNameDisplay = document.getElementById("fileNameDisplay");
 
-    if (
-      !jsonTextArea ||
-      !manualJsonStatus ||
-      !urlSelectorContainer ||
-      !loadBtn
-    ) {
-      console.error("Cannot load manual source: UI elements missing.");
+    if (!jsonTextArea || !manualJsonStatus || !loadBtn) {
+      console.error("Cannot load manual source: Crucial UI elements missing (textarea, status, load button).");
       return;
     }
 
-    manualJsonStatus.textContent = ""; // Clear previous status
+    manualJsonStatus.textContent = "";
     manualJsonStatus.style.color = "";
     loadBtn.disabled = true;
     loadBtn.textContent = "Loading...";
-    UI.elements.captureBtn.disabled = true; // Disable capture while loading
+    if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
 
     const sourceContent = jsonTextArea.value.trim();
-    const sourceDescription = "textarea content";
+    const sourceDescription = fileInput?.files?.[0]?.name ? `file "${fileInput.files[0].name}"` : "textarea content";
 
-    // --- Clear file input when loading from textarea ---
     if (fileInput) fileInput.value = "";
     if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
 
     if (!sourceContent) {
-      manualJsonStatus.textContent =
-        "Error: Paste JSON content into the textarea first.";
+      manualJsonStatus.textContent = "Error: No JSON content to load (paste or upload a file).";
       manualJsonStatus.style.color = "red";
       loadBtn.disabled = false;
       loadBtn.textContent = "Load Manual Pages";
@@ -600,38 +531,41 @@ class App {
       await urlFetcher.setDataDirectly(sourceContent);
 
       if (urlFetcher.dataLoadedDirectly) {
-        urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
-        urlSelectorContainer.style.display = "";
-        manualJsonStatus.textContent = `Success: Loaded ${urlFetcher.urlsList.length} pages from ${sourceDescription}.`;
+        if (urlSelector.container) {
+            urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
+            if(urlSelectorContainer) urlSelectorContainer.style.display = "";
+        } else if (typeof urlSelector.initialize === 'function') {
+            console.warn("URL Selector was not initialized, attempting now for manual load.");
+            await urlSelector.initialize();
+            if (urlSelector.container) {
+                urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
+                if(urlSelectorContainer) urlSelectorContainer.style.display = "";
+            } else {
+                 throw new Error("Failed to initialize URL Selector for displaying manual data.");
+            }
+        }
+        manualJsonStatus.textContent = `Success: Loaded ${urlFetcher.urlsList.length} pages from ${sourceDescription}. Select pages to capture.`;
         manualJsonStatus.style.color = "green";
       } else {
-        const errorMsg =
-          urlFetcher.error?.message ||
-          "Failed to process JSON data. Check format.";
+        const errorMsg = urlFetcher.error?.message || "Failed to process JSON data. Check format and console.";
         manualJsonStatus.textContent = `Error: ${errorMsg}`;
         manualJsonStatus.style.color = "red";
-        urlSelector.clearRenderedUrls();
-        urlSelectorContainer.style.display = "none";
-        UI.elements.captureBtn.disabled = true;
+        if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
+        if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
+        if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
       }
     } catch (error) {
-      console.error(
-        `Error loading manual source from ${sourceDescription}:`,
-        error
-      );
-      const errorMsg =
-        error instanceof URLProcessingError
-          ? error.message
-          : "Invalid JSON format or structure.";
+      console.error(`Error loading manual source from ${sourceDescription}:`, error);
+      const errorMsg = error instanceof AppError ? error.message : "Invalid JSON format or structure.";
       manualJsonStatus.textContent = `Error: ${errorMsg}`;
       manualJsonStatus.style.color = "red";
-      urlSelector.clearRenderedUrls();
-      urlSelectorContainer.style.display = "none";
-      UI.elements.captureBtn.disabled = true;
+      if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
+      if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
+      if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
     } finally {
       loadBtn.disabled = false;
       loadBtn.textContent = "Load Manual Pages";
-      this._checkCaptureButtonState(); // Check main capture button state
+      this._checkCaptureButtonState();
     }
   }
 
@@ -644,42 +578,53 @@ class App {
       reader.onerror = (event) => {
         reject(
           new Error(
-            "File could not be read. Error code: " + event.target.error.code
+            "File could not be read. Error code: " + (event.target.error?.code || 'unknown')
           )
         );
       };
-      reader.readAsText(file); // Read the file as text
+      reader.readAsText(file);
     });
   }
 
   _checkCaptureButtonState() {
     const captureBtn = UI.elements.captureBtn;
     const buttonContainer = UI.elements.buttonContainer;
+    const loadManualBtn = document.getElementById("loadManualJsonBtn");
+
     if (!captureBtn || !buttonContainer) {
+      console.warn("Capture button or its container not found, cannot update state.");
       return;
     }
 
     const selectedSource = document.querySelector(
       'input[name="pageSourceOption"]:checked'
     )?.value;
-    const isManualModeActiveAndLoaded =
-      selectedSource === "manual" && urlFetcher.dataLoadedDirectly;
+
+    if (loadManualBtn && selectedSource === 'manual') {
+        const jsonTextArea = document.getElementById("manualJsonText");
+        loadManualBtn.disabled = !jsonTextArea?.value.trim();
+    } else if (loadManualBtn) {
+        loadManualBtn.disabled = true;
+    }
 
     const prerequisitesMet =
       !this._processingQueue &&
       this.baseUrlValid &&
       this.loginHandler.isAuthenticatedForCapture();
-    const urlsSelected = urlSelector.selectedUrls.size > 0;
-    const dataAvailableAndSelected =
-      urlsSelected &&
-      (selectedSource === "automatic" || isManualModeActiveAndLoaded);
 
-    const isReadyToCapture = prerequisitesMet && dataAvailableAndSelected;
+    let urlsAvailableAndSelected = false;
+    if (selectedSource === "automatic") {
+      urlsAvailableAndSelected = urlFetcher.urlsList.length > 0 && urlSelector.selectedUrls.size > 0;
+    } else if (selectedSource === "manual") {
+      urlsAvailableAndSelected = urlFetcher.dataLoadedDirectly && urlSelector.selectedUrls.size > 0;
+    }
 
+    const isReadyToCapture = prerequisitesMet && urlsAvailableAndSelected;
     captureBtn.disabled = !isReadyToCapture;
 
-    if (UI.elements.captureForm.style.display !== "none") {
-      buttonContainer.style.display = "";
+    const captureFormVisible = UI.elements.captureForm.style.display !== "none";
+    if (captureFormVisible) {
+      buttonContainer.style.display = "flex";
       buttonContainer.classList.remove("hidden");
     } else {
       buttonContainer.style.display = "none";
@@ -689,8 +634,11 @@ class App {
 
   _setupEventHandlers() {
     events.on(events.events.CAPTURE_PROGRESS, (data) => {
-      if (data && data.message) UI.progress.updateProgressMessage(data.message);
+      if (data && data.message && UI.elements.progress) {
+          UI.progress.updateProgressMessage(data.message);
+      }
     });
+
     events.on(events.events.SCREENSHOT_TAKEN, (data) => {
       if (!data || !data.result) return;
       const preset = data.result.preset || "N/A";
@@ -709,6 +657,7 @@ class App {
         5000
       );
     });
+
     events.on("URL_SELECTION_CHANGED", (data) => {
       this._checkCaptureButtonState();
     });
@@ -720,13 +669,13 @@ class App {
       this.loginHandler.handleLoginOptionChange(data.option);
 
       const captureForm = UI.elements.captureForm;
-      const pageSourceSelection = document.getElementById(
-        "pageSourceSelection"
-      );
+      const pageSourceSelection = document.getElementById("pageSourceSelection");
 
-      if (data.option === "continueWithoutLogin") {
+      if (data.option === "continueWithoutLogin" || (data.option === "login" && this.loginHandler.isLoggedIn)) {
+        if (captureForm) captureForm.style.display = "";
+        if (pageSourceSelection) pageSourceSelection.style.display = "";
         this._updateUIMode();
-      } else {
+      } else if (data.option === "login" && !this.loginHandler.isLoggedIn) {
         if (captureForm) captureForm.style.display = "none";
         if (pageSourceSelection) pageSourceSelection.style.display = "none";
       }
@@ -734,25 +683,22 @@ class App {
     });
 
     events.on("LOGIN_COMPLETE", (data) => {
-      const loginSection = document.getElementById("loginSection");
       const captureForm = UI.elements.captureForm;
-      const pageSourceSelection = document.getElementById(
-        "pageSourceSelection"
-      );
-
-      if (loginSection) loginSection.style.display = "block";
+      const pageSourceSelection = document.getElementById("pageSourceSelection");
 
       if (data.loggedIn) {
+        if (captureForm) captureForm.style.display = "";
+        if (pageSourceSelection) pageSourceSelection.style.display = "";
         this._updateUIMode();
       } else {
         if (this.loginHandler.getSelectedLoginOption() === "login") {
           UI.utils.showStatus(
-            "Login failed. Select 'Continue without login' or try again.",
+            "Login failed. Select 'Continue as Guest' or try login again.",
             true
           );
-          if (captureForm) captureForm.style.display = "none";
-          if (pageSourceSelection) pageSourceSelection.style.display = "none";
         }
+        if (captureForm) captureForm.style.display = "none";
+        if (pageSourceSelection) pageSourceSelection.style.display = "none";
       }
       this._checkCaptureButtonState();
     });
@@ -762,49 +708,50 @@ class App {
     const selectedSource = document.querySelector(
       'input[name="pageSourceOption"]:checked'
     )?.value;
+
     if (selectedSource !== "automatic") {
-      console.log("Skipping automatic fetch, source is not 'automatic'.");
-      if (urlSelector.container && urlSelector.clearRenderedUrls) {
+      console.log("Skipping automatic URL fetch: Source is not 'automatic'.");
+      if (urlSelector.container && typeof urlSelector.clearRenderedUrls === 'function') {
         urlSelector.clearRenderedUrls();
       }
       return;
     }
+
     if (!this.baseUrlValid || !this.loginHandler.isAuthenticatedForCapture()) {
-      console.warn(
-        "Attempted automatic fetch, but Base URL/Login state invalid."
-      );
-      if (urlSelector.container && urlSelector.showLoadingState) {
-        urlSelector.showLoadingState("Waiting for Base URL/Login...");
+      console.warn("Attempted automatic fetch, but Base URL or Login state is invalid.");
+      if (urlSelector.container && typeof urlSelector.showLoadingState === 'function') {
+        urlSelector.showLoadingState("Waiting for Base URL & Authentication...");
       }
       return;
     }
-    if (
-      !document.getElementById("urlSelectorContainer") ||
-      !urlSelector.container
-    ) {
-      console.error("URL selector not ready for fetching.");
-      UI.utils.showStatus("UI Error: URL Selector not ready.", true);
-      return;
+
+    if (!urlSelector.container && typeof urlSelector.initialize === 'function' && !document.getElementById("urlSelectorContainer")) {
+        console.warn("URL selector not ready for fetching, attempting to initialize.");
+        await urlSelector.initialize();
+    }
+    if (!urlSelector.container) {
+        console.error("URL selector critical error: Container not available for fetching.");
+        UI.utils.showStatus("UI Error: URL Selector component failed to initialize.", true);
+        return;
     }
 
     urlSelector.showLoadingState();
     try {
-      console.log("Fetching URLs from endpoint (Automatic source).");
+      console.log("Fetching URLs from endpoint (Source: Automatic).");
       await urlFetcher.loadUrls();
-      console.log("Fetching from endpoint complete.");
+      console.log("URL fetching from endpoint complete.");
 
-      urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
-      urlSelector.updateSelectionCounter();
+      if (urlSelector.renderUrlCategories) urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
+      if (urlSelector.updateSelectionCounter) urlSelector.updateSelectionCounter();
+
     } catch (error) {
-      handleError(error, { logToConsole: true, showToUser: true });
-      const displayError =
-        error instanceof AppError ? error.message : "Failed to load page list.";
+      const displayError = error instanceof AppError ? error.message : "Failed to load page list from server.";
       if (urlSelector.categoriesContainer) {
-        urlSelector.categoriesContainer.innerHTML = `<div class="url-selector-error"><p>${displayError}</p><p>Check connection or Base URL.</p></div>`;
-      } else if (typeof urlSelector.showFallbackUI === "function") {
+        urlSelector.categoriesContainer.innerHTML = `<div class="url-selector-error"><p>${displayError}</p><p>Check server connection or Project URL. Ensure the backend service is running.</p></div>`;
+      } else if (typeof urlSelector.showFallbackUI === 'function') {
         urlSelector.showFallbackUI();
       }
-      urlSelector.updateSelectionCounter();
+      if (urlSelector.updateSelectionCounter) urlSelector.updateSelectionCounter();
     } finally {
       this._checkCaptureButtonState();
     }
@@ -819,206 +766,206 @@ class App {
     progressOutput.style.display = "";
 
     if (this._processingQueue) {
-      UI.utils.showStatus("Capture running...", false, 3000);
+      UI.utils.showStatus("Capture is already running...", false, 3000);
       return;
     }
     if (!this.loginHandler.isAuthenticatedForCapture()) {
       UI.utils.showStatus("Please authenticate or continue as guest.", true);
-      progressOutput.style.display = "none";
+      if (progressOutput) progressOutput.style.display = "none";
       return;
     }
     if (!this.baseUrlValid) {
       UI.utils.showStatus("Please provide a valid Base URL.", true);
-      progressOutput.style.display = "none";
+      if (progressOutput) progressOutput.style.display = "none";
       return;
     }
 
     this.startTotalTime = performance.now();
     let urlList = [];
+    let errorInCaptureSetup = false;
 
     try {
       AppState.reset();
       UI.utils.resetUI();
-      // this.isPaused = false; // Moved down
-      // this.captureQueue = []; // Moved down
-      // this.currentCaptureIndex = 0; // Moved down
       this._setCaptureSettingsCollapsed(true);
 
-      const capturePreset =
-        UI.elements.capturePreset?.value || config.screenshot.defaultPreset;
+      const capturePreset = UI.elements.capturePreset?.value || config.screenshot.defaultPreset;
       const fullPageCheckbox = document.getElementById("fullPageCheckbox");
-      const captureFullPage = fullPageCheckbox
-        ? fullPageCheckbox.checked
-        : false;
+      const captureFullPage = fullPageCheckbox ? fullPageCheckbox.checked : false;
 
       if (typeof urlSelector.getSelectedUrlsForCapture === "function") {
         urlList = urlSelector.getSelectedUrlsForCapture();
       } else {
-        throw new Error("URL Selector component not available.");
+        errorInCaptureSetup = true;
+        throw new AppError("URL Selector component not available or not initialized.");
       }
 
       if (urlList.length === 0) {
-        throw new URLProcessingError(
-          "Please select at least one page.",
-          "No URLs selected"
-        );
+        errorInCaptureSetup = true;
+        throw new URLProcessingError("Please select at least one page to capture.", "No URLs selected");
       }
 
       UI.progress.updateStats(urlList.length, 0, 0, 0);
-      UI.elements.captureBtn.disabled = true; // Disable main capture button
+      if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
 
-      // *** MODIFICATION START ***
-      // Prepare queue and state variables related to processing BEFORE updating the pause/resume button
       this.captureQueue = urlList.map((url, index) => ({
         url,
         index,
         capturePreset,
         captureFullPage,
-        actionSequences: [], // Assuming simple mode for this part, adjust if needed
+        actionSequences: [],
       }));
       this.currentCaptureIndex = 0;
-      this.isPaused = false; // Ensure isPaused is false at the start
-      this._processingQueue = true; // Set processing flag to true
+      this.isPaused = false;
+      this._processingQueue = true;
 
-      this.updatePauseResumeButton(); // NOW update the pause/resume button.
-      // _processingQueue is true, isPaused is false,
-      // so the button should show "Pause" ⏸️ and be enabled.
-      // *** MODIFICATION END ***
+      this.updatePauseResumeButton();
 
       await this.processCaptureQueue();
+
     } catch (error) {
+      errorInCaptureSetup = true;
       handleError(error, { logToConsole: true, showToUser: true });
-      this._processingQueue = false; // Ensure reset on error
+      this._processingQueue = false;
       this._setCaptureSettingsCollapsed(false);
-      // this._checkCaptureButtonState(); // Redundant here, finally block handles it
-      // this.updatePauseResumeButton(); // Redundant here, finally block handles it
-      if (progressOutput) progressOutput.style.display = "none";
-    } finally {
-      const isFinished = this.currentCaptureIndex >= this.captureQueue.length;
-      const endTotalTime = performance.now();
-      const totalTimeTaken = this.startTotalTime
-        ? ((endTotalTime - this.startTotalTime) / 1000).toFixed(2)
-        : "N/A";
-
-      if (this.startTotalTime && isFinished && !this.isPaused) {
-        UI.progress.updateStats(
-          this.captureQueue.length,
-          AppState.screenshots.size,
-          AppState.failedUrls.length,
-          totalTimeTaken
-        );
+      if (errorInCaptureSetup && AppState.screenshots.size === 0 && AppState.failedUrls.length === 0) {
+         if (progressOutput) progressOutput.style.display = "none";
       }
+    } finally {
+      const endTime = performance.now();
+      const totalTimeTakenMs = this.startTotalTime ? (endTime - this.startTotalTime) : 0;
+      const totalTimeTakenSec = (totalTimeTakenMs / 1000).toFixed(2);
+      const isQueueFullyProcessed = this.currentCaptureIndex >= this.captureQueue.length;
 
-      // If not paused (i.e., process completed or errored out fully),
-      // then _processingQueue should be false.
       if (!this.isPaused) {
         this._processingQueue = false;
+        if (isQueueFullyProcessed && this.startTotalTime > 0) {
+             UI.progress.updateStats(
+                 this.captureQueue.length,
+                 AppState.screenshots.size,
+                 AppState.failedUrls.length,
+                 totalTimeTakenSec
+             );
+             if (!errorInCaptureSetup) {
+                 const failedCount = AppState.failedUrls.length;
+                 const successCount = AppState.screenshots.size;
+                 const totalProcessedOrAttempted = this.captureQueue?.length || 0;
+                 const completionMessage = `Capture complete. Processed ${totalProcessedOrAttempted} pages (${successCount} success, ${failedCount} failed).`;
+                 UI.utils.showStatus(completionMessage, failedCount > 0, 0);
+             }
+        } else if (!isQueueFullyProcessed && !errorInCaptureSetup && this.startTotalTime > 0) {
+            console.warn("Capture ended; not paused, not fully processed, and no major setup error noted. Displaying partial stats.");
+            if(AppState.screenshots.size > 0 || AppState.failedUrls.length > 0 || this.captureQueue.length > 0) {
+                 const failedCount = AppState.failedUrls.length;
+                 const successCount = AppState.screenshots.size;
+                 const totalPagesInQueue = this.captureQueue?.length || (successCount + failedCount);
+                 const partialMessage = `Processing finished. Captured ${successCount + failedCount} of ${totalPagesInQueue} pages.`;
+                 UI.utils.showStatus(partialMessage, failedCount > 0, 0);
+                 UI.progress.updateStats(
+                    totalPagesInQueue,
+                    successCount,
+                    failedCount,
+                    totalTimeTakenSec
+                 );
+            } else if (!errorInCaptureSetup) {
+                UI.utils.showStatus("No pages were processed.", false, 0);
+            }
+        }
+      } else {
+         if (this.startTotalTime > 0) {
+             UI.progress.updateStats(
+                 this.captureQueue.length,
+                 AppState.screenshots.size,
+                 AppState.failedUrls.length,
+                 totalTimeTakenSec
+             );
+         }
       }
-
-      // Update button states after everything, regardless of pause state
-      this._checkCaptureButtonState(); // This will enable/disable captureBtn
-      this.updatePauseResumeButton(); // This will correctly reflect pause/resume state
-
+      this._checkCaptureButtonState();
+      this.updatePauseResumeButton();
       const pdfBtnVisible = AppState.screenshots.size > 0;
       const combineAllPdfBtn = document.querySelector(".combine-all-pdf-btn");
       if (combineAllPdfBtn?.parentElement) {
-        const pdfContainer =
-          combineAllPdfBtn.closest(".combine-all-pdf-container") ||
-          combineAllPdfBtn.parentElement;
-        pdfContainer.style.display = pdfBtnVisible ? "flex" : "none";
-        combineAllPdfBtn.disabled = !pdfBtnVisible;
+          const pdfContainer = combineAllPdfBtn.closest(".combine-all-pdf-container") || combineAllPdfBtn.parentElement;
+          pdfContainer.style.display = pdfBtnVisible ? "flex" : "none";
+          combineAllPdfBtn.disabled = !pdfBtnVisible;
       }
-      // Redundant _processingQueue = false removed, handled above or in processCaptureQueue
+      if (errorInCaptureSetup && (!urlList || urlList.length === 0) && progressOutput) {
+        progressOutput.style.display = "none";
+      }
     }
   }
-  
+
   async processCaptureQueue() {
-    // If paused, or if the queue is finished, stop processing.
     if (this.isPaused || this.currentCaptureIndex >= this.captureQueue.length) {
       if (this.isPaused) {
-        // If we are explicitly pausing, mark processing as false.
         this._processingQueue = false;
       }
-      // Note: The updatePauseResumeButton() call is handled by pauseResumeCapture()
-      // or by the finally block in captureScreenshots() when the queue fully completes.
       return;
     }
 
-    // If processing is not already flagged as active (e.g., starting or resuming)
     if (!this._processingQueue) {
-      this._processingQueue = true; // Mark processing as active
+      this._processingQueue = true;
       console.log("Starting/Resuming queue processing...");
-      this.updatePauseResumeButton(); // <<< --- MODIFICATION: Update button state immediately
+      this.updatePauseResumeButton();
     }
 
     const totalUrls = this.captureQueue.length;
-    // Ensure the main capture button is disabled while the queue is running.
     if (UI.elements.captureBtn) {
         UI.elements.captureBtn.disabled = true;
     }
 
-    // Process items in the queue as long as not paused and items remain
     while (this.currentCaptureIndex < totalUrls && !this.isPaused) {
-      const itemIndex = this.currentCaptureIndex; // Get current item's original index for reference
+      const itemIndex = this.currentCaptureIndex;
       const item = this.captureQueue[itemIndex];
 
-      // Safety check for invalid item in the queue
       if (!item || !item.url) {
         console.error(`Invalid item at queue index ${itemIndex}:`, item);
         AppState.addFailedUrl(`Invalid Item @ Queue Index ${itemIndex}`);
-        this.currentCaptureIndex++; // Move to the next item
-        UI.progress.updateProgress(this.currentCaptureIndex, totalUrls); // Update progress bar
-        continue; // Skip to the next iteration
+        this.currentCaptureIndex++;
+        if(UI.elements.progressBar) UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
+        continue;
       }
 
       const { url, index, capturePreset, captureFullPage, actionSequences } = item;
 
-      // Update UI with current processing status
-      UI.progress.updateProgressMessage(
+      if(UI.elements.progress) UI.progress.updateProgressMessage(
         `Processing ${itemIndex + 1} of ${totalUrls}: ${url}`
       );
-      UI.progress.updateProgress(itemIndex, totalUrls); // Update progress bar based on current actual item
+      if(UI.elements.progressBar) UI.progress.updateProgress(itemIndex, totalUrls);
 
       try {
-        // Attempt to take the screenshot
         const result = await ScreenshotCapture.takeScreenshot(
           url,
           capturePreset,
           captureFullPage,
-          actionSequences || [] // Ensure actionsList is an array
+          actionSequences || []
         );
 
-        // If paused during screenshot capture, stop further processing for this item.
-        if (this.isPaused) {
-          this._processingQueue = false; // Mark processing as stopped due to pause
-          break; // Exit the while loop
-        }
-
-        // Generate filename and add details to the result
-        const timestamp = URLProcessor.getTimestamp();
-        const baseFileName = URLProcessor.generateFilename(url, index, ""); // index is original from urlList
-        const fullPageSuffix = captureFullPage ? "_FullPage" : "";
-        const fileName = baseFileName.replace(
-          ".png",
-          `${fullPageSuffix}_${timestamp}.png`
-        );
-        result.fileName = fileName; // Add generated filename to the result object
-
-        // Add the live thumbnail to the UI
-        UI.thumbnails.addLiveThumbnail(result, fileName, url); // sequenceName is url for simple mode
-        AppState.addScreenshot(url, result); // Store successful screenshot
-        AppState.removeFailedUrl(url); // Remove from failed list if it was there before
-
-      } catch (error) {
-        // If paused during error handling, stop.
         if (this.isPaused) {
           this._processingQueue = false;
           break;
         }
 
-        handleError(error, { logToConsole: true, showToUser: false }); // Log error, don't show to user here
+        const timestamp = URLProcessor.getTimestamp();
+        const baseFileName = URLProcessor.generateFilename(url, index, "");
+        const fullPageSuffix = captureFullPage ? "_FullPage" : "";
+        const fileName = baseFileName.replace(
+          ".png",
+          `${fullPageSuffix}_${timestamp}.png`
+        );
+        result.fileName = fileName;
 
-        // Create an error result object for the thumbnail
+        UI.thumbnails.addLiveThumbnail(result, fileName, url);
+        AppState.addScreenshot(url, result);
+        AppState.removeFailedUrl(url);
+
+      } catch (error) {
+        if (this.isPaused) {
+          this._processingQueue = false;
+          break;
+        }
+        handleError(error, { logToConsole: true, showToUser: false });
         const timestamp = URLProcessor.getTimestamp();
         const baseFileName = URLProcessor.generateFilename(url, index, "");
         const fullPageSuffix = captureFullPage ? "_FullPage" : "";
@@ -1029,13 +976,11 @@ class App {
         const errorResult = {
           error: true,
           errorMessage: error.message || "Unknown error during capture",
-          sequenceName: url, // Or a more specific name if available
-          url: error.url || url, // URL from the error object or the item
+          sequenceName: url,
+          url: error.url || url,
         };
         UI.thumbnails.addLiveThumbnail(errorResult, fileName, url);
-        AppState.addFailedUrl(url); // Add to failed list
-
-        // Show specific error status in the UI
+        AppState.addFailedUrl(url);
         const displayError =
           error instanceof ScreenshotError
             ? `(${error.reason || error.message})`
@@ -1043,66 +988,51 @@ class App {
         UI.utils.showStatus(`✗ Failed: ${url} ${displayError}`, true);
       }
 
-      this.currentCaptureIndex++; // Move to the next item in the queue
-      UI.progress.updateProgress(this.currentCaptureIndex, totalUrls); // Update progress bar
+      this.currentCaptureIndex++;
+      if(UI.elements.progressBar) UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
 
-      // Add a small delay between processing items if not paused
       if (this.currentCaptureIndex < totalUrls && !this.isPaused) {
-        await new Promise((resolve) => setTimeout(resolve, 250)); // 250ms delay
+        await new Promise((resolve) => setTimeout(resolve, 250));
       }
 
-      // If paused during the delay or after processing, break the loop
       if (this.isPaused) {
         this._processingQueue = false;
         break;
       }
-    } // End of while loop
+    }
 
-    // After the loop (either completed all items or was paused)
     const isFinished = this.currentCaptureIndex >= totalUrls;
 
     if (isFinished && !this.isPaused) {
-      // Queue completed all items normally
       console.log("Queue processing finished normally.");
-      const failedCount = AppState.failedUrls.length;
-      const successCount = AppState.screenshots.size; // More accurate count of successes
-      const completionMessage = `Capture complete. Processed ${totalUrls} pages (${successCount} success, ${failedCount} failed).`;
-      UI.utils.showStatus(completionMessage, failedCount > 0, 0); // Persistent message
-      this._processingQueue = false; // Mark processing as no longer active
+      this._processingQueue = false;
+      // Final completion message is now handled in captureScreenshots().finally
+      // this.updatePauseResumeButton(); // Also handled by captureScreenshots().finally
     } else if (this.isPaused) {
-      // Queue was paused mid-way
       console.log("Queue processing paused.");
-      UI.utils.showStatus(
+      if(UI.elements.progress) UI.utils.showStatus(
         `Capture paused at URL ${this.currentCaptureIndex + 1} of ${totalUrls}. Click Resume (▶️) to continue.`,
-        false, // Not an error message
-        0 // Persistent message
+        false,
+        0
       );
-      // _processingQueue was already set to false when isPaused became true (or should have been)
     } else {
-      // This case should ideally not be reached if logic is sound (e.g. loop finished but not 'isFinished' and not 'isPaused')
-      console.warn("Queue loop finished unexpectedly.");
-      this._processingQueue = false; // Ensure processing is marked as not active
+      console.warn("Queue loop finished unexpectedly (not paused, not completed).");
+      this._processingQueue = false;
+      // this.updatePauseResumeButton(); // Handled by captureScreenshots().finally
     }
-
-    // Final state updates for buttons are primarily handled by the `finally` block
-    // in `captureScreenshots` and by `pauseResumeCapture` itself.
   }
-
-
 
   createPauseResumeButton() {
     const buttonContainer = UI.elements.buttonContainer;
     if (!buttonContainer || document.getElementById("pauseResumeBtn")) return;
+
     const pauseResumeBtn = document.createElement("button");
     pauseResumeBtn.id = "pauseResumeBtn";
     pauseResumeBtn.className = "btn icon-btn pause-resume-btn";
     pauseResumeBtn.innerHTML = "⏸️";
     pauseResumeBtn.title = "Pause capture";
-    events.addDOMEventListener(
-      pauseResumeBtn,
-      "click",
-      this.pauseResumeCapture
-    );
+    events.addDOMEventListener(pauseResumeBtn, "click", this.pauseResumeCapture);
+
     const captureBtn = UI.elements.captureBtn;
     if (captureBtn && buttonContainer.contains(captureBtn)) {
       captureBtn.insertAdjacentElement("afterend", pauseResumeBtn);
@@ -1114,60 +1044,46 @@ class App {
 
   pauseResumeCapture() {
     this.isPaused = !this.isPaused;
+
     if (this.isPaused) {
       console.log("Pause requested.");
-      this.updatePauseResumeButton();
-    } else {
+    } else { 
       console.log("Resume requested.");
-      UI.utils.showStatus("", false, 1);
-      this.updatePauseResumeButton();
-      if (
-        this.currentCaptureIndex < this.captureQueue.length &&
-        !this._processingQueue
-      ) {
-        UI.utils.showStatus(
-          `Capture resuming from URL ${this.currentCaptureIndex + 1} of ${
-            this.captureQueue.length
-          }`,
-          false,
-          3000
-        );
+      if(UI.elements.progress) UI.utils.showStatus("", false, 1);
+      if (this.currentCaptureIndex < this.captureQueue.length && !this._processingQueue) {
         this.processCaptureQueue();
       } else if (this._processingQueue) {
-        console.warn("Resume clicked, but processing seems active.");
+        console.warn("Resume clicked, but processing logic indicates it's already active or should be.");
       } else {
-        console.log("Resume clicked, but capture queue is finished.");
-        this._checkCaptureButtonState();
-        this.updatePauseResumeButton();
+        console.log("Resume clicked, but capture queue appears finished or not started properly.");
       }
     }
+    this.updatePauseResumeButton();
   }
 
-updatePauseResumeButton() {
-  const pauseResumeBtn = document.getElementById("pauseResumeBtn");
-  if (!pauseResumeBtn) return;
+  updatePauseResumeButton() {
+    const pauseResumeBtn = document.getElementById("pauseResumeBtn");
+    if (!pauseResumeBtn) return;
 
-  const hasItemsToProcess = this.currentCaptureIndex < this.captureQueue.length;
-  const isProcessing = this._processingQueue;
+    const hasItemsToProcess = this.currentCaptureIndex < this.captureQueue.length;
+    const isProcessing = this._processingQueue;
 
-  if (this.isPaused) {
-    pauseResumeBtn.innerHTML = "▶️"; // Resume icon
-    pauseResumeBtn.title = "Resume capture";
-    pauseResumeBtn.classList.add("paused");
-    // Enable if there are items to process, disable if queue is done
-    pauseResumeBtn.disabled = !hasItemsToProcess;
-  } else { // Not paused (i.e., running or finished)
-    pauseResumeBtn.innerHTML = "⏸️"; // Pause icon
-    pauseResumeBtn.title = "Pause capture";
-    pauseResumeBtn.classList.remove("paused");
-    // Enable if actively processing AND has items. Disable otherwise (finished or before start).
-    pauseResumeBtn.disabled = !isProcessing || !hasItemsToProcess;
+    if (this.isPaused) {
+      pauseResumeBtn.innerHTML = "▶️";
+      pauseResumeBtn.title = "Resume capture";
+      pauseResumeBtn.classList.add("paused");
+      pauseResumeBtn.disabled = !hasItemsToProcess;
+    } else { 
+      pauseResumeBtn.innerHTML = "⏸️";
+      pauseResumeBtn.title = "Pause capture";
+      pauseResumeBtn.classList.remove("paused");
+      pauseResumeBtn.disabled = !isProcessing || !hasItemsToProcess;
+    }
+    console.log(
+      `updatePauseResumeButton: isPaused=${this.isPaused}, isProcessing=${isProcessing}, hasItems=${hasItemsToProcess}, btnDisabled=${pauseResumeBtn.disabled}`
+    );
   }
-  // For diagnostics, let's see the state:
-  console.log(
-    `updatePauseResumeButton: isPaused=${this.isPaused}, isProcessing=${isProcessing}, hasItems=${hasItemsToProcess}, btnDisabled=${pauseResumeBtn.disabled}`
-  );
-}
+
   _toggleCaptureSettings() {
     const content = document.getElementById("captureSettingsContent");
     const wrapper = document.getElementById("captureSettingsToggle");
@@ -1180,7 +1096,7 @@ updatePauseResumeButton() {
     const isCollapsed = content.classList.toggle("collapsed");
     wrapper.classList.toggle("collapsed", isCollapsed);
 
-    console.log(`Settings toggled. Collapsed: ${isCollapsed}`);
+    console.log(`Capture settings toggled. Collapsed: ${isCollapsed}`);
   }
 
   _setCaptureSettingsCollapsed(collapsed) {
@@ -1190,7 +1106,6 @@ updatePauseResumeButton() {
     if (!content || !wrapper) {
       return;
     }
-
     content.classList.toggle("collapsed", collapsed);
     wrapper.classList.toggle("collapsed", collapsed);
   }
