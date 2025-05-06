@@ -50,7 +50,7 @@ class App {
 
     this._setupEventListeners();
     this._initializeUI();
-    this._setupEventHandlers();
+    this._setupEventHandlers(); // Event handlers setup, including the modified CAPTURE_PROGRESS
 
     document.body.classList.add("simple-mode");
     document.body.classList.remove("advanced-mode");
@@ -137,7 +137,6 @@ class App {
       statusElement.style.color = "green";
       loginOptionSection.style.display = "block";
       this._enableLoginOptions();
-      // captureForm remains hidden until login choice is made
     } else {
       this.baseUrlValid = false;
       this.baseUrl = url;
@@ -146,7 +145,6 @@ class App {
       statusElement.style.color = "red";
       urlFetcher.projectName = "";
       this._disableLoginOptions();
-      // captureForm remains hidden
       urlSelector.cleanup();
     }
     this._checkCaptureButtonState();
@@ -227,12 +225,11 @@ class App {
         UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
     }
 
-
     if (UI.elements.captureBtn) {
       UI.elements.captureBtn.disabled = true;
     }
     this.createPauseResumeButton();
-    this._setCaptureSettingsCollapsed(false); // Start expanded
+    this._setCaptureSettingsCollapsed(false);
 
     const manualArea = document.getElementById("manualJsonInputArea");
     if (manualArea) manualArea.style.display = "none";
@@ -334,7 +331,6 @@ class App {
       return;
     }
      screenSizeRow.style.display = 'flex';
-
 
     let waitTimeContainer = document.getElementById("simpleWaitTimeContainer");
     let simpleWaitTimeInput = document.getElementById("simpleWaitTime");
@@ -633,9 +629,16 @@ class App {
   }
 
   _setupEventHandlers() {
+    // MODIFICATION: Prepend hourglass to CAPTURE_PROGRESS messages
     events.on(events.events.CAPTURE_PROGRESS, (data) => {
       if (data && data.message && UI.elements.progress) {
-          UI.progress.updateProgressMessage(data.message);
+          let messageWithIcon = data.message;
+          // Add icon to most progress messages for visual cue
+          // Exclude if it already seems to have a specific icon like ✓ or ✗ from showStatus
+          if (!messageWithIcon.startsWith("✓ ") && !messageWithIcon.startsWith("✗ ") && !messageWithIcon.startsWith("⚠️ ") && !messageWithIcon.startsWith("ℹ️ ")) {
+              messageWithIcon = "⏳ " + data.message;
+          }
+          UI.progress.updateProgressMessage(messageWithIcon);
       }
     });
 
@@ -850,8 +853,11 @@ class App {
                  const failedCount = AppState.failedUrls.length;
                  const successCount = AppState.screenshots.size;
                  const totalProcessedOrAttempted = this.captureQueue?.length || 0;
-                 const completionMessage = `Capture complete. Processed ${totalProcessedOrAttempted} pages (${successCount} success, ${failedCount} failed).`;
-                 UI.utils.showStatus(completionMessage, failedCount > 0, 0);
+                 const hadFailures = failedCount > 0;
+                 const icon = hadFailures ? "⚠️ " : "✓ ";
+                 const completionMessageText = `Capture complete. Processed ${totalProcessedOrAttempted} pages (${successCount} success, ${failedCount} failed).`;
+                 const fullCompletionMessage = icon + completionMessageText;
+                 UI.utils.showStatus(fullCompletionMessage, hadFailures, 0);
              }
         } else if (!isQueueFullyProcessed && !errorInCaptureSetup && this.startTotalTime > 0) {
             console.warn("Capture ended; not paused, not fully processed, and no major setup error noted. Displaying partial stats.");
@@ -859,7 +865,8 @@ class App {
                  const failedCount = AppState.failedUrls.length;
                  const successCount = AppState.screenshots.size;
                  const totalPagesInQueue = this.captureQueue?.length || (successCount + failedCount);
-                 const partialMessage = `Processing finished. Captured ${successCount + failedCount} of ${totalPagesInQueue} pages.`;
+                 const icon = failedCount > 0 ? "⚠️ " : "ℹ️ ";
+                 const partialMessage = `${icon}Processing finished. Captured ${successCount + failedCount} of ${totalPagesInQueue} pages.`;
                  UI.utils.showStatus(partialMessage, failedCount > 0, 0);
                  UI.progress.updateStats(
                     totalPagesInQueue,
@@ -868,7 +875,7 @@ class App {
                     totalTimeTakenSec
                  );
             } else if (!errorInCaptureSetup) {
-                UI.utils.showStatus("No pages were processed.", false, 0);
+                UI.utils.showStatus("ℹ️ No pages were processed.", false, 0);
             }
         }
       } else {
@@ -929,8 +936,9 @@ class App {
 
       const { url, index, capturePreset, captureFullPage, actionSequences } = item;
 
+      // MODIFICATION: Prepend hourglass to "Processing..." message
       if(UI.elements.progress) UI.progress.updateProgressMessage(
-        `Processing ${itemIndex + 1} of ${totalUrls}: ${url}`
+        `⏳ Processing ${itemIndex + 1} of ${totalUrls}: ${url}`
       );
       if(UI.elements.progressBar) UI.progress.updateProgress(itemIndex, totalUrls);
 
@@ -1007,18 +1015,16 @@ class App {
       console.log("Queue processing finished normally.");
       this._processingQueue = false;
       // Final completion message is now handled in captureScreenshots().finally
-      // this.updatePauseResumeButton(); // Also handled by captureScreenshots().finally
     } else if (this.isPaused) {
       console.log("Queue processing paused.");
       if(UI.elements.progress) UI.utils.showStatus(
-        `Capture paused at URL ${this.currentCaptureIndex + 1} of ${totalUrls}. Click Resume (▶️) to continue.`,
+        `⏳ Capture paused at URL ${this.currentCaptureIndex + 1} of ${totalUrls}. Click Resume (▶️) to continue.`, // Added icon here too
         false,
         0
       );
     } else {
       console.warn("Queue loop finished unexpectedly (not paused, not completed).");
       this._processingQueue = false;
-      // this.updatePauseResumeButton(); // Handled by captureScreenshots().finally
     }
   }
 
@@ -1049,7 +1055,7 @@ class App {
       console.log("Pause requested.");
     } else { 
       console.log("Resume requested.");
-      if(UI.elements.progress) UI.utils.showStatus("", false, 1);
+      if(UI.elements.progress) UI.utils.showStatus("", false, 1); // Clear pause message
       if (this.currentCaptureIndex < this.captureQueue.length && !this._processingQueue) {
         this.processCaptureQueue();
       } else if (this._processingQueue) {
@@ -1079,9 +1085,10 @@ class App {
       pauseResumeBtn.classList.remove("paused");
       pauseResumeBtn.disabled = !isProcessing || !hasItemsToProcess;
     }
-    console.log(
-      `updatePauseResumeButton: isPaused=${this.isPaused}, isProcessing=${isProcessing}, hasItems=${hasItemsToProcess}, btnDisabled=${pauseResumeBtn.disabled}`
-    );
+    // This console.log can be helpful for debugging button states:
+    // console.log(
+    //   `updatePauseResumeButton: isPaused=${this.isPaused}, isProcessing=${isProcessing}, hasItems=${hasItemsToProcess}, btnDisabled=${pauseResumeBtn.disabled}`
+    // );
   }
 
   _toggleCaptureSettings() {

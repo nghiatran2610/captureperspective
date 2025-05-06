@@ -144,12 +144,35 @@ textarea {
   padding: var(--spacing-md);
   border-radius: 4px;
   text-align: center;
-  transition: opacity 0.5s ease-out; /* Added transition */
-  opacity: 1; /* Start visible */
+  transition: opacity 0.5s ease-out;
+  opacity: 1; /* Default to visible when it has content */
+  border: 1px solid transparent; /* Base border, can be overridden */
 }
 .status-message:empty {
-  display: none; /* Hide if empty */
+  display: none;
 }
+
+.status-message.success { /* Your existing success style */
+  background-color: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb; /* Ensure border matches */
+}
+
+.status-message.error { /* Your existing error style */
+  background-color: #f8d7da;
+  color: #721c24;
+  border-color: #f5c6cb; /* Ensure border matches */
+}
+
+/* New style for neutral progress updates */
+.status-message.progress-update {
+  background-color: #e9ecef; /* A light grey background */
+  color: #495057;             /* A darker grey text for good contrast */
+  border-color: #ced4da;     /* A slightly darker grey border */
+  /* You could also add a subtle left border for emphasis if desired: */
+  /* border-left: 3px solid #6c757d; */
+}
+
 
 .success {
   background-color: #d4edda;

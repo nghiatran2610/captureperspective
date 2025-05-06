@@ -8,7 +8,7 @@ export const progress = {
      * @param {number} total - Total number of operations
      */
     updateProgress(completed, total) {
-      if (elements.progressBar) { // Add null check for robustness
+      if (elements.progressBar) { // Add null check
         elements.progressBar.style.width = `${(completed / total) * 100}%`;
       }
     },
@@ -29,7 +29,7 @@ export const progress = {
     
     /**
      * Update progress message in the #progress element.
-     * This function now ensures the message is visible and clears previous timers.
+     * Applies a neutral 'progress-update' style.
      * @param {string} message - Progress message to display.
      */
     updateProgressMessage(message) {
@@ -46,19 +46,18 @@ export const progress = {
           elements.progress.fadeoutTimer = null;
         }
 
-        // Ensure the progress message area is visible and styled neutrally
+        // Ensure the progress message area is visible and styled
         elements.progress.style.transition = 'none'; // Remove transition before immediate style changes
         elements.progress.style.opacity = '1';       // Make it visible
         
-        // Reset class to base 'status-message' to remove 'success'/'error' if they were set
-        // and ensure it's not hidden by '.status-message:empty' if message is brief
         if (message && message.trim() !== "") {
-            elements.progress.className = 'status-message'; 
+            // Apply the new neutral style for progress updates
+            elements.progress.className = 'status-message progress-update'; 
         } else {
-            // If setting an empty message, behave like UI.utils.showStatus(null)
+            // If setting an empty message, reset to base and hide
             elements.progress.textContent = '';
-            elements.progress.className = 'status-message';
-            elements.progress.style.opacity = '0';
+            elements.progress.className = 'status-message'; // Base class
+            elements.progress.style.opacity = '0'; // Hide if empty
         }
 
       } else {
