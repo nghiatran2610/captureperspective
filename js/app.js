@@ -931,115 +931,164 @@ class App {
       // Redundant _processingQueue = false removed, handled above or in processCaptureQueue
     }
   }
-
+  
   async processCaptureQueue() {
+    // If paused, or if the queue is finished, stop processing.
     if (this.isPaused || this.currentCaptureIndex >= this.captureQueue.length) {
       if (this.isPaused) {
+        // If we are explicitly pausing, mark processing as false.
         this._processingQueue = false;
       }
+      // Note: The updatePauseResumeButton() call is handled by pauseResumeCapture()
+      // or by the finally block in captureScreenshots() when the queue fully completes.
       return;
     }
+
+    // If processing is not already flagged as active (e.g., starting or resuming)
     if (!this._processingQueue) {
-      this._processingQueue = true;
+      this._processingQueue = true; // Mark processing as active
       console.log("Starting/Resuming queue processing...");
+      this.updatePauseResumeButton(); // <<< --- MODIFICATION: Update button state immediately
     }
+
     const totalUrls = this.captureQueue.length;
+    // Ensure the main capture button is disabled while the queue is running.
+    if (UI.elements.captureBtn) {
+        UI.elements.captureBtn.disabled = true;
+    }
+
+    // Process items in the queue as long as not paused and items remain
     while (this.currentCaptureIndex < totalUrls && !this.isPaused) {
-      const itemIndex = this.currentCaptureIndex;
+      const itemIndex = this.currentCaptureIndex; // Get current item's original index for reference
       const item = this.captureQueue[itemIndex];
+
+      // Safety check for invalid item in the queue
       if (!item || !item.url) {
-        console.error(`Invalid item at index ${itemIndex}`, item);
-        AppState.addFailedUrl(`Invalid Item @ ${itemIndex}`);
-        this.currentCaptureIndex++;
-        continue;
+        console.error(`Invalid item at queue index ${itemIndex}:`, item);
+        AppState.addFailedUrl(`Invalid Item @ Queue Index ${itemIndex}`);
+        this.currentCaptureIndex++; // Move to the next item
+        UI.progress.updateProgress(this.currentCaptureIndex, totalUrls); // Update progress bar
+        continue; // Skip to the next iteration
       }
-      const { url, index, capturePreset, captureFullPage, actionSequences } =
-        item;
+
+      const { url, index, capturePreset, captureFullPage, actionSequences } = item;
+
+      // Update UI with current processing status
       UI.progress.updateProgressMessage(
         `Processing ${itemIndex + 1} of ${totalUrls}: ${url}`
       );
-      UI.progress.updateProgress(itemIndex, totalUrls);
+      UI.progress.updateProgress(itemIndex, totalUrls); // Update progress bar based on current actual item
+
       try {
+        // Attempt to take the screenshot
         const result = await ScreenshotCapture.takeScreenshot(
           url,
           capturePreset,
           captureFullPage,
-          actionSequences
+          actionSequences || [] // Ensure actionsList is an array
         );
+
+        // If paused during screenshot capture, stop further processing for this item.
         if (this.isPaused) {
-          this._processingQueue = false;
-          break;
+          this._processingQueue = false; // Mark processing as stopped due to pause
+          break; // Exit the while loop
         }
+
+        // Generate filename and add details to the result
         const timestamp = URLProcessor.getTimestamp();
-        const baseFileName = URLProcessor.generateFilename(url, index, "");
+        const baseFileName = URLProcessor.generateFilename(url, index, ""); // index is original from urlList
         const fullPageSuffix = captureFullPage ? "_FullPage" : "";
         const fileName = baseFileName.replace(
           ".png",
           `${fullPageSuffix}_${timestamp}.png`
         );
-        result.fileName = fileName;
-        UI.thumbnails.addLiveThumbnail(result, fileName, url);
-        AppState.addScreenshot(url, result);
-        AppState.removeFailedUrl(url);
+        result.fileName = fileName; // Add generated filename to the result object
+
+        // Add the live thumbnail to the UI
+        UI.thumbnails.addLiveThumbnail(result, fileName, url); // sequenceName is url for simple mode
+        AppState.addScreenshot(url, result); // Store successful screenshot
+        AppState.removeFailedUrl(url); // Remove from failed list if it was there before
+
       } catch (error) {
+        // If paused during error handling, stop.
         if (this.isPaused) {
           this._processingQueue = false;
           break;
         }
-        handleError(error, { logToConsole: true, showToUser: false });
+
+        handleError(error, { logToConsole: true, showToUser: false }); // Log error, don't show to user here
+
+        // Create an error result object for the thumbnail
         const timestamp = URLProcessor.getTimestamp();
         const baseFileName = URLProcessor.generateFilename(url, index, "");
         const fullPageSuffix = captureFullPage ? "_FullPage" : "";
         const fileName = baseFileName.replace(
-          ".png",
-          `${fullPageSuffix}_Error_${timestamp}.png`
+            ".png",
+            `${fullPageSuffix}_Error_${timestamp}.png`
         );
         const errorResult = {
           error: true,
-          errorMessage: error.message || "Unknown error",
-          sequenceName: url,
-          url: error.url || url,
+          errorMessage: error.message || "Unknown error during capture",
+          sequenceName: url, // Or a more specific name if available
+          url: error.url || url, // URL from the error object or the item
         };
         UI.thumbnails.addLiveThumbnail(errorResult, fileName, url);
-        AppState.addFailedUrl(url);
+        AppState.addFailedUrl(url); // Add to failed list
+
+        // Show specific error status in the UI
         const displayError =
           error instanceof ScreenshotError
             ? `(${error.reason || error.message})`
             : `(${error.message || "Unknown"})`;
         UI.utils.showStatus(`✗ Failed: ${url} ${displayError}`, true);
       }
-      this.currentCaptureIndex++;
-      UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
+
+      this.currentCaptureIndex++; // Move to the next item in the queue
+      UI.progress.updateProgress(this.currentCaptureIndex, totalUrls); // Update progress bar
+
+      // Add a small delay between processing items if not paused
       if (this.currentCaptureIndex < totalUrls && !this.isPaused) {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        await new Promise((resolve) => setTimeout(resolve, 250)); // 250ms delay
       }
+
+      // If paused during the delay or after processing, break the loop
       if (this.isPaused) {
         this._processingQueue = false;
         break;
       }
-    }
+    } // End of while loop
+
+    // After the loop (either completed all items or was paused)
     const isFinished = this.currentCaptureIndex >= totalUrls;
+
     if (isFinished && !this.isPaused) {
+      // Queue completed all items normally
       console.log("Queue processing finished normally.");
       const failedCount = AppState.failedUrls.length;
-      const successCount = totalUrls - failedCount;
-      const completionMessage = `Capture complete11. Processed ${totalUrls} pages (${successCount} success, ${failedCount} failed).`;
-      UI.utils.showStatus(completionMessage, failedCount > 0, 0);
-      this._processingQueue = false;
+      const successCount = AppState.screenshots.size; // More accurate count of successes
+      const completionMessage = `Capture complete. Processed ${totalUrls} pages (${successCount} success, ${failedCount} failed).`;
+      UI.utils.showStatus(completionMessage, failedCount > 0, 0); // Persistent message
+      this._processingQueue = false; // Mark processing as no longer active
     } else if (this.isPaused) {
+      // Queue was paused mid-way
       console.log("Queue processing paused.");
       UI.utils.showStatus(
-        `Capture paused at URL ${
-          this.currentCaptureIndex + 1
-        } of ${totalUrls}. Click Resume (▶️) to continue.`,
-        false,
-        0
+        `Capture paused at URL ${this.currentCaptureIndex + 1} of ${totalUrls}. Click Resume (▶️) to continue.`,
+        false, // Not an error message
+        0 // Persistent message
       );
+      // _processingQueue was already set to false when isPaused became true (or should have been)
     } else {
+      // This case should ideally not be reached if logic is sound (e.g. loop finished but not 'isFinished' and not 'isPaused')
       console.warn("Queue loop finished unexpectedly.");
-      this._processingQueue = false;
+      this._processingQueue = false; // Ensure processing is marked as not active
     }
+
+    // Final state updates for buttons are primarily handled by the `finally` block
+    // in `captureScreenshots` and by `pauseResumeCapture` itself.
   }
+
+
 
   createPauseResumeButton() {
     const buttonContainer = UI.elements.buttonContainer;
@@ -1094,25 +1143,31 @@ class App {
     }
   }
 
-  updatePauseResumeButton() {
-    const pauseResumeBtn = document.getElementById("pauseResumeBtn");
-    if (!pauseResumeBtn) return;
-    const hasItemsToProcess =
-      this.currentCaptureIndex < this.captureQueue.length;
-    const isProcessing = this._processingQueue;
-    if (this.isPaused) {
-      pauseResumeBtn.innerHTML = "▶️";
-      pauseResumeBtn.title = "Resume capture";
-      pauseResumeBtn.classList.add("paused");
-      pauseResumeBtn.disabled = !hasItemsToProcess;
-    } else {
-      pauseResumeBtn.innerHTML = "⏸️";
-      pauseResumeBtn.title = "Pause capture";
-      pauseResumeBtn.classList.remove("paused");
-      pauseResumeBtn.disabled = !isProcessing || !hasItemsToProcess;
-    }
-  }
+updatePauseResumeButton() {
+  const pauseResumeBtn = document.getElementById("pauseResumeBtn");
+  if (!pauseResumeBtn) return;
 
+  const hasItemsToProcess = this.currentCaptureIndex < this.captureQueue.length;
+  const isProcessing = this._processingQueue;
+
+  if (this.isPaused) {
+    pauseResumeBtn.innerHTML = "▶️"; // Resume icon
+    pauseResumeBtn.title = "Resume capture";
+    pauseResumeBtn.classList.add("paused");
+    // Enable if there are items to process, disable if queue is done
+    pauseResumeBtn.disabled = !hasItemsToProcess;
+  } else { // Not paused (i.e., running or finished)
+    pauseResumeBtn.innerHTML = "⏸️"; // Pause icon
+    pauseResumeBtn.title = "Pause capture";
+    pauseResumeBtn.classList.remove("paused");
+    // Enable if actively processing AND has items. Disable otherwise (finished or before start).
+    pauseResumeBtn.disabled = !isProcessing || !hasItemsToProcess;
+  }
+  // For diagnostics, let's see the state:
+  console.log(
+    `updatePauseResumeButton: isPaused=${this.isPaused}, isProcessing=${isProcessing}, hasItems=${hasItemsToProcess}, btnDisabled=${pauseResumeBtn.disabled}`
+  );
+}
   _toggleCaptureSettings() {
     const content = document.getElementById("captureSettingsContent");
     const wrapper = document.getElementById("captureSettingsToggle");
