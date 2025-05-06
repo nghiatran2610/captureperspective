@@ -839,9 +839,9 @@ class App {
     try {
       AppState.reset();
       UI.utils.resetUI();
-      this.isPaused = false;
-      this.captureQueue = [];
-      this.currentCaptureIndex = 0;
+      // this.isPaused = false; // Moved down
+      // this.captureQueue = []; // Moved down
+      // this.currentCaptureIndex = 0; // Moved down
       this._setCaptureSettingsCollapsed(true);
 
       const capturePreset =
@@ -865,26 +865,33 @@ class App {
       }
 
       UI.progress.updateStats(urlList.length, 0, 0, 0);
-      UI.elements.captureBtn.disabled = true;
-      this.updatePauseResumeButton();
+      UI.elements.captureBtn.disabled = true; // Disable main capture button
 
+      // *** MODIFICATION START ***
+      // Prepare queue and state variables related to processing BEFORE updating the pause/resume button
       this.captureQueue = urlList.map((url, index) => ({
         url,
         index,
         capturePreset,
         captureFullPage,
-        actionSequences: [],
+        actionSequences: [], // Assuming simple mode for this part, adjust if needed
       }));
       this.currentCaptureIndex = 0;
+      this.isPaused = false; // Ensure isPaused is false at the start
+      this._processingQueue = true; // Set processing flag to true
 
-      this._processingQueue = true;
+      this.updatePauseResumeButton(); // NOW update the pause/resume button.
+      // _processingQueue is true, isPaused is false,
+      // so the button should show "Pause" ⏸️ and be enabled.
+      // *** MODIFICATION END ***
+
       await this.processCaptureQueue();
     } catch (error) {
       handleError(error, { logToConsole: true, showToUser: true });
-      this._processingQueue = false;
+      this._processingQueue = false; // Ensure reset on error
       this._setCaptureSettingsCollapsed(false);
-      this._checkCaptureButtonState();
-      this.updatePauseResumeButton();
+      // this._checkCaptureButtonState(); // Redundant here, finally block handles it
+      // this.updatePauseResumeButton(); // Redundant here, finally block handles it
       if (progressOutput) progressOutput.style.display = "none";
     } finally {
       const isFinished = this.currentCaptureIndex >= this.captureQueue.length;
@@ -892,6 +899,7 @@ class App {
       const totalTimeTaken = this.startTotalTime
         ? ((endTotalTime - this.startTotalTime) / 1000).toFixed(2)
         : "N/A";
+
       if (this.startTotalTime && isFinished && !this.isPaused) {
         UI.progress.updateStats(
           this.captureQueue.length,
@@ -900,12 +908,17 @@ class App {
           totalTimeTaken
         );
       }
+
+      // If not paused (i.e., process completed or errored out fully),
+      // then _processingQueue should be false.
       if (!this.isPaused) {
-        this._checkCaptureButtonState();
-        this.updatePauseResumeButton();
-      } else {
-        if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+        this._processingQueue = false;
       }
+
+      // Update button states after everything, regardless of pause state
+      this._checkCaptureButtonState(); // This will enable/disable captureBtn
+      this.updatePauseResumeButton(); // This will correctly reflect pause/resume state
+
       const pdfBtnVisible = AppState.screenshots.size > 0;
       const combineAllPdfBtn = document.querySelector(".combine-all-pdf-btn");
       if (combineAllPdfBtn?.parentElement) {
@@ -915,9 +928,7 @@ class App {
         pdfContainer.style.display = pdfBtnVisible ? "flex" : "none";
         combineAllPdfBtn.disabled = !pdfBtnVisible;
       }
-      if (!this.isPaused) {
-        this._processingQueue = false;
-      }
+      // Redundant _processingQueue = false removed, handled above or in processCaptureQueue
     }
   }
 
@@ -1012,7 +1023,7 @@ class App {
       console.log("Queue processing finished normally.");
       const failedCount = AppState.failedUrls.length;
       const successCount = totalUrls - failedCount;
-      const completionMessage = `Capture complete. Processed ${totalUrls} pages (${successCount} success, ${failedCount} failed).`;
+      const completionMessage = `Capture complete11. Processed ${totalUrls} pages (${successCount} success, ${failedCount} failed).`;
       UI.utils.showStatus(completionMessage, failedCount > 0, 0);
       this._processingQueue = false;
     } else if (this.isPaused) {
