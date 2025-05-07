@@ -25,7 +25,6 @@ body {
   color: var(--text-color);
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--spacing-xl);
   box-sizing: border-box;
 }
 
@@ -76,7 +75,6 @@ textarea {
 .input-row {
   display: flex;
   gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
   flex-wrap: wrap;
 }
 
@@ -1177,7 +1175,6 @@ body.advanced-mode .simple-mode-settings {
   display: flex;
   align-items: center;
   padding: 10px 15px; /* Add some padding */
-  margin-bottom: 10px; /* Space below */
 }
 .base-url-label {
   font-weight: 600;
