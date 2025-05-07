@@ -74,8 +74,8 @@
             class="setting-container important-setting-group page-source-selector"
             style="display: none"
           >
-            <label style="font-weight: bold; margin-bottom: 5px; display: block"
-              >Page Source:</label
+            <label style="font-weight: bold; display: block"
+              >Load Pages</label
             >
             <div class="input-row">
               <label>
@@ -86,7 +86,7 @@
                   id="sourceAutomatic"
                   checked
                 />
-                Load Automatically (from Project URL)
+                Automatically
               </label>
               <label>
                 <input
@@ -95,7 +95,7 @@
                   value="manual"
                   id="sourceManual"
                 />
-                Load Manually (from JSON)
+                From JSON (Perspective Page Configuration)
               </label>
             </div>
           </div>
@@ -105,10 +105,6 @@
             class="setting-container manual-input-options"
             style="display: none"
           >
-            <label
-              style="display: block; margin-bottom: 10px; font-weight: bold"
-              >Manual Page Input:</label
-            >
             <div class="manual-input-group">
               <div class="manual-paste-group">
                 <label for="manualJsonText" class="manual-input-label"
@@ -138,7 +134,7 @@
               class="btn btn-small load-manual-btn"
               style="margin-top: 10px"
             >
-              Load Manual Pages
+              Load Pages
             </button>
             <div
               id="manualJsonStatus"

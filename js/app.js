@@ -529,10 +529,6 @@ class App {
       if (jsonTextArea) {
         jsonTextArea.value = fileContent;
         console.log(`File "${file.name}" content loaded into textarea.`);
-        if (manualJsonStatus) {
-          manualJsonStatus.textContent = `File "${file.name}" ready. Click "Load Manual Pages" to process.`;
-          manualJsonStatus.style.color = "blue";
-        }
       }
     } catch (readError) {
       console.error("Error reading file:", readError);
@@ -582,7 +578,7 @@ class App {
         "Error: No JSON content to load (paste or upload a file).";
       manualJsonStatus.style.color = "red";
       loadBtn.disabled = false;
-      loadBtn.textContent = "Load Manual Pages";
+      loadBtn.textContent = "Load Pages";
       return;
     }
 
@@ -638,7 +634,7 @@ class App {
       if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
     } finally {
       loadBtn.disabled = false;
-      loadBtn.textContent = "Load Manual Pages";
+      loadBtn.textContent = "Load Pages";
       this._checkCaptureButtonState();
     }
   }

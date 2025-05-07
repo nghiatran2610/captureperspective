@@ -69,8 +69,6 @@ input[type="checkbox"] {
 
 textarea {
   width: 100%;
-  /* Removed fixed padding/font-size, set in specific rules now */
-  margin-bottom: var(--spacing-lg);
   resize: vertical;
   /* Removed fixed height */
 }
