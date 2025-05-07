@@ -17,7 +17,7 @@
         <label for="baseUrlInput" class="base-url-label">Project URL</label>
         <input
           type="text"
-          placeholder="http://localhost:8088/data/perspective/client/PROJECT_NAME"
+          placeholder="http://GATEWAY_IP:PORT/data/perspective/client/PROJECT_NAME"
           class="base-url-input"
           id="baseUrlInput"
           aria-describedby="baseUrlStatus"
@@ -204,6 +204,7 @@
         >
           📸
         </button>
+        <div id="captureWarningMessage" style="display: none"></div>
       </div>
     </div>
 

@@ -114,23 +114,23 @@ class App {
     captureForm.style.display = "none";
     progressOutput.style.display = "none";
     pageSourceSelection.style.display = "none";
-    
+
     // MODIFICATION: Explicitly uncheck login option radio buttons
     const loginRadios = document.querySelectorAll('input[name="loginOption"]');
-    loginRadios.forEach(radio => {
-        radio.checked = false;
+    loginRadios.forEach((radio) => {
+      radio.checked = false;
     });
 
     // Also, reset the LoginHandler's state as the project context is changing significantly.
     if (this.loginHandler) {
-        this.loginHandler.isLoggedIn = false;
-        this.loginHandler.loggedInUsername = null;
-        this.loginHandler.selectedLoginOption = 'login'; // Reset to default or null
-        this.loginHandler.stopSessionPolling();
-        this.loginHandler.hideLoginFrame();
-        if (typeof this.loginHandler.updateLoginStatus === 'function') {
-            this.loginHandler.updateLoginStatus('logged-out', 'Not authenticated');
-        }
+      this.loginHandler.isLoggedIn = false;
+      this.loginHandler.loggedInUsername = null;
+      this.loginHandler.selectedLoginOption = "login"; // Reset to default or null
+      this.loginHandler.stopSessionPolling();
+      this.loginHandler.hideLoginFrame();
+      if (typeof this.loginHandler.updateLoginStatus === "function") {
+        this.loginHandler.updateLoginStatus("logged-out", "Not authenticated");
+      }
     }
 
     if (urlSelector.cleanup) urlSelector.cleanup(); // Cleanup URL selector UI
@@ -240,12 +240,11 @@ class App {
   _initializeUI() {
     this._ensureHiddenWaitTimeStorage();
     if (UI.elements.waitTime && UI.elements.waitTime.id === "simpleWaitTime") {
-        UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
-        const hiddenWaitTime = document.getElementById("hiddenWaitTime");
-        if(hiddenWaitTime) hiddenWaitTime.value = UI.elements.waitTime.value;
-
+      UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
+      const hiddenWaitTime = document.getElementById("hiddenWaitTime");
+      if (hiddenWaitTime) hiddenWaitTime.value = UI.elements.waitTime.value;
     } else if (UI.elements.waitTime) {
-        UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
+      UI.elements.waitTime.value = config.ui.defaultWaitTime || 5;
     }
 
     if (UI.elements.captureBtn) {
@@ -270,11 +269,15 @@ class App {
       hiddenWaitTime.value = config.ui.defaultWaitTime || 5;
       document.body.appendChild(hiddenWaitTime);
     }
-    if (!UI.elements.waitTime || (UI.elements.waitTime.id !== "simpleWaitTime" && this.currentMode === "simple")) {
-        const simpleWaitTimeInput = document.getElementById("simpleWaitTime");
-        UI.elements.waitTime = simpleWaitTimeInput || hiddenWaitTime;
+    if (
+      !UI.elements.waitTime ||
+      (UI.elements.waitTime.id !== "simpleWaitTime" &&
+        this.currentMode === "simple")
+    ) {
+      const simpleWaitTimeInput = document.getElementById("simpleWaitTime");
+      UI.elements.waitTime = simpleWaitTimeInput || hiddenWaitTime;
     } else if (!UI.elements.waitTime) {
-        UI.elements.waitTime = hiddenWaitTime;
+      UI.elements.waitTime = hiddenWaitTime;
     }
   }
 
@@ -318,19 +321,25 @@ class App {
     this._setupSimpleModeSettings();
 
     setTimeout(async () => {
-      if (typeof urlSelector.initialize === 'function') { // Always try to ensure it's initialized
-          try {
-            await urlSelector.initialize();
-             // _handleSourceChange will be called by LOGIN_COMPLETE or if source option changes
-            if (UI.elements.captureForm.style.display !== 'none') { // Only if form is visible
-                 this._handleSourceChange();
-            }
-          } catch (error) {
-            console.error("Failed to initialize URL selector in _updateUIMode:", error);
-            if (typeof urlSelector.showFallbackUIIfNeeded === "function") { // Corrected name
-              urlSelector.showFallbackUIIfNeeded();
-            }
+      if (typeof urlSelector.initialize === "function") {
+        // Always try to ensure it's initialized
+        try {
+          await urlSelector.initialize();
+          // _handleSourceChange will be called by LOGIN_COMPLETE or if source option changes
+          if (UI.elements.captureForm.style.display !== "none") {
+            // Only if form is visible
+            this._handleSourceChange();
           }
+        } catch (error) {
+          console.error(
+            "Failed to initialize URL selector in _updateUIMode:",
+            error
+          );
+          if (typeof urlSelector.showFallbackUIIfNeeded === "function") {
+            // Corrected name
+            urlSelector.showFallbackUIIfNeeded();
+          }
+        }
       }
       this._checkCaptureButtonState();
     }, 0);
@@ -342,16 +351,22 @@ class App {
     const parentElement = UI.elements.captureSettingsContent;
     const urlInputContainer = UI.elements.urlInputContainer;
     if (!parentElement || !urlInputContainer) {
-      console.error("Cannot setup simple settings: Parent or URL input container not found.");
+      console.error(
+        "Cannot setup simple settings: Parent or URL input container not found."
+      );
       return;
     }
 
-    const screenSizeRow = parentElement.querySelector(".screen-size-row.important-setting-group");
+    const screenSizeRow = parentElement.querySelector(
+      ".screen-size-row.important-setting-group"
+    );
     if (!screenSizeRow) {
-      console.error("Critical UI Error: .screen-size-row.important-setting-group not found within captureSettingsContent.");
+      console.error(
+        "Critical UI Error: .screen-size-row.important-setting-group not found within captureSettingsContent."
+      );
       return;
     }
-     screenSizeRow.style.display = 'flex';
+    screenSizeRow.style.display = "flex";
 
     let waitTimeContainer = document.getElementById("simpleWaitTimeContainer");
     let simpleWaitTimeInput = document.getElementById("simpleWaitTime");
@@ -372,9 +387,11 @@ class App {
       simpleWaitTimeInput.className = "wait-time-input";
       simpleWaitTimeInput.min = "1";
       simpleWaitTimeInput.max = config.timing.maxWaitTime / 1000 || 120;
-      
-      const hiddenWait = document.getElementById("hiddenWaitTime") || UI.elements.waitTime;
-      simpleWaitTimeInput.value = hiddenWait?.value || config.ui.defaultWaitTime || 5;
+
+      const hiddenWait =
+        document.getElementById("hiddenWaitTime") || UI.elements.waitTime;
+      simpleWaitTimeInput.value =
+        hiddenWait?.value || config.ui.defaultWaitTime || 5;
       waitTimeContainer.appendChild(simpleWaitTimeInput);
 
       events.addDOMEventListener(simpleWaitTimeInput, "change", (event) => {
@@ -385,14 +402,14 @@ class App {
     } else {
       waitTimeContainer.style.display = "flex";
       if (!waitTimeContainer.classList.contains("important-setting-group")) {
-         waitTimeContainer.classList.add("important-setting-group");
+        waitTimeContainer.classList.add("important-setting-group");
       }
     }
     if (simpleWaitTimeInput && UI.elements.waitTime !== simpleWaitTimeInput) {
       UI.elements.waitTime = simpleWaitTimeInput;
       const hiddenWaitTime = document.getElementById("hiddenWaitTime");
-      if(hiddenWaitTime && simpleWaitTimeInput.value) {
-          hiddenWaitTime.value = simpleWaitTimeInput.value;
+      if (hiddenWaitTime && simpleWaitTimeInput.value) {
+        hiddenWaitTime.value = simpleWaitTimeInput.value;
       }
     }
   }
@@ -406,7 +423,9 @@ class App {
       'input[name="pageSourceOption"]:checked'
     )?.value;
     const manualArea = document.getElementById("manualJsonInputArea");
-    const urlSelectorContainer = document.getElementById("urlSelectorContainer"); // This is the one created by url-selector.js
+    const urlSelectorContainer = document.getElementById(
+      "urlSelectorContainer"
+    ); // This is the one created by url-selector.js
     const manualJsonStatus = document.getElementById("manualJsonStatus");
     const jsonTextArea = document.getElementById("manualJsonText");
     const fileInput = document.getElementById("manualJsonFile");
@@ -432,14 +451,19 @@ class App {
       this.captureQueue = [];
       AppState.reset();
       UI.utils.resetUI();
-      if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
-
-    } else { // 'automatic' selected
+      if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+    } else {
+      // 'automatic' selected
       manualArea.style.display = "none";
       if (urlSelectorContainer) {
-          urlSelectorContainer.style.display = "";
-      } else if (typeof urlSelector.initialize === 'function' && !document.getElementById("urlSelectorContainer")) {
-          console.warn("URL Selector container not ready for 'automatic' source change handling yet.");
+        urlSelectorContainer.style.display = "";
+      } else if (
+        typeof urlSelector.initialize === "function" &&
+        !document.getElementById("urlSelectorContainer")
+      ) {
+        console.warn(
+          "URL Selector container not ready for 'automatic' source change handling yet."
+        );
       }
 
       if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
@@ -451,11 +475,18 @@ class App {
         console.log("Automatic source selected, initiating URL fetching...");
         this._initiateUrlFetching();
       } else {
-        console.log("Automatic source selected, but prerequisites (Base URL/Login) not met.");
-        if (urlSelector.container && typeof urlSelector.showLoadingState === 'function') {
-            urlSelector.showLoadingState("Waiting for Base URL & Authentication...");
+        console.log(
+          "Automatic source selected, but prerequisites (Base URL/Login) not met."
+        );
+        if (
+          urlSelector.container &&
+          typeof urlSelector.showLoadingState === "function"
+        ) {
+          urlSelector.showLoadingState(
+            "Waiting for Base URL & Authentication..."
+          );
         }
-        if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+        if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
       }
     }
     this._checkCaptureButtonState();
@@ -477,9 +508,14 @@ class App {
       return;
     }
     const file = fileInput.files[0];
-    if (!file.type || (file.type !== "application/json" && !file.name.toLowerCase().endsWith(".json"))) {
+    if (
+      !file.type ||
+      (file.type !== "application/json" &&
+        !file.name.toLowerCase().endsWith(".json"))
+    ) {
       if (manualJsonStatus) {
-        manualJsonStatus.textContent = "Error: Please select a valid .json file.";
+        manualJsonStatus.textContent =
+          "Error: Please select a valid .json file.";
         manualJsonStatus.style.color = "red";
       }
       fileInput.value = "";
@@ -513,13 +549,17 @@ class App {
   async _handleLoadManualSource() {
     const jsonTextArea = document.getElementById("manualJsonText");
     const manualJsonStatus = document.getElementById("manualJsonStatus");
-    const urlSelectorContainer = document.getElementById("urlSelectorContainer");
+    const urlSelectorContainer = document.getElementById(
+      "urlSelectorContainer"
+    );
     const loadBtn = document.getElementById("loadManualJsonBtn");
     const fileInput = document.getElementById("manualJsonFile");
     const fileNameDisplay = document.getElementById("fileNameDisplay");
 
     if (!jsonTextArea || !manualJsonStatus || !loadBtn) {
-      console.error("Cannot load manual source: Crucial UI elements missing (textarea, status, load button).");
+      console.error(
+        "Cannot load manual source: Crucial UI elements missing (textarea, status, load button)."
+      );
       return;
     }
 
@@ -527,16 +567,19 @@ class App {
     manualJsonStatus.style.color = "";
     loadBtn.disabled = true;
     loadBtn.textContent = "Loading...";
-    if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+    if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
 
     const sourceContent = jsonTextArea.value.trim();
-    const sourceDescription = fileInput?.files?.[0]?.name ? `file "${fileInput.files[0].name}"` : "textarea content";
+    const sourceDescription = fileInput?.files?.[0]?.name
+      ? `file "${fileInput.files[0].name}"`
+      : "textarea content";
 
     if (fileInput) fileInput.value = "";
     if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
 
     if (!sourceContent) {
-      manualJsonStatus.textContent = "Error: No JSON content to load (paste or upload a file).";
+      manualJsonStatus.textContent =
+        "Error: No JSON content to load (paste or upload a file).";
       manualJsonStatus.style.color = "red";
       loadBtn.disabled = false;
       loadBtn.textContent = "Load Manual Pages";
@@ -551,36 +594,48 @@ class App {
 
       if (urlFetcher.dataLoadedDirectly) {
         if (urlSelector.container) {
+          urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
+          if (urlSelectorContainer) urlSelectorContainer.style.display = "";
+        } else if (typeof urlSelector.initialize === "function") {
+          console.warn(
+            "URL Selector was not initialized, attempting now for manual load."
+          );
+          await urlSelector.initialize();
+          if (urlSelector.container) {
             urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
-            if(urlSelectorContainer) urlSelectorContainer.style.display = "";
-        } else if (typeof urlSelector.initialize === 'function') {
-            console.warn("URL Selector was not initialized, attempting now for manual load.");
-            await urlSelector.initialize();
-            if (urlSelector.container) {
-                urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
-                if(urlSelectorContainer) urlSelectorContainer.style.display = "";
-            } else {
-                 throw new Error("Failed to initialize URL Selector for displaying manual data.");
-            }
+            if (urlSelectorContainer) urlSelectorContainer.style.display = "";
+          } else {
+            throw new Error(
+              "Failed to initialize URL Selector for displaying manual data."
+            );
+          }
         }
         manualJsonStatus.textContent = `Success: Loaded ${urlFetcher.urlsList.length} pages from ${sourceDescription}. Select pages to capture.`;
         manualJsonStatus.style.color = "green";
       } else {
-        const errorMsg = urlFetcher.error?.message || "Failed to process JSON data. Check format and console.";
+        const errorMsg =
+          urlFetcher.error?.message ||
+          "Failed to process JSON data. Check format and console.";
         manualJsonStatus.textContent = `Error: ${errorMsg}`;
         manualJsonStatus.style.color = "red";
         if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
         if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
-        if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+        if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
       }
     } catch (error) {
-      console.error(`Error loading manual source from ${sourceDescription}:`, error);
-      const errorMsg = error instanceof AppError ? error.message : "Invalid JSON format or structure.";
+      console.error(
+        `Error loading manual source from ${sourceDescription}:`,
+        error
+      );
+      const errorMsg =
+        error instanceof AppError
+          ? error.message
+          : "Invalid JSON format or structure.";
       manualJsonStatus.textContent = `Error: ${errorMsg}`;
       manualJsonStatus.style.color = "red";
       if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
       if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
-      if(UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+      if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
     } finally {
       loadBtn.disabled = false;
       loadBtn.textContent = "Load Manual Pages";
@@ -597,7 +652,8 @@ class App {
       reader.onerror = (event) => {
         reject(
           new Error(
-            "File could not be read. Error code: " + (event.target.error?.code || 'unknown')
+            "File could not be read. Error code: " +
+              (event.target.error?.code || "unknown")
           )
         );
       };
@@ -611,7 +667,9 @@ class App {
     const loadManualBtn = document.getElementById("loadManualJsonBtn");
 
     if (!captureBtn || !buttonContainer) {
-      console.warn("Capture button or its container not found, cannot update state.");
+      console.warn(
+        "Capture button or its container not found, cannot update state."
+      );
       return;
     }
 
@@ -619,11 +677,11 @@ class App {
       'input[name="pageSourceOption"]:checked'
     )?.value;
 
-    if (loadManualBtn && selectedSource === 'manual') {
-        const jsonTextArea = document.getElementById("manualJsonText");
-        if(jsonTextArea) loadManualBtn.disabled = !jsonTextArea.value.trim(); // Check if jsonTextArea exists
+    if (loadManualBtn && selectedSource === "manual") {
+      const jsonTextArea = document.getElementById("manualJsonText");
+      if (jsonTextArea) loadManualBtn.disabled = !jsonTextArea.value.trim(); // Check if jsonTextArea exists
     } else if (loadManualBtn) {
-        loadManualBtn.disabled = true;
+      loadManualBtn.disabled = true;
     }
 
     const prerequisitesMet =
@@ -633,9 +691,11 @@ class App {
 
     let urlsAvailableAndSelected = false;
     if (selectedSource === "automatic") {
-      urlsAvailableAndSelected = urlFetcher.urlsList.length > 0 && urlSelector.selectedUrls.size > 0;
+      urlsAvailableAndSelected =
+        urlFetcher.urlsList.length > 0 && urlSelector.selectedUrls.size > 0;
     } else if (selectedSource === "manual") {
-      urlsAvailableAndSelected = urlFetcher.dataLoadedDirectly && urlSelector.selectedUrls.size > 0;
+      urlsAvailableAndSelected =
+        urlFetcher.dataLoadedDirectly && urlSelector.selectedUrls.size > 0;
     }
 
     const isReadyToCapture = prerequisitesMet && urlsAvailableAndSelected;
@@ -654,11 +714,16 @@ class App {
   _setupEventHandlers() {
     events.on(events.events.CAPTURE_PROGRESS, (data) => {
       if (data && data.message && UI.elements.progress) {
-          let messageWithIcon = data.message;
-          if (!messageWithIcon.startsWith("✓ ") && !messageWithIcon.startsWith("✗ ") && !messageWithIcon.startsWith("⚠️ ") && !messageWithIcon.startsWith("ℹ️ ")) {
-              messageWithIcon = "⏳ " + data.message;
-          }
-          UI.progress.updateProgressMessage(messageWithIcon);
+        let messageWithIcon = data.message;
+        if (
+          !messageWithIcon.startsWith("✓ ") &&
+          !messageWithIcon.startsWith("✗ ") &&
+          !messageWithIcon.startsWith("⚠️ ") &&
+          !messageWithIcon.startsWith("ℹ️ ")
+        ) {
+          messageWithIcon = "⏳ " + data.message;
+        }
+        UI.progress.updateProgressMessage(messageWithIcon);
       }
     });
 
@@ -692,9 +757,14 @@ class App {
       this.loginHandler.handleLoginOptionChange(data.option);
 
       const captureForm = UI.elements.captureForm;
-      const pageSourceSelection = document.getElementById("pageSourceSelection");
+      const pageSourceSelection = document.getElementById(
+        "pageSourceSelection"
+      );
 
-      if (data.option === "continueWithoutLogin" || (data.option === "login" && this.loginHandler.isLoggedIn)) {
+      if (
+        data.option === "continueWithoutLogin" ||
+        (data.option === "login" && this.loginHandler.isLoggedIn)
+      ) {
         if (captureForm) captureForm.style.display = "";
         if (pageSourceSelection) pageSourceSelection.style.display = "";
         this._updateUIMode();
@@ -707,7 +777,9 @@ class App {
 
     events.on("LOGIN_COMPLETE", (data) => {
       const captureForm = UI.elements.captureForm;
-      const pageSourceSelection = document.getElementById("pageSourceSelection");
+      const pageSourceSelection = document.getElementById(
+        "pageSourceSelection"
+      );
 
       if (data.loggedIn) {
         if (captureForm) captureForm.style.display = "";
@@ -734,28 +806,49 @@ class App {
 
     if (selectedSource !== "automatic") {
       console.log("Skipping automatic URL fetch: Source is not 'automatic'.");
-      if (urlSelector.container && typeof urlSelector.clearRenderedUrls === 'function') {
+      if (
+        urlSelector.container &&
+        typeof urlSelector.clearRenderedUrls === "function"
+      ) {
         urlSelector.clearRenderedUrls();
       }
       return;
     }
 
     if (!this.baseUrlValid || !this.loginHandler.isAuthenticatedForCapture()) {
-      console.warn("Attempted automatic fetch, but Base URL or Login state is invalid.");
-      if (urlSelector.container && typeof urlSelector.showLoadingState === 'function') {
-        urlSelector.showLoadingState("Waiting for Base URL & Authentication...");
+      console.warn(
+        "Attempted automatic fetch, but Base URL or Login state is invalid."
+      );
+      if (
+        urlSelector.container &&
+        typeof urlSelector.showLoadingState === "function"
+      ) {
+        urlSelector.showLoadingState(
+          "Waiting for Base URL & Authentication..."
+        );
       }
       return;
     }
 
-    if (!urlSelector.container && typeof urlSelector.initialize === 'function' && !document.getElementById("urlSelectorContainer")) {
-        console.warn("URL selector not ready for fetching, attempting to initialize.");
-        await urlSelector.initialize();
+    if (
+      !urlSelector.container &&
+      typeof urlSelector.initialize === "function" &&
+      !document.getElementById("urlSelectorContainer")
+    ) {
+      console.warn(
+        "URL selector not ready for fetching, attempting to initialize."
+      );
+      await urlSelector.initialize();
     }
     if (!urlSelector.container) {
-        console.error("URL selector critical error: Container not available for fetching.");
-        UI.utils.showStatus("UI Error: URL Selector component failed to initialize.", true);
-        return;
+      console.error(
+        "URL selector critical error: Container not available for fetching."
+      );
+      UI.utils.showStatus(
+        "UI Error: URL Selector component failed to initialize.",
+        true
+      );
+      return;
     }
 
     urlSelector.showLoadingState();
@@ -764,17 +857,23 @@ class App {
       await urlFetcher.loadUrls();
       console.log("URL fetching from endpoint complete.");
 
-      if (urlSelector.renderUrlCategories) urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
-      if (urlSelector.updateSelectionCounter) urlSelector.updateSelectionCounter();
-
+      if (urlSelector.renderUrlCategories)
+        urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
+      if (urlSelector.updateSelectionCounter)
+        urlSelector.updateSelectionCounter();
     } catch (error) {
-      const displayError = error instanceof AppError ? error.message : "Failed to load page list from server.";
+      const displayError =
+        error instanceof AppError
+          ? error.message
+          : "Failed to load page list from server.";
       if (urlSelector.categoriesContainer) {
         urlSelector.categoriesContainer.innerHTML = `<div class="url-selector-error"><p>${displayError}</p><p>Check server connection or Project URL. Ensure the backend service is running.</p></div>`;
-      } else if (typeof urlSelector.showFallbackUIIfNeeded === 'function') { // Corrected name
+      } else if (typeof urlSelector.showFallbackUIIfNeeded === "function") {
+        // Corrected name
         urlSelector.showFallbackUIIfNeeded();
       }
-      if (urlSelector.updateSelectionCounter) urlSelector.updateSelectionCounter();
+      if (urlSelector.updateSelectionCounter)
+        urlSelector.updateSelectionCounter();
     } finally {
       this._checkCaptureButtonState();
     }
@@ -782,6 +881,10 @@ class App {
 
   async captureScreenshots() {
     const progressOutput = UI.elements.progressOutput;
+    const captureWarningMessage = document.getElementById(
+      "captureWarningMessage"
+    ); // Get warning message element
+
     if (!progressOutput) {
       UI.utils.showStatus("UI Error: Progress area missing.", true);
       return;
@@ -812,24 +915,39 @@ class App {
       UI.utils.resetUI();
       this._setCaptureSettingsCollapsed(true);
 
-      const capturePreset = UI.elements.capturePreset?.value || config.screenshot.defaultPreset;
+      const capturePreset =
+        UI.elements.capturePreset?.value || config.screenshot.defaultPreset;
       const fullPageCheckbox = document.getElementById("fullPageCheckbox");
-      const captureFullPage = fullPageCheckbox ? fullPageCheckbox.checked : false;
+      const captureFullPage = fullPageCheckbox
+        ? fullPageCheckbox.checked
+        : false;
 
       if (typeof urlSelector.getSelectedUrlsForCapture === "function") {
         urlList = urlSelector.getSelectedUrlsForCapture();
       } else {
         errorInCaptureSetup = true;
-        throw new AppError("URL Selector component not available or not initialized.");
+        throw new AppError(
+          "URL Selector component not available or not initialized."
+        );
       }
 
       if (urlList.length === 0) {
         errorInCaptureSetup = true;
-        throw new URLProcessingError("Please select at least one page to capture.", "No URLs selected");
+        throw new URLProcessingError(
+          "Please select at least one page to capture.",
+          "No URLs selected"
+        );
       }
 
       UI.progress.updateStats(urlList.length, 0, 0, 0);
       if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+
+      // Show warning message
+      if (captureWarningMessage) {
+        captureWarningMessage.textContent =
+          "The browser needs to be active for the screenshot to be captured properly";
+        captureWarningMessage.style.display = "block";
+      }
 
       this.captureQueue = urlList.map((url, index) => ({
         url,
@@ -845,79 +963,109 @@ class App {
       this.updatePauseResumeButton();
 
       await this.processCaptureQueue();
-
     } catch (error) {
       errorInCaptureSetup = true;
       handleError(error, { logToConsole: true, showToUser: true });
       this._processingQueue = false;
       this._setCaptureSettingsCollapsed(false);
-      if (errorInCaptureSetup && AppState.screenshots.size === 0 && AppState.failedUrls.length === 0) {
-         if (progressOutput) progressOutput.style.display = "none";
+      if (
+        errorInCaptureSetup &&
+        AppState.screenshots.size === 0 &&
+        AppState.failedUrls.length === 0
+      ) {
+        if (progressOutput) progressOutput.style.display = "none";
       }
     } finally {
       const endTime = performance.now();
-      const totalTimeTakenMs = this.startTotalTime ? (endTime - this.startTotalTime) : 0;
+      const totalTimeTakenMs = this.startTotalTime
+        ? endTime - this.startTotalTime
+        : 0;
       const totalTimeTakenSec = (totalTimeTakenMs / 1000).toFixed(2);
-      const isQueueFullyProcessed = this.currentCaptureIndex >= this.captureQueue.length;
+      const isQueueFullyProcessed =
+        this.currentCaptureIndex >= this.captureQueue.length;
+
+      // Hide warning message
+      if (captureWarningMessage) {
+        captureWarningMessage.style.display = "none";
+      }
 
       if (!this.isPaused) {
         this._processingQueue = false;
         if (isQueueFullyProcessed && this.startTotalTime > 0) {
-             UI.progress.updateStats(
-                 this.captureQueue.length,
-                 AppState.screenshots.size,
-                 AppState.failedUrls.length,
-                 totalTimeTakenSec
-             );
-             if (!errorInCaptureSetup) {
-                 const failedCount = AppState.failedUrls.length;
-                 const successCount = AppState.screenshots.size;
-                 const totalProcessedOrAttempted = this.captureQueue?.length || 0;
-                 const hadFailures = failedCount > 0;
-                 const icon = hadFailures ? "⚠️ " : "✓ ";
-                 const completionMessageText = `Capture complete. Processed ${totalProcessedOrAttempted} pages (${successCount} success, ${failedCount} failed).`;
-                 const fullCompletionMessage = icon + completionMessageText;
-                 UI.utils.showStatus(fullCompletionMessage, hadFailures, 0);
-             }
-        } else if (!isQueueFullyProcessed && !errorInCaptureSetup && this.startTotalTime > 0) {
-            console.warn("Capture ended; not paused, not fully processed, and no major setup error noted. Displaying partial stats.");
-            if(AppState.screenshots.size > 0 || AppState.failedUrls.length > 0 || this.captureQueue.length > 0) {
-                 const failedCount = AppState.failedUrls.length;
-                 const successCount = AppState.screenshots.size;
-                 const totalPagesInQueue = this.captureQueue?.length || (successCount + failedCount);
-                 const icon = failedCount > 0 ? "⚠️ " : "ℹ️ ";
-                 const partialMessage = `${icon}Processing finished. Captured ${successCount + failedCount} of ${totalPagesInQueue} pages.`;
-                 UI.utils.showStatus(partialMessage, failedCount > 0, 0);
-                 UI.progress.updateStats(
-                    totalPagesInQueue,
-                    successCount,
-                    failedCount,
-                    totalTimeTakenSec
-                 );
-            } else if (!errorInCaptureSetup) {
-                UI.utils.showStatus("ℹ️ No pages were processed.", false, 0);
-            }
+          UI.progress.updateStats(
+            this.captureQueue.length,
+            AppState.screenshots.size,
+            AppState.failedUrls.length,
+            totalTimeTakenSec
+          );
+          if (!errorInCaptureSetup) {
+            const failedCount = AppState.failedUrls.length;
+            const successCount = AppState.screenshots.size;
+            const totalProcessedOrAttempted = this.captureQueue?.length || 0;
+            const hadFailures = failedCount > 0;
+            const icon = hadFailures ? "⚠️ " : "✓ ";
+            const completionMessageText = `Capture complete. Processed ${totalProcessedOrAttempted} pages (${successCount} success, ${failedCount} failed).`;
+            const fullCompletionMessage = icon + completionMessageText;
+            UI.utils.showStatus(fullCompletionMessage, hadFailures, 0);
+          }
+        } else if (
+          !isQueueFullyProcessed &&
+          !errorInCaptureSetup &&
+          this.startTotalTime > 0
+        ) {
+          console.warn(
+            "Capture ended; not paused, not fully processed, and no major setup error noted. Displaying partial stats."
+          );
+          if (
+            AppState.screenshots.size > 0 ||
+            AppState.failedUrls.length > 0 ||
+            this.captureQueue.length > 0
+          ) {
+            const failedCount = AppState.failedUrls.length;
+            const successCount = AppState.screenshots.size;
+            const totalPagesInQueue =
+              this.captureQueue?.length || successCount + failedCount;
+            const icon = failedCount > 0 ? "⚠️ " : "ℹ️ ";
+            const partialMessage = `${icon}Processing finished. Captured ${
+              successCount + failedCount
+            } of ${totalPagesInQueue} pages.`;
+            UI.utils.showStatus(partialMessage, failedCount > 0, 0);
+            UI.progress.updateStats(
+              totalPagesInQueue,
+              successCount,
+              failedCount,
+              totalTimeTakenSec
+            );
+          } else if (!errorInCaptureSetup) {
+            UI.utils.showStatus("ℹ️ No pages were processed.", false, 0);
+          }
         }
       } else {
-         if (this.startTotalTime > 0) {
-             UI.progress.updateStats(
-                 this.captureQueue.length,
-                 AppState.screenshots.size,
-                 AppState.failedUrls.length,
-                 totalTimeTakenSec
-             );
-         }
+        if (this.startTotalTime > 0) {
+          UI.progress.updateStats(
+            this.captureQueue.length,
+            AppState.screenshots.size,
+            AppState.failedUrls.length,
+            totalTimeTakenSec
+          );
+        }
       }
       this._checkCaptureButtonState();
       this.updatePauseResumeButton();
       const pdfBtnVisible = AppState.screenshots.size > 0;
       const combineAllPdfBtn = document.querySelector(".combine-all-pdf-btn");
       if (combineAllPdfBtn?.parentElement) {
-          const pdfContainer = combineAllPdfBtn.closest(".combine-all-pdf-container") || combineAllPdfBtn.parentElement;
-          pdfContainer.style.display = pdfBtnVisible ? "flex" : "none";
-          combineAllPdfBtn.disabled = !pdfBtnVisible;
+        const pdfContainer =
+          combineAllPdfBtn.closest(".combine-all-pdf-container") ||
+          combineAllPdfBtn.parentElement;
+        pdfContainer.style.display = pdfBtnVisible ? "flex" : "none";
+        combineAllPdfBtn.disabled = !pdfBtnVisible;
       }
-      if (errorInCaptureSetup && (!urlList || urlList.length === 0) && progressOutput) {
+      if (
+        errorInCaptureSetup &&
+        (!urlList || urlList.length === 0) &&
+        progressOutput
+      ) {
         progressOutput.style.display = "none";
       }
     }
@@ -928,18 +1076,43 @@ class App {
       if (this.isPaused) {
         this._processingQueue = false;
       }
+      // If not paused but queue is finished, ensure warning is hidden
+      if (
+        !this.isPaused &&
+        this.currentCaptureIndex >= this.captureQueue.length
+      ) {
+        const captureWarningMessage = document.getElementById(
+          "captureWarningMessage"
+        );
+        if (captureWarningMessage) {
+          captureWarningMessage.style.display = "none";
+        }
+      }
       return;
     }
+
+    const captureWarningMessage = document.getElementById(
+      "captureWarningMessage"
+    ); // Ensure we can access it here too
 
     if (!this._processingQueue) {
       this._processingQueue = true;
       console.log("Starting/Resuming queue processing...");
       this.updatePauseResumeButton();
+      // Show warning if resuming and it's not already shown
+      if (
+        captureWarningMessage &&
+        captureWarningMessage.style.display === "none"
+      ) {
+        captureWarningMessage.textContent =
+          "The browser needs to be active for the screenshot to be captured properly";
+        captureWarningMessage.style.display = "block";
+      }
     }
 
     const totalUrls = this.captureQueue.length;
     if (UI.elements.captureBtn) {
-        UI.elements.captureBtn.disabled = true;
+      UI.elements.captureBtn.disabled = true;
     }
 
     while (this.currentCaptureIndex < totalUrls && !this.isPaused) {
@@ -950,16 +1123,20 @@ class App {
         console.error(`Invalid item at queue index ${itemIndex}:`, item);
         AppState.addFailedUrl(`Invalid Item @ Queue Index ${itemIndex}`);
         this.currentCaptureIndex++;
-        if(UI.elements.progressBar) UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
+        if (UI.elements.progressBar)
+          UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
         continue;
       }
 
-      const { url, index, capturePreset, captureFullPage, actionSequences } = item;
+      const { url, index, capturePreset, captureFullPage, actionSequences } =
+        item;
 
-      if(UI.elements.progress) UI.progress.updateProgressMessage(
-        `⏳ Processing ${itemIndex + 1} of ${totalUrls}: ${url}`
-      );
-      if(UI.elements.progressBar) UI.progress.updateProgress(itemIndex, totalUrls);
+      if (UI.elements.progress)
+        UI.progress.updateProgressMessage(
+          `⏳ Processing ${itemIndex + 1} of ${totalUrls}: ${url}`
+        );
+      if (UI.elements.progressBar)
+        UI.progress.updateProgress(itemIndex, totalUrls);
 
       try {
         const result = await ScreenshotCapture.takeScreenshot(
@@ -971,6 +1148,7 @@ class App {
 
         if (this.isPaused) {
           this._processingQueue = false;
+          // Don't hide warning here, it should persist if paused mid-queue
           break;
         }
 
@@ -986,10 +1164,10 @@ class App {
         UI.thumbnails.addLiveThumbnail(result, fileName, url);
         AppState.addScreenshot(url, result);
         AppState.removeFailedUrl(url);
-
       } catch (error) {
         if (this.isPaused) {
           this._processingQueue = false;
+          // Don't hide warning here
           break;
         }
         handleError(error, { logToConsole: true, showToUser: false });
@@ -997,8 +1175,8 @@ class App {
         const baseFileName = URLProcessor.generateFilename(url, index, "");
         const fullPageSuffix = captureFullPage ? "_FullPage" : "";
         const fileName = baseFileName.replace(
-            ".png",
-            `${fullPageSuffix}_Error_${timestamp}.png`
+          ".png",
+          `${fullPageSuffix}_Error_${timestamp}.png`
         );
         const errorResult = {
           error: true,
@@ -1016,7 +1194,8 @@ class App {
       }
 
       this.currentCaptureIndex++;
-      if(UI.elements.progressBar) UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
+      if (UI.elements.progressBar)
+        UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
 
       if (this.currentCaptureIndex < totalUrls && !this.isPaused) {
         await new Promise((resolve) => setTimeout(resolve, 250));
@@ -1024,6 +1203,7 @@ class App {
 
       if (this.isPaused) {
         this._processingQueue = false;
+        // Don't hide warning here
         break;
       }
     }
@@ -1033,16 +1213,33 @@ class App {
     if (isFinished && !this.isPaused) {
       console.log("Queue processing finished normally.");
       this._processingQueue = false;
+      if (captureWarningMessage) {
+        // Hide warning when fully finished
+        captureWarningMessage.style.display = "none";
+      }
     } else if (this.isPaused) {
       console.log("Queue processing paused.");
-      if(UI.elements.progress) UI.utils.showStatus(
-        `⏳ Capture paused at URL ${this.currentCaptureIndex + 1} of ${totalUrls}. Click Resume (▶️) to continue.`,
-        false,
-        0
-      );
+      if (UI.elements.progress)
+        UI.utils.showStatus(
+          `⏳ Capture paused at URL ${
+            this.currentCaptureIndex + 1
+          } of ${totalUrls}. Click Resume (▶️) to continue.`,
+          false,
+          0
+        );
+      // Ensure warning remains visible if paused
+      if (captureWarningMessage) {
+        captureWarningMessage.style.display = "block";
+      }
     } else {
-      console.warn("Queue loop finished unexpectedly (not paused, not completed).");
+      console.warn(
+        "Queue loop finished unexpectedly (not paused, not completed)."
+      );
       this._processingQueue = false;
+      if (captureWarningMessage) {
+        // Hide if ended unexpectedly but not paused
+        captureWarningMessage.style.display = "none";
+      }
     }
   }
 
@@ -1055,7 +1252,11 @@ class App {
     pauseResumeBtn.className = "btn icon-btn pause-resume-btn";
     pauseResumeBtn.innerHTML = "⏸️";
     pauseResumeBtn.title = "Pause capture";
-    events.addDOMEventListener(pauseResumeBtn, "click", this.pauseResumeCapture);
+    events.addDOMEventListener(
+      pauseResumeBtn,
+      "click",
+      this.pauseResumeCapture
+    );
 
     const captureBtn = UI.elements.captureBtn;
     if (captureBtn && buttonContainer.contains(captureBtn)) {
@@ -1068,18 +1269,40 @@ class App {
 
   pauseResumeCapture() {
     this.isPaused = !this.isPaused;
+    const captureWarningMessage = document.getElementById(
+      "captureWarningMessage"
+    );
 
     if (this.isPaused) {
       console.log("Pause requested.");
-    } else { 
+      // Warning should remain visible if paused
+      if (captureWarningMessage) {
+        captureWarningMessage.style.display = "block";
+      }
+    } else {
       console.log("Resume requested.");
-      if(UI.elements.progress) UI.utils.showStatus("", false, 1);
-      if (this.currentCaptureIndex < this.captureQueue.length && !this._processingQueue) {
+      if (UI.elements.progress) UI.utils.showStatus("", false, 1); // Clear pause message
+      // Warning should remain visible if resuming
+      if (captureWarningMessage) {
+        captureWarningMessage.style.display = "block";
+      }
+      if (
+        this.currentCaptureIndex < this.captureQueue.length &&
+        !this._processingQueue
+      ) {
         this.processCaptureQueue();
       } else if (this._processingQueue) {
-        console.warn("Resume clicked, but processing logic indicates it's already active or should be.");
+        console.warn(
+          "Resume clicked, but processing logic indicates it's already active or should be."
+        );
       } else {
-        console.log("Resume clicked, but capture queue appears finished or not started properly.");
+        console.log(
+          "Resume clicked, but capture queue appears finished or not started properly."
+        );
+        // If resuming but queue is effectively done, hide warning
+        if (captureWarningMessage) {
+          captureWarningMessage.style.display = "none";
+        }
       }
     }
     this.updatePauseResumeButton();
@@ -1089,7 +1312,8 @@ class App {
     const pauseResumeBtn = document.getElementById("pauseResumeBtn");
     if (!pauseResumeBtn) return;
 
-    const hasItemsToProcess = this.currentCaptureIndex < this.captureQueue.length;
+    const hasItemsToProcess =
+      this.currentCaptureIndex < this.captureQueue.length;
     const isProcessing = this._processingQueue;
 
     if (this.isPaused) {
@@ -1097,7 +1321,7 @@ class App {
       pauseResumeBtn.title = "Resume capture";
       pauseResumeBtn.classList.add("paused");
       pauseResumeBtn.disabled = !hasItemsToProcess;
-    } else { 
+    } else {
       pauseResumeBtn.innerHTML = "⏸️";
       pauseResumeBtn.title = "Pause capture";
       pauseResumeBtn.classList.remove("paused");
