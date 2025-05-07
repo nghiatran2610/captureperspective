@@ -144,7 +144,7 @@ class App {
           "Invalid format. Expected .../client/PROJECT_NAME";
         statusElement.style.color = "red";
       } else if (!url) {
-        statusElement.textContent = "";
+        statusElement.textContent = ""; // Ensure message is cleared if input is empty
       }
       if (urlFetcher) urlFetcher.projectName = "";
       this._disableLoginOptions();
@@ -156,7 +156,7 @@ class App {
     if (success) {
       this.baseUrl = urlFetcher.baseClientUrl;
       this.baseUrlValid = true;
-      statusElement.textContent = "Base URL looks valid.";
+      statusElement.textContent = ""; // Message removed for valid state
       statusElement.style.color = "green";
       loginOptionSection.style.display = "block";
       this._enableLoginOptions();
