@@ -78,9 +78,72 @@ class App {
     }
 
     baseUrlSection.style.display = "";
-    this._handleBaseUrlInput({ target: baseUrlInput }); // Trigger initial validation
+    this._handleBaseUrlInput({ target: baseUrlInput });
+    this._setCaptureUIsDisabled(false); // Ensure UIs are enabled on init
 
     console.log("Application initialized.");
+  }
+
+  // NEW Helper method to disable/enable form inputs during capture
+  _setCaptureUIsDisabled(disabled) {
+    const baseUrlInput = document.getElementById("baseUrlInput");
+    const capturePresetSelect = UI.elements.capturePreset;
+    const fullPageCheckbox = document.getElementById("fullPageCheckbox");
+    const simpleWaitTimeInput = document.getElementById("simpleWaitTime");
+    const pageSourceRadios = document.querySelectorAll(
+      'input[name="pageSourceOption"]'
+    );
+    const manualJsonTextArea = document.getElementById("manualJsonText");
+    const manualJsonFileInput = document.getElementById("manualJsonFile");
+    const loadManualJsonBtn = document.getElementById("loadManualJsonBtn");
+
+    // URL Selector specific elements (if initialized)
+    const urlSearchInput = document.getElementById("urlSearch");
+    const toggleSelectionBtn = document.getElementById("toggleSelectionBtn");
+
+    if (baseUrlInput) baseUrlInput.disabled = disabled;
+
+    // Screenshot Capture Settings
+    if (capturePresetSelect) capturePresetSelect.disabled = disabled;
+    if (fullPageCheckbox) fullPageCheckbox.disabled = disabled;
+    if (simpleWaitTimeInput) simpleWaitTimeInput.disabled = disabled;
+
+    // Page Source and Manual JSON Area
+    pageSourceRadios.forEach((radio) => (radio.disabled = disabled));
+    if (manualJsonTextArea) manualJsonTextArea.disabled = disabled;
+    if (manualJsonFileInput) manualJsonFileInput.disabled = disabled;
+    if (loadManualJsonBtn) loadManualJsonBtn.disabled = disabled;
+
+    // URL Selector controls
+    if (urlSearchInput) urlSearchInput.disabled = disabled;
+    if (toggleSelectionBtn) toggleSelectionBtn.disabled = disabled;
+
+    // Disable category checkboxes and URL item checkboxes within the URL selector
+    if (urlSelector && urlSelector.categoriesContainer) {
+      urlSelector.categoriesContainer
+        .querySelectorAll(".category-checkbox, .url-checkbox")
+        .forEach((cb) => (cb.disabled = disabled));
+    }
+    // Also disable toggling of the "Pages" section header
+    const captureSettingsToggle = document.getElementById(
+      "captureSettingsToggle"
+    );
+    if (captureSettingsToggle) {
+      if (disabled) {
+        captureSettingsToggle.style.pointerEvents = "none";
+        captureSettingsToggle.style.opacity = "0.7";
+      } else {
+        captureSettingsToggle.style.pointerEvents = "";
+        captureSettingsToggle.style.opacity = "1";
+      }
+    }
+    // Disable login option radios
+    const loginOptionRadios = document.querySelectorAll(
+      'input[name="loginOption"]'
+    );
+    loginOptionRadios.forEach((radio) => (radio.disabled = disabled));
+
+    console.log(`Capture UIs ${disabled ? "Disabled" : "Enabled"}`);
   }
 
   _handleBaseUrlInput(event) {
@@ -321,7 +384,7 @@ class App {
     );
     if (!screenSizeRow) {
       console.error(
-        "Critical UI Error: .screen-size-row.important-setting-group not found."
+        "Critical UI Error: .screen-size-row.important-setting-group not found within captureSettingsContent."
       );
       return;
     }
@@ -333,7 +396,7 @@ class App {
       waitTimeContainer.id = "simpleWaitTimeContainer";
       waitTimeContainer.className = "setting-container important-setting-group";
       const waitTimeLabel = document.createElement("label");
-      waitTimeLabel.textContent = "Max Wait Time (sec):";
+      waitTimeLabel.textContent = "Wait Time (sec)";
       waitTimeLabel.htmlFor = "simpleWaitTime";
       waitTimeContainer.appendChild(waitTimeLabel);
       simpleWaitTimeInput = document.createElement("input");
@@ -493,7 +556,9 @@ class App {
     const fileNameDisplay = document.getElementById("fileNameDisplay");
 
     if (!jsonTextArea || !manualJsonStatus || !loadBtn) {
-      console.error("Cannot load manual source: Crucial UI elements missing.");
+      console.error(
+        "Cannot load manual source: Crucial UI elements missing (textarea, status, load button)."
+      );
       return;
     }
     manualJsonStatus.textContent = "";
@@ -526,13 +591,16 @@ class App {
           urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
           if (urlSelectorContainer) urlSelectorContainer.style.display = "";
         } else if (typeof urlSelector.initialize === "function") {
+          console.warn(
+            "URL Selector was not initialized, attempting now for manual load."
+          );
           await urlSelector.initialize();
           if (urlSelector.container) {
             urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
             if (urlSelectorContainer) urlSelectorContainer.style.display = "";
           } else {
             throw new Error(
-              "Failed to initialize URL Selector for manual data."
+              "Failed to initialize URL Selector for displaying manual data."
             );
           }
         }
@@ -588,8 +656,12 @@ class App {
     const captureBtn = UI.elements.captureBtn;
     const buttonContainer = UI.elements.buttonContainer;
     const loadManualBtn = document.getElementById("loadManualJsonBtn");
-    if (!captureBtn || !buttonContainer) return;
-
+    if (!captureBtn || !buttonContainer) {
+      console.warn(
+        "Capture button or its container not found, cannot update state."
+      );
+      return;
+    }
     const selectedSource = document.querySelector(
       'input[name="pageSourceOption"]:checked'
     )?.value;
@@ -611,7 +683,8 @@ class App {
       urlsAvailableAndSelected =
         urlFetcher.dataLoadedDirectly && urlSelector.selectedUrls.size > 0;
     }
-    captureBtn.disabled = !(prerequisitesMet && urlsAvailableAndSelected);
+    const isReadyToCapture = prerequisitesMet && urlsAvailableAndSelected;
+    captureBtn.disabled = !isReadyToCapture;
     const captureFormVisible = UI.elements.captureForm.style.display !== "none";
     if (captureFormVisible) {
       buttonContainer.style.display = "flex";
@@ -650,7 +723,6 @@ class App {
         ? `Full Page (${width}x${height})`
         : `${presetName}`;
       const url = data.url || data.result.url || "Unknown URL";
-      // Check if a mount issue was detected for this successful capture
       if (data.result.detectedMountIssue) {
         UI.utils.showStatus(
           `⚠️ Captured with mount issue: ${url
@@ -762,7 +834,7 @@ class App {
           ? error.message
           : "Failed to load page list from server.";
       if (urlSelector.categoriesContainer) {
-        urlSelector.categoriesContainer.innerHTML = `<div class="url-selector-error"><p>${displayError}</p><p>Check server connection or Project URL. Backend service might be unavailable.</p></div>`;
+        urlSelector.categoriesContainer.innerHTML = `<div class="url-selector-error"><p>${displayError}</p><p>Check server connection or Project URL. Ensure the backend service is running.</p></div>`;
       } else if (typeof urlSelector.showFallbackUIIfNeeded === "function") {
         urlSelector.showFallbackUIIfNeeded();
       }
@@ -797,6 +869,9 @@ class App {
       if (progressOutput) progressOutput.style.display = "none";
       return;
     }
+
+    this._setCaptureUIsDisabled(true); // Disable UIs at the start
+
     this.startTotalTime = performance.now();
     let urlList = [];
     let errorInCaptureSetup = false;
@@ -847,7 +922,7 @@ class App {
     } catch (error) {
       errorInCaptureSetup = true;
       handleError(error, { logToConsole: true, showToUser: true });
-      this._processingQueue = false;
+      this._processingQueue = false; // Ensure this is reset on setup error
       this._setCaptureSettingsCollapsed(false);
       if (
         errorInCaptureSetup &&
@@ -865,8 +940,10 @@ class App {
       const isQueueFullyProcessed =
         this.currentCaptureIndex >= this.captureQueue.length;
       if (captureWarningMessage) captureWarningMessage.style.display = "none";
+
       if (!this.isPaused) {
         this._processingQueue = false;
+        this._setCaptureUIsDisabled(false); // Re-enable UIs if not paused and finished
         if (isQueueFullyProcessed && this.startTotalTime > 0) {
           UI.progress.updateStats(
             this.captureQueue.length,
@@ -916,6 +993,7 @@ class App {
           }
         }
       } else {
+        // If paused, UIs remain disabled until resumed and completed
         if (this.startTotalTime > 0)
           UI.progress.updateStats(
             this.captureQueue.length,
@@ -924,7 +1002,7 @@ class App {
             totalTimeTakenSec
           );
       }
-      this._checkCaptureButtonState();
+      this._checkCaptureButtonState(); // This will re-enable captureBtn if conditions met
       this.updatePauseResumeButton();
       const pdfBtnVisible = AppState.screenshots.size > 0;
       const combineAllPdfBtn = document.querySelector(".combine-all-pdf-btn");
@@ -947,7 +1025,11 @@ class App {
 
   async processCaptureQueue() {
     if (this.isPaused || this.currentCaptureIndex >= this.captureQueue.length) {
-      if (this.isPaused) this._processingQueue = false;
+      if (this.isPaused) {
+        this._processingQueue = false; // Mark as not processing if paused
+        this._setCaptureUIsDisabled(false); // Re-enable UIs if paused and user might want to change settings before resuming (though pause button will be primary action)
+        // Or keep them disabled: this._setCaptureUIsDisabled(true);
+      }
       if (
         !this.isPaused &&
         this.currentCaptureIndex >= this.captureQueue.length
@@ -956,6 +1038,7 @@ class App {
           "captureWarningMessage"
         );
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
+        this._setCaptureUIsDisabled(false); // Re-enable UIs when queue is fully done
       }
       return;
     }
@@ -964,6 +1047,7 @@ class App {
     );
     if (!this._processingQueue) {
       this._processingQueue = true;
+      this._setCaptureUIsDisabled(true); // Ensure UIs are disabled when processing starts/resumes
       this.updatePauseResumeButton();
       if (
         captureWarningMessage &&
@@ -1007,7 +1091,7 @@ class App {
         );
         if (this.isPaused) {
           this._processingQueue = false;
-          break;
+          /* UI disable state handled by pauseResumeCapture */ break;
         }
 
         const timestamp = URLProcessor.getTimestamp();
@@ -1026,7 +1110,6 @@ class App {
           console.warn(
             `Screenshot for ${url} captured with detected mount issue: ${result.mountIssueMessage}`
           );
-          // Status updated via SCREENSHOT_TAKEN event now
         }
         UI.thumbnails.addLiveThumbnail(result, result.fileName, url);
         AppState.addScreenshot(url, result);
@@ -1034,7 +1117,7 @@ class App {
       } catch (error) {
         if (this.isPaused) {
           this._processingQueue = false;
-          break;
+          /* UI disable state handled by pauseResumeCapture */ break;
         }
         handleError(error, { logToConsole: true, showToUser: false });
         const timestamp = URLProcessor.getTimestamp();
@@ -1076,12 +1159,13 @@ class App {
         await new Promise((resolve) => setTimeout(resolve, 250));
       if (this.isPaused) {
         this._processingQueue = false;
-        break;
+        /* UI disable state handled by pauseResumeCapture */ break;
       }
     }
     const isFinished = this.currentCaptureIndex >= totalUrls;
     if (isFinished && !this.isPaused) {
       this._processingQueue = false;
+      this._setCaptureUIsDisabled(false); // Re-enable UIs when queue is fully done
       if (captureWarningMessage) captureWarningMessage.style.display = "none";
     } else if (this.isPaused) {
       if (UI.elements.progress)
@@ -1093,8 +1177,11 @@ class App {
           0
         );
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
+      // UIs remain disabled while paused, handled by pauseResumeCapture or initial call to captureScreenshots
     } else {
+      // Should ideally not happen if logic is correct
       this._processingQueue = false;
+      this._setCaptureUIsDisabled(false); // Fallback to enable
       if (captureWarningMessage) captureWarningMessage.style.display = "none";
     }
   }
@@ -1127,8 +1214,15 @@ class App {
       "captureWarningMessage"
     );
     if (this.isPaused) {
+      console.log("Pause requested.");
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
+      // When pausing, critical UIs should remain disabled.
+      // _setCaptureUIsDisabled(true) is implicitly handled as it's not re-enabled here.
+      // The "Pause" button itself will become "Resume" and stay enabled if queue not empty.
     } else {
+      // Resuming
+      console.log("Resume requested.");
+      this._setCaptureUIsDisabled(true); // Explicitly ensure UI is disabled upon resuming
       if (UI.elements.progress) UI.utils.showStatus("", false, 1);
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
       if (
@@ -1137,9 +1231,12 @@ class App {
       ) {
         this.processCaptureQueue();
       } else if (this._processingQueue) {
-        /* Already processing */
+        console.warn(
+          "Resume clicked, but processing logic indicates it's already active or should be."
+        );
       } else {
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
+        this._setCaptureUIsDisabled(false); // Re-enable if resuming but queue was already finished
       }
     }
     this.updatePauseResumeButton();
@@ -1155,11 +1252,13 @@ class App {
       pauseResumeBtn.innerHTML = "▶️";
       pauseResumeBtn.title = "Resume capture";
       pauseResumeBtn.classList.add("paused");
-      pauseResumeBtn.disabled = !hasItemsToProcess;
+      pauseResumeBtn.disabled = !hasItemsToProcess; // Enable if there are items left
     } else {
+      // Not paused (either running or stopped)
       pauseResumeBtn.innerHTML = "⏸️";
       pauseResumeBtn.title = "Pause capture";
       pauseResumeBtn.classList.remove("paused");
+      // Disable Pause button if not processing OR if no items are left to process
       pauseResumeBtn.disabled = !isProcessing || !hasItemsToProcess;
     }
   }
@@ -1167,18 +1266,29 @@ class App {
   _toggleCaptureSettings() {
     const content = document.getElementById("captureSettingsContent");
     const wrapper = document.getElementById("captureSettingsToggle");
-    if (!content || !wrapper) return;
+    if (!content || !wrapper) {
+      console.warn("Could not toggle settings: Content or wrapper not found.");
+      return;
+    }
+    // Only allow toggling if not processing
+    if (this._processingQueue) {
+      console.log("Cannot toggle settings: Capture in progress.");
+      return;
+    }
     const isCollapsed = content.classList.toggle("collapsed");
     wrapper.classList.toggle("collapsed", isCollapsed);
+    console.log(`Capture settings toggled. Collapsed: ${isCollapsed}`);
   }
 
   _setCaptureSettingsCollapsed(collapsed) {
     const content = document.getElementById("captureSettingsContent");
     const wrapper = document.getElementById("captureSettingsToggle");
-    if (!content || !wrapper) return;
+    if (!content || !wrapper) {
+      return;
+    }
     content.classList.toggle("collapsed", collapsed);
     wrapper.classList.toggle("collapsed", collapsed);
   }
-}
+} // End App Class
 
 export default App;
