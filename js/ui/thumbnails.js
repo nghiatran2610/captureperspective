@@ -72,7 +72,6 @@ export const thumbnails = {
 
   /**
    * Add a live thumbnail to the container, organized by category
-   * (Corrected Version: Groups by parentCategory, labels thumbnail with subCategoryName)
    * @param {Object} result - Screenshot result object
    * @param {string} fileName - Filename for the screenshot
    * @param {string} [sequenceName=null] - Optional name/identifier (often the URL)
@@ -97,27 +96,36 @@ export const thumbnails = {
     const isHidden =
       window.getComputedStyle(liveThumbnailsContainer).display === "none";
     if (isHidden) {
-      console.log("First thumbnail, making container visible.");
       liveThumbnailsContainer.style.display = "flex";
     }
 
     const identifierForCategory = sequenceName || fileName;
-    // Get both parent and sub-category names using the fixed parser
     const { parentCategory, category: subCategoryName } =
       this.parseCategoryFromFileName(identifierForCategory);
 
-    // --- FIX: Get container based ONLY on parentCategory for grouping ---
-    // Pass null for subCategoryName here as it's not used for grouping ID/Title anymore
     const categoryContainer = this.getCategoryContainer(null, parentCategory);
     if (!categoryContainer) return null;
     const categoryContent =
       categoryContainer.querySelector(".category-content");
 
-    // --- Create Thumbnail Element ---
     const thumbnailContainer = document.createElement("div");
     thumbnailContainer.className = "thumbnail-container";
     if (isToolbarAction) thumbnailContainer.classList.add("toolbar-action");
-    if (result.error) thumbnailContainer.classList.add("error-thumbnail");
+
+    if (result.error) {
+      thumbnailContainer.classList.add("error-thumbnail");
+      const errorBadge = document.createElement("div");
+      errorBadge.textContent = "Error";
+      errorBadge.className = "error-badge";
+      thumbnailContainer.appendChild(errorBadge);
+    } else if (result.detectedMountIssue) {
+      // MODIFIED: Add a specific class for detected mount issues
+      thumbnailContainer.classList.add("mount-issue-detected");
+      // Add a title attribute to the container for more details on hover
+      thumbnailContainer.title = `Page reported: ${
+        result.mountIssueMessage || "Mount issue"
+      }`;
+    }
 
     if (isRetry) {
       const retryBadge = document.createElement("div");
@@ -125,18 +133,19 @@ export const thumbnails = {
       retryBadge.className = "retry-badge";
       thumbnailContainer.appendChild(retryBadge);
     }
-    if (result.error) {
-      const errorBadge = document.createElement("div");
-      errorBadge.textContent = "Error";
-      errorBadge.className = "error-badge";
-      thumbnailContainer.appendChild(errorBadge);
-    }
+    // Note: The general error badge logic is above. If you want a specific icon for mount-issue-detected,
+    // it would be added here or via CSS pseudo-elements.
 
-    // --- Image or Placeholder ---
     const thumbImg = document.createElement("img");
-    if (result.error) {
+    if (result.error || !result.thumbnail) {
       thumbImg.src =
-        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90" viewBox="0 0 120 90"><rect width="120" height="90" fill="%23f8d7da"/><text x="60" y="45" font-family="Arial" font-size="12" fill="%23721c24" text-anchor="middle" dy=".3em">Capture Error</text></svg>';
+        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90" viewBox="0 0 120 90"><rect width="120" height="90" fill="%23f8d7da"/><text x="60" y="45" font-family="Arial" font-size="12" fill="%23721c24" text-anchor="middle" dy=".3em">' +
+        (result.detectedMountIssue &&
+        result.mountIssueMessage &&
+        !result.screenshot
+          ? "Mount Error (No Image)"
+          : "Capture Error") +
+        "</text></svg>";
       thumbImg.className = "thumbnail-image error-image";
       thumbImg.title = result.errorMessage || "Error capturing screenshot";
     } else {
@@ -153,41 +162,43 @@ export const thumbnails = {
         );
       });
     }
-    thumbnailContainer.appendChild(thumbImg); // Add image first
+    thumbnailContainer.appendChild(thumbImg);
 
-    // --- FIX: Labeling within the thumbnail ---
-    // 1. Add Sub-Category Name (Page Name) if it exists
     if (subCategoryName) {
       const subCatLabel = document.createElement("div");
       subCatLabel.textContent = utils.truncateText(subCategoryName, 25);
       subCatLabel.title = subCategoryName;
-      // Add a specific class for styling this label if needed
       subCatLabel.className = "thumbnail-subcategory-name";
       thumbnailContainer.appendChild(subCatLabel);
     }
 
-    // 2. Always add the generated Filename
     const nameLabel = document.createElement("div");
     nameLabel.textContent = utils.truncateText(fileName, 25);
-    nameLabel.title = fileName;
-    nameLabel.className = "thumbnail-filename";
+    nameLabel.title = fileName; // Original filename for full hover
     thumbnailContainer.appendChild(nameLabel);
-    // --- End Labeling Fix ---
+    nameLabel.className = "thumbnail-filename";
 
-    // Add error message text if applicable
     if (result.error && result.errorMessage) {
-      const errorMsg = document.createElement("div");
-      errorMsg.textContent =
-        result.errorMessage.includes("No view configured") ||
-        result.errorMessage.includes("Mount definition")
-          ? "Mount Error"
-          : "Capture Failed";
-      errorMsg.className = "thumbnail-error-message";
-      errorMsg.title = result.errorMessage;
-      thumbnailContainer.appendChild(errorMsg);
+      const errorMsgDiv = document.createElement("div");
+      errorMsgDiv.textContent = "Capture Failed";
+      errorMsgDiv.className = "thumbnail-error-message";
+      errorMsgDiv.title = result.errorMessage;
+      thumbnailContainer.appendChild(errorMsgDiv);
+    } else if (
+      result.detectedMountIssue &&
+      result.mountIssueMessage &&
+      !result.error
+    ) {
+      // The main indication will be the CSS class and optional warning icon.
+      // The full message is on the container's title.
+      // We could add a small text note if desired, but the icon might be cleaner.
+      // Example:
+      // const mountNoteDiv = document.createElement("div");
+      // mountNoteDiv.textContent = "View Issue";
+      // mountNoteDiv.className = "thumbnail-mount-issue-note";
+      // thumbnailContainer.appendChild(mountNoteDiv);
     }
 
-    // Add download button only for non-error thumbnails
     if (!result.error && result.screenshot) {
       const downloadBtn = document.createElement("button");
       downloadBtn.className = "thumbnail-download-btn";
@@ -203,10 +214,8 @@ export const thumbnails = {
       thumbnailContainer.dataset.screenshot = result.screenshot;
     }
 
-    // Add the thumbnail to the correct category container
     categoryContent.appendChild(thumbnailContainer);
 
-    // Update category count
     const countElement = categoryContainer.querySelector(".thumbnail-count");
     if (countElement) {
       const newCount = categoryContent.querySelectorAll(
@@ -215,7 +224,6 @@ export const thumbnails = {
       countElement.textContent = `(${newCount})`;
     }
 
-    // Ensure "Combine All" PDF button is visible and enabled
     const pdfContainer = liveThumbnailsContainer?.querySelector(
       ".combine-all-pdf-container"
     );
@@ -227,7 +235,6 @@ export const thumbnails = {
       pdfButton.disabled = false;
     }
 
-    // Scroll into view logic
     const thumbnailRect = thumbnailContainer.getBoundingClientRect();
     const outputRect = liveThumbnailsContainer.getBoundingClientRect();
     if (thumbnailRect.bottom > outputRect.bottom) {
@@ -241,20 +248,12 @@ export const thumbnails = {
     return thumbnailContainer;
   },
 
-  /**
-   * Create or get a category container for organizing thumbnails.
-   * (Corrected Version: Groups and Titles based only on parentCategoryName)
-   * @param {string | null} _subCategoryName - Ignored for grouping/ID/Title now. Kept for signature consistency.
-   * @param {string} parentCategoryName - Name of the parent category (e.g., module name or "Home").
-   * @returns {HTMLElement | null} - The category container element or null if creation fails.
-   */
   getCategoryContainer(_subCategoryName, parentCategoryName) {
-    // _subCategoryName is unused for ID/Title
     let liveThumbnailsContainer =
       elements.liveThumbnails || document.getElementById("liveThumbnails");
     if (!liveThumbnailsContainer) {
       liveThumbnailsContainer = this.createLiveThumbnailsContainer();
-      if (!liveThumbnailsContainer) return null; // Stop if container creation failed
+      if (!liveThumbnailsContainer) return null;
     }
 
     const contentSection = document.getElementById("thumbnailsContent");
@@ -263,80 +262,65 @@ export const thumbnails = {
       return null;
     }
 
-    // --- FIX: ID and Title based ONLY on parentCategoryName ---
     const parentClean = (parentCategoryName || "unknown")
       .replace(/[^a-zA-Z0-9-_]/g, "-")
       .toLowerCase();
-    const categoryId = `category-${parentClean}`; // ID based only on parent
+    const categoryId = `category-${parentClean}`;
 
     let categoryContainer = document.getElementById(categoryId);
 
     if (!categoryContainer) {
-      // Create the container if it doesn't exist for this parent category
       categoryContainer = document.createElement("div");
       categoryContainer.id = categoryId;
       categoryContainer.className = "thumbnail-category";
 
       const categoryHeader = document.createElement("div");
       categoryHeader.className = "category-header";
-      // --- Click listener for collapse/expand ---
       categoryHeader.addEventListener("click", (e) => {
-        if (e.target.closest(".combine-pdf-btn")) return; // Ignore clicks on the PDF button
+        if (e.target.closest(".combine-pdf-btn")) return;
         const content = categoryContainer.querySelector(".category-content");
         if (!content) return;
         const isCollapsed = content.style.display === "none";
-        content.style.display = isCollapsed ? "flex" : "none"; // Toggle display
-        categoryHeader.classList.toggle("collapsed", !isCollapsed); // Toggle class for styling
+        content.style.display = isCollapsed ? "flex" : "none";
+        categoryHeader.classList.toggle("collapsed", !isCollapsed);
         const toggleIcon = categoryHeader.querySelector(".toggle-icon");
-        if (toggleIcon) toggleIcon.innerHTML = isCollapsed ? "▼" : "►"; // Update icon
+        if (toggleIcon) toggleIcon.innerHTML = isCollapsed ? "▼" : "►";
       });
 
-      // --- Header elements ---
       const toggleIcon = document.createElement("span");
       toggleIcon.className = "toggle-icon";
-      toggleIcon.innerHTML = "▼"; // Default icon
+      toggleIcon.innerHTML = "▼";
       categoryHeader.appendChild(toggleIcon);
 
       const categoryTitle = document.createElement("h4");
-      categoryTitle.textContent = parentCategoryName; // Title is JUST the parent category name
+      categoryTitle.textContent = parentCategoryName;
       categoryHeader.appendChild(categoryTitle);
-      // --- End ID/Title Fix ---
 
       const thumbnailCount = document.createElement("span");
       thumbnailCount.className = "thumbnail-count";
-      thumbnailCount.textContent = "(0)"; // Initial count
+      thumbnailCount.textContent = "(0)";
       categoryHeader.appendChild(thumbnailCount);
 
-      // --- Content area for thumbnails ---
       const categoryContent = document.createElement("div");
-      categoryContent.className = "category-content"; // Default style likely display: flex; flex-wrap: wrap;
+      categoryContent.className = "category-content";
 
-      // --- "Combine to PDF" button for this category ---
       const combinePdfBtn = document.createElement("button");
       combinePdfBtn.className = "btn btn-small combine-pdf-btn";
       combinePdfBtn.textContent = "Combine to PDF";
-      combinePdfBtn.title = `Combine screenshots from ${parentCategoryName} into a PDF`; // Use parent name in title
+      combinePdfBtn.title = `Combine screenshots from ${parentCategoryName} into a PDF`;
       combinePdfBtn.addEventListener("click", (e) => {
-        e.stopPropagation(); // Prevent the header click listener
-        this.generatePDF(categoryContainer); // Generate PDF for this specific category
+        e.stopPropagation();
+        this.generatePDF(categoryContainer);
       });
-      categoryHeader.appendChild(combinePdfBtn); // Add button to header
+      categoryHeader.appendChild(combinePdfBtn);
 
-      // --- Assemble Category Container ---
       categoryContainer.appendChild(categoryHeader);
       categoryContainer.appendChild(categoryContent);
-      contentSection.appendChild(categoryContainer); // Add to the main content area
+      contentSection.appendChild(categoryContainer);
     }
-
-    return categoryContainer; // Return existing or new container
+    return categoryContainer;
   },
 
-  /**
-   * Parses category information from an identifier (URL or filename).
-   * Handles URL paths relative to '/client/PROJECT_NAME/' or falls back to filename parsing.
-   * @param {string} identifier - The input string.
-   * @returns {Object} - { parentCategory: string, category: string | null }
-   */
   parseCategoryFromFileName(identifier) {
     let parentCategory = "Other";
     let category = null;
@@ -404,7 +388,6 @@ export const thumbnails = {
     return { parentCategory, category };
   },
 
-  /** Helper to format category names */
   formatCategoryName(name) {
     if (!name) return "";
     try {
@@ -420,7 +403,6 @@ export const thumbnails = {
     }
   },
 
-  /** Downloads a single screenshot */
   downloadSingleScreenshot(screenshotData, fileName) {
     try {
       const link = document.createElement("a");
@@ -436,24 +418,21 @@ export const thumbnails = {
     }
   },
 
-  /** Optimizes image size and format for PDF inclusion */
   optimizeImageForPDF(dataURL) {
     return new Promise((resolve, reject) => {
       try {
         const img = new Image();
         img.onload = () => {
           try {
-            const dims = this.getValidImageDimensions(img); // Use helper
+            const dims = this.getValidImageDimensions(img);
             if (!dims || dims.width <= 0 || dims.height <= 0) {
-              console.warn("Opt PDF: Invalid dims");
               resolve(dataURL);
               return;
             }
             let targetWidth = dims.width,
               targetHeight = dims.height;
-            const MAX_DIMENSION = 1800; // Max dimension constraint for PDF quality/size balance
+            const MAX_DIMENSION = 1800;
             if (targetWidth > MAX_DIMENSION || targetHeight > MAX_DIMENSION) {
-              // Resize logic maintains aspect ratio
               if (targetWidth > targetHeight) {
                 const ratio = targetHeight / targetWidth;
                 targetWidth = MAX_DIMENSION;
@@ -473,11 +452,10 @@ export const thumbnails = {
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "high";
             ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(0, 0, targetWidth, targetHeight); // Ensure white background
+            ctx.fillRect(0, 0, targetWidth, targetHeight);
             ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
             let optimizedData;
-            const quality = targetWidth > 1000 ? 0.85 : 0.92; // JPEG quality
-            // Use PNG for smaller images (unless original was JPEG) for better quality, JPEG for larger
+            const quality = targetWidth > 1000 ? 0.85 : 0.92;
             if (
               targetWidth * targetHeight < 300000 &&
               !dataURL.startsWith("data:image/jpeg")
@@ -487,30 +465,25 @@ export const thumbnails = {
               optimizedData = canvas.toDataURL("image/jpeg", quality);
             }
             canvas.width = 1;
-            canvas.height = 1; // Clean up canvas memory
+            canvas.height = 1;
             resolve(optimizedData);
           } catch (err) {
-            console.warn("Error during image optimization canvas step:", err);
             resolve(dataURL);
           }
-        }; // Return original on error
+        };
         img.onerror = () => {
-          console.warn("Failed to load image for optimization");
           resolve(dataURL);
-        }; // Return original on error
-        img.src = dataURL; // Start loading image
+        };
+        img.src = dataURL;
       } catch (err) {
-        console.warn("Exception starting optimization:", err);
         resolve(dataURL);
       }
-    }); // Return original on error
+    });
   },
 
-  /** Gets valid, positive integer dimensions from an image element */
   getValidImageDimensions(img) {
     let width = img.width || img.naturalWidth || 0;
     let height = img.height || img.naturalHeight || 0;
-    // Ensure dimensions are positive numbers, default to 100x100 if invalid
     if (
       !width ||
       !height ||
@@ -519,9 +492,6 @@ export const thumbnails = {
       width <= 0 ||
       height <= 0
     ) {
-      console.warn(
-        `Invalid image dimensions detected (${width}x${height}), using defaults (100x100).`
-      );
       width = 100;
       height = 100;
     }
@@ -531,7 +501,6 @@ export const thumbnails = {
     };
   },
 
-  /** Generates a PDF for a single category */
   generatePDF(categoryContainer) {
     const categoryTitleElement = categoryContainer.querySelector(
       ".category-header h4"
@@ -550,7 +519,7 @@ export const thumbnails = {
       utils.showStatus("No valid screenshots in category", true);
       return;
     }
-    utils.showStatus(`Generating PDF for ${categoryTitle}...`, false, 0); // Persistent message
+    utils.showStatus(`Generating PDF for ${categoryTitle}...`, false, 0);
     const pdf = new jspdf.jsPDF({
       orientation: "landscape",
       unit: "mm",
@@ -559,14 +528,12 @@ export const thumbnails = {
       precision: 4,
       putOnlyUsedFonts: true,
     });
-    // Add header
     pdf.setFontSize(18);
     pdf.text(categoryTitle, 20, 20);
     pdf.setFontSize(10);
     pdf.text(`Generated on ${new Date().toLocaleString()}`, 20, 28);
     pdf.setLineWidth(0.2);
     pdf.line(20, 32, pdf.internal.pageSize.width - 20, 32);
-    // Define page layout constants
     const leftMargin = 15,
       rightMargin = 15,
       topMargin = 40,
@@ -575,12 +542,9 @@ export const thumbnails = {
     const pageHeight = pdf.internal.pageSize.height - topMargin - bottomMargin;
     let currentIndex = 0,
       pageCount = 1;
-    const self = this; // Store 'this' context for async callbacks
-
-    // Process screenshots sequentially to manage memory
+    const self = this;
     function processNextScreenshot() {
       if (currentIndex >= validThumbnails.length) {
-        // Base case: All done
         try {
           const sanitizedTitle = categoryTitle.replace(/[^a-zA-Z0-9]/g, "_");
           pdf.save(
@@ -592,14 +556,12 @@ export const thumbnails = {
             5000
           );
         } catch (e) {
-          console.error("Error saving PDF:", e);
           utils.showStatus("Error saving PDF", true);
         } finally {
           utils.showStatus("", false, 1);
-        } // Clear "Generating..." message
+        }
         return;
       }
-      // Get data for current screenshot
       const container = validThumbnails[currentIndex];
       const screenshotData = container.dataset.screenshot;
       const filename = container.dataset.filename || `Page ${currentIndex + 1}`;
@@ -607,15 +569,11 @@ export const thumbnails = {
         currentIndex++;
         processNextScreenshot();
         return;
-      } // Skip if data missing
-
-      // Add new page if not the first image
+      }
       if (currentIndex > 0) {
         pdf.addPage();
         pageCount++;
       }
-
-      // Optimize image, then add to PDF
       self
         .optimizeImageForPDF(screenshotData)
         .then((optimizedData) => {
@@ -623,7 +581,6 @@ export const thumbnails = {
           img.onload = () => {
             try {
               const imgDimensions = self.getValidImageDimensions(img);
-              // Calculate image size on page maintaining aspect ratio
               let imgWidthOnPage, imgHeightOnPage;
               const imgRatio = imgDimensions.width / imgDimensions.height;
               const pageRatio = pageWidth / pageHeight;
@@ -636,18 +593,15 @@ export const thumbnails = {
               }
               imgWidthOnPage = Math.max(1, Math.round(imgWidthOnPage));
               imgHeightOnPage = Math.max(1, Math.round(imgHeightOnPage));
-              // Basic validation for calculated dimensions
               if (
                 isNaN(imgWidthOnPage) ||
                 isNaN(imgHeightOnPage) ||
                 imgWidthOnPage <= 0 ||
                 imgHeightOnPage <= 0
-              ) {
-                throw new Error("Invalid calculated PDF image dimensions");
-              }
+              )
+                throw new Error("Invalid PDF image dims");
               const xPos = leftMargin;
-              const yPos = topMargin; // Position image
-              // Add image using appropriate format
+              const yPos = topMargin;
               pdf.addImage(
                 optimizedData,
                 optimizedData.includes("data:image/png") ? "PNG" : "JPEG",
@@ -658,57 +612,42 @@ export const thumbnails = {
                 null,
                 "FAST"
               );
-              // Add filename caption below image
               pdf.setFontSize(8);
               const captionY = yPos + imgHeightOnPage + 5;
               const truncatedFilename =
                 filename.length > 120
                   ? filename.substring(0, 117) + "..."
                   : filename;
-              // Check if caption fits before drawing
-              if (captionY < pdf.internal.pageSize.height - bottomMargin + 2) {
+              if (captionY < pdf.internal.pageSize.height - bottomMargin + 2)
                 pdf.text(truncatedFilename, leftMargin, captionY, {
                   maxWidth: pageWidth,
                 });
-              } else {
-                console.warn(
-                  `Caption skipped for ${filename} due to page height limits.`
-                );
-              }
-              // Move to next screenshot
               currentIndex++;
-              setTimeout(processNextScreenshot, 10); // Small delay for UI responsiveness
+              setTimeout(processNextScreenshot, 10);
             } catch (error) {
-              console.error(`Error adding image ${filename} to PDF:`, error);
               currentIndex++;
               processNextScreenshot();
             }
-          }; // Continue on error
+          };
           img.onerror = () => {
-            console.error(
-              `Failed to load optimized image for PDF: ${filename}`
-            );
             currentIndex++;
             processNextScreenshot();
-          }; // Continue on error
-          img.src = optimizedData; // Load the optimized image data
+          };
+          img.src = optimizedData;
         })
         .catch((error) => {
-          console.error(`Error optimizing image ${filename}:`, error);
           currentIndex++;
           processNextScreenshot();
-        }); // Continue on error
+        });
     }
-    processNextScreenshot(); // Start the sequential processing
+    processNextScreenshot();
   },
 
-  /** Generates a single PDF containing screenshots from ALL categories */
   generateAllCategoriesPDF(categoryContainers) {
-    utils.showStatus("Generating comprehensive PDF...", false, 0); // Persistent message
+    utils.showStatus("Generating comprehensive PDF...", false, 0);
     try {
-      if (typeof jspdf === "undefined" || typeof jspdf.jsPDF === "undefined") {
+      if (typeof jspdf === "undefined" || typeof jspdf.jsPDF === "undefined")
         throw new Error("jsPDF library not found.");
-      }
       const pdf = new jspdf.jsPDF({
         orientation: "landscape",
         unit: "mm",
@@ -717,7 +656,6 @@ export const thumbnails = {
         precision: 4,
         putOnlyUsedFonts: true,
       });
-      // --- PDF Header ---
       const projectUrl =
         urlFetcher.baseClientUrl || "Project URL not available";
       const generatedDateString = `Generated on ${new Date().toLocaleString()}`;
@@ -748,25 +686,19 @@ export const thumbnails = {
         currentY
       );
       currentY += 5;
-      // --- Page Layout ---
       const topMargin = currentY;
       const bottomMargin = 20;
       const pageWidth = pageContentWidth;
       const pageHeight =
         pdf.internal.pageSize.height - topMargin - bottomMargin;
-      // --- Processing Variables ---
       let pageCount = 1,
         totalScreenshotsProcessed = 0;
       let hasAnyScreenshots = false;
       const self = this;
-
-      // --- Async function to process one category at a time ---
       const processCategory = async (categoryIndex) => {
         if (categoryIndex >= categoryContainers.length) {
-          // Base case: All categories processed
-          if (hasAnyScreenshots) {
-            finalizeAndSaveAll();
-          } else {
+          if (hasAnyScreenshots) finalizeAndSaveAll();
+          else {
             utils.showStatus(
               "No valid screenshots found to generate PDF.",
               true
@@ -794,29 +726,19 @@ export const thumbnails = {
         if (validThumbnails.length === 0) {
           await processCategory(categoryIndex + 1);
           return;
-        } // Skip empty categories
-
-        // Process screenshots within this category
+        }
         for (let i = 0; i < validThumbnails.length; i++) {
           const container = validThumbnails[i];
           const screenshotData = container.dataset.screenshot;
           const filename = container.dataset.filename || `Page ${i + 1}`;
           if (!screenshotData) continue;
-
-          // Add new page if needed
           if (totalScreenshotsProcessed > 0) {
             pdf.addPage();
             pageCount++;
           }
-          hasAnyScreenshots = true; // Mark that we've added content
-
-          // Add Category Title on page (optional) - Commented out
-          // pdf.setFontSize(10); pdf.setTextColor(120);
-          // pdf.text(categoryTitle, leftMargin, topMargin - 4);
-          // pdf.setTextColor(0);
+          hasAnyScreenshots = true;
 
           try {
-            // Optimize and add image
             const optimizedData = await self.optimizeImageForPDF(
               screenshotData
             );
@@ -845,14 +767,8 @@ export const thumbnails = {
               isNaN(imgHeightOnPage) ||
               imgWidthOnPage <= 0 ||
               imgHeightOnPage <= 0
-            ) {
-              console.error(
-                "Invalid calc dims for PDF:",
-                imgWidthOnPage,
-                imgHeightOnPage
-              );
+            )
               continue;
-            }
             const xPos = leftMargin;
             const yPos = topMargin;
             pdf.addImage(
@@ -865,29 +781,23 @@ export const thumbnails = {
               null,
               "FAST"
             );
-            // Add filename caption
             pdf.setFontSize(7);
             const captionY = yPos + imgHeightOnPage + 4;
             const truncatedFilename =
               filename.length > 120
                 ? filename.substring(0, 117) + "..."
                 : filename;
-            if (captionY < pdf.internal.pageSize.height - bottomMargin + 2) {
+            if (captionY < pdf.internal.pageSize.height - bottomMargin + 2)
               pdf.text(truncatedFilename, leftMargin, captionY, {
                 maxWidth: pageWidth,
               });
-            } else {
-              console.warn(`Caption skipped for ${filename}.`);
-            }
             totalScreenshotsProcessed++;
             utils.showStatus(
               `Generating PDF: Processed ${totalScreenshotsProcessed} screenshots...`,
               false,
               0
-            ); // Update progress
+            );
           } catch (error) {
-            // Handle errors for individual images
-            console.error(`Error processing screenshot ${filename}:`, error);
             pdf.setFontSize(8);
             pdf.setTextColor(255, 0, 0);
             pdf.text(
@@ -897,14 +807,10 @@ export const thumbnails = {
             );
             pdf.setTextColor(0);
           }
-          await new Promise((res) => setTimeout(res, 5)); // Brief delay for UI
-        } // End screenshot loop for category
-
-        // Process next category recursively
+          await new Promise((res) => setTimeout(res, 5));
+        }
         await processCategory(categoryIndex + 1);
-      }; // End processCategory function definition
-
-      // --- Function to Save PDF ---
+      };
       const finalizeAndSaveAll = () => {
         try {
           pdf.save(
@@ -916,24 +822,19 @@ export const thumbnails = {
             5000
           );
         } catch (e) {
-          console.error("Error saving combined PDF:", e);
           utils.showStatus("Error saving combined PDF", true);
         } finally {
           utils.showStatus("", false, 1);
-        } // Clear "Generating..."
+        }
       };
-
-      // --- Start Processing ---
       processCategory(0);
     } catch (error) {
-      // Catch errors during PDF setup
-      console.error("Error generating comprehensive PDF:", error);
       utils.showStatus(
         "Error generating comprehensive PDF: " + error.message,
         true
       );
     }
-  }, // End generateAllCategoriesPDF function
+  },
 };
 
 export default thumbnails;

@@ -18,7 +18,12 @@ let _waitTimeout = null;
  * @param {Array} [actionsList=[]] - Optional array of actions to perform before capturing.
  * @returns {Promise<Object>} - An object containing the screenshot, thumbnail, time taken, etc.
  */
-export async function takeScreenshot(url, preset = "fullHD", captureFullPage = false, actionsList = []) {
+export async function takeScreenshot(
+  url,
+  preset = "fullHD",
+  captureFullPage = false,
+  actionsList = []
+) {
   // Clear any existing timeout
   if (_waitTimeout) {
     clearTimeout(_waitTimeout);
@@ -27,175 +32,187 @@ export async function takeScreenshot(url, preset = "fullHD", captureFullPage = f
 
   const startTime = performance.now();
   const iframe = document.getElementById("screenshotIframe");
-  let mountErrorDetected = false;
+  let detectedMountIssueDuringLoad = false;
+  let detectedMountIssueMessage = null;
 
   // Set up a MutationObserver to watch for mount errors in the DOM
+  // This observer will only set flags, not throw errors directly.
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-        // Check each added node for error messages
         for (const node of mutation.addedNodes) {
-          if (node.nodeType === 1) { // Element node
+          if (node.nodeType === 1) {
+            // Element node
             const text = node.textContent || "";
-            if (text.includes("No view configured for center mount") || text.includes("Mount definition should contain a property")) {
-              mountErrorDetected = true;
-              console.log("Mount error detected by observer:", text);
+            if (
+              text.includes("No view configured for center mount") ||
+              text.includes("Mount definition should contain a property")
+            ) {
+              detectedMountIssueDuringLoad = true;
+              detectedMountIssueMessage = text;
+              console.warn("Mount issue detected by observer:", text);
             }
-             // Check children for error messages too
-             const errorEls = node.querySelectorAll(".error-message, .warning-message, .error");
-             for(const el of errorEls) {
-                 const elText = el.textContent || "";
-                 if (elText.includes("No view configured for center mount") || elText.includes("Mount definition should contain a property")) {
-                     mountErrorDetected = true;
-                     console.log("Mount error detected in child element:", elText);
-                 }
-             }
+            const errorEls = node.querySelectorAll(
+              ".error-message, .warning-message, .error"
+            );
+            for (const el of errorEls) {
+              const elText = el.textContent || "";
+              if (
+                elText.includes("No view configured for center mount") ||
+                elText.includes("Mount definition should contain a property")
+              ) {
+                detectedMountIssueDuringLoad = true;
+                detectedMountIssueMessage = elText;
+                console.warn(
+                  "Mount issue detected in child element by observer:",
+                  elText
+                );
+              }
+            }
           }
         }
       }
     }
   });
 
-  // --- MODIFIED: Get base dimensions from preset ---
-  const basePreset = config.screenshot.presets[preset] || config.screenshot.presets.fullHD;
+  const basePreset =
+    config.screenshot.presets[preset] || config.screenshot.presets.fullHD;
   let width = basePreset.width;
-  let initialHeight = basePreset.height; // Use preset height initially or if not capturing full page
-  let actualHeight = initialHeight; // This will be updated if captureFullPage is true
-  // --- END MODIFICATION ---
+  let initialHeight = basePreset.height;
+  let actualHeight = initialHeight;
 
-  // Set initial dimensions for the iframe based on the *base* preset.
   iframe.style.width = `${width}px`;
-  iframe.style.height = `${initialHeight}px`; // Start with preset height
+  iframe.style.height = `${initialHeight}px`;
+
+  let wasMountIssueDetectedInRendering = false;
+  let finalDetectedMountIssueMessage = null;
 
   try {
-    events.emit(events.events.CAPTURE_STARTED, { url, preset, captureFullPage });
+    events.emit(events.events.CAPTURE_STARTED, {
+      url,
+      preset,
+      captureFullPage,
+    });
 
-    // Start observing the iframe for changes
-     observer.observe(iframe.contentDocument || iframe.contentWindow.document, { childList: true, subtree: true });
+    observer.observe(iframe.contentDocument || iframe.contentWindow.document, {
+      childList: true,
+      subtree: true,
+    });
 
-
-    // Load the URL into the iframe and wait for it to render.
     await loadUrlInIframe(iframe, url);
+    await new Promise((resolve) => setTimeout(resolve, 300)); // Allow observer to catch early errors
 
-    // Wait a bit to ensure any mount errors are caught
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    // Check if a mount error was detected during loading
-    if (mountErrorDetected) {
-       observer.disconnect();
-       throw new errorHandling.ScreenshotError(
-         "Failed to capture screenshot: No view configured for center mount error detected",
-         url,
-         "Mount error detected during loading"
-       );
-     }
-
-
-    const renderResult = await waitForRendering(url, iframe);
-
-     // If rendering failed due to specific errors, abort screenshot capture
-     if (!renderResult.success) {
-       observer.disconnect();
-       throw new errorHandling.ScreenshotError(`Failed to capture screenshot: ${renderResult.error}`, url, renderResult.error);
-     }
-
-
-    // Perform any action sequences (e.g., navigating to submenus)
-    if (actionsList && actionsList.length > 0) {
-      await actions.performActions(iframe.contentDocument, actionsList);
-
-      // Check again for mount errors after actions
-      if (mountErrorDetected) {
-           observer.disconnect();
-           throw new errorHandling.ScreenshotError(
-             "Failed to capture screenshot: No view configured for center mount error detected after actions",
-             url,
-             "Mount error detected after actions"
-           );
-      }
-
-      // Give the page a moment to settle after actions
-      await new Promise(resolve => setTimeout(resolve, 500));
+    if (detectedMountIssueDuringLoad) {
+      console.warn(
+        `Mount issue was detected during initial load for ${url}: ${detectedMountIssueMessage}`
+      );
+      finalDetectedMountIssueMessage = detectedMountIssueMessage;
+      wasMountIssueDetectedInRendering = true; // Mark that an issue was found
     }
 
-    // Stop observing now that we're past the error-prone part
-     observer.disconnect();
+    // waitForRendering will now resolve successfully even if mount issues are found,
+    // but will pass back a flag.
+    const renderResult = await waitForRendering(url, iframe);
 
+    if (renderResult.detectedMountIssue) {
+      wasMountIssueDetectedInRendering = true;
+      finalDetectedMountIssueMessage =
+        renderResult.mountIssueMessage ||
+        finalDetectedMountIssueMessage ||
+        "Mount issue detected during rendering.";
+      console.warn(
+        `Mount issue noted by waitForRendering for ${url}: ${finalDetectedMountIssueMessage}`
+      );
+    }
 
-    // Retrieve the current URL from the iframe after navigation.
+    // If rendering truly failed for other reasons, then throw an error.
+    if (!renderResult.success && !renderResult.detectedMountIssue) {
+      observer.disconnect();
+      throw new errorHandling.ScreenshotError(
+        `Failed to capture screenshot: ${renderResult.error}`,
+        url,
+        renderResult.error
+      );
+    }
+
+    if (actionsList && actionsList.length > 0) {
+      await actions.performActions(iframe.contentDocument, actionsList);
+      // Re-check observer flag after actions, as actions might trigger new mount issues
+      if (detectedMountIssueDuringLoad && !wasMountIssueDetectedInRendering) {
+        // If observer caught something new
+        console.warn(
+          `Mount issue detected by observer after actions for ${url}: ${detectedMountIssueMessage}`
+        );
+        finalDetectedMountIssueMessage = detectedMountIssueMessage;
+        wasMountIssueDetectedInRendering = true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    observer.disconnect();
     const currentUrl = iframe.contentWindow.location.href;
 
-
-    // --- MODIFIED: Calculate height only if captureFullPage is true ---
     if (captureFullPage) {
       const doc = iframe.contentDocument;
-      // Try multiple approaches to get the full page height
       const bodyScrollHeight = doc.body ? doc.body.scrollHeight : 0;
-      const docScrollHeight = doc.documentElement ? doc.documentElement.scrollHeight : 0;
+      const docScrollHeight = doc.documentElement
+        ? doc.documentElement.scrollHeight
+        : 0;
       const bodyOffsetHeight = doc.body ? doc.body.offsetHeight : 0;
-      const docOffsetHeight = doc.documentElement ? doc.documentElement.offsetHeight : 0;
+      const docOffsetHeight = doc.documentElement
+        ? doc.documentElement.offsetHeight
+        : 0;
 
-       // Find all elements and get their bottom positions
-       const allElements = doc.querySelectorAll('*');
-       let maxBottom = 0;
-       for (const el of allElements) {
-           try {
-               const rect = el.getBoundingClientRect();
-               // Need to account for potential scroll position within iframe
-               const scrollTop = iframe.contentWindow.pageYOffset || doc.documentElement.scrollTop || doc.body.scrollTop || 0;
-               const bottom = rect.bottom + scrollTop;
-               if (bottom > maxBottom) {
-                   maxBottom = bottom;
-               }
-           } catch(e) { /* ignore elements that might cause errors like SVG */ }
-       }
+      const allElements = doc.querySelectorAll("*");
+      let maxBottom = 0;
+      for (const el of allElements) {
+        try {
+          const rect = el.getBoundingClientRect();
+          const scrollTop =
+            iframe.contentWindow.pageYOffset ||
+            doc.documentElement.scrollTop ||
+            doc.body.scrollTop ||
+            0;
+          const bottom = rect.bottom + scrollTop;
+          if (bottom > maxBottom) {
+            maxBottom = bottom;
+          }
+        } catch (e) {
+          /* ignore elements that might cause errors like SVG */
+        }
+      }
 
-
-      console.log("Body scroll height:", bodyScrollHeight);
-      console.log("Document scroll height:", docScrollHeight);
-      console.log("Body offset height:", bodyOffsetHeight);
-      console.log("Document offset height:", docOffsetHeight);
-      console.log("Max element bottom:", maxBottom);
-
-
-      // Use the maximum of all these values to ensure we capture everything
       actualHeight = Math.max(
         bodyScrollHeight,
         docScrollHeight,
         bodyOffsetHeight,
         docOffsetHeight,
         maxBottom,
-        initialHeight // Ensure minimum height is the preset height
+        initialHeight
       );
-      console.log(`Final calculated height for Full Page (Width: ${width}):`, actualHeight);
-
-      // Update the iframe height *only* if capturing full page
       iframe.style.height = `${actualHeight}px`;
 
-       // Ensure that the body and documentElement heights are set to allow full capture
-       try {
-         doc.body.style.height = 'auto';
-         doc.body.style.overflow = 'visible';
-         doc.documentElement.style.height = 'auto';
-         doc.documentElement.style.overflow = 'visible';
-       } catch(e) { console.warn("Couldn't set document styles:", e); }
+      try {
+        doc.body.style.height = "auto";
+        doc.body.style.overflow = "visible";
+        doc.documentElement.style.height = "auto";
+        doc.documentElement.style.overflow = "visible";
+      } catch (e) {
+        console.warn("Couldn't set document styles:", e);
+      }
 
-      // Wait for the resize to take effect
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 300));
     } else {
-      // If not capturing full page, actualHeight remains the initial preset height
       actualHeight = initialHeight;
-      console.log(`Using fixed height from preset ${preset}: ${actualHeight}`);
-       // Ensure iframe is set to the correct fixed height
-       iframe.style.height = `${actualHeight}px`;
+      iframe.style.height = `${actualHeight}px`;
     }
-    // --- END MODIFICATION ---
 
-
-    // Capture the screenshot using the determined width and actualHeight
-    const { screenshotData } = await captureScreenshotInternal(iframe, currentUrl, width, actualHeight);
-
-    // Create a thumbnail for display.
+    const { screenshotData } = await captureScreenshotInternal(
+      iframe,
+      currentUrl,
+      width,
+      actualHeight
+    );
     const thumbnailData = await utils.createThumbnail(
       screenshotData,
       config.screenshot.thumbnailSize.width,
@@ -205,45 +222,64 @@ export async function takeScreenshot(url, preset = "fullHD", captureFullPage = f
     const endTime = performance.now();
     const timeTaken = ((endTime - startTime) / 1000).toFixed(2);
 
-    // --- MODIFIED: Include final dimensions and full page flag in result ---
     const result = {
       screenshot: screenshotData,
       thumbnail: thumbnailData,
       timeTaken,
-      preset: preset, // The base preset selected
-      isFullPage: captureFullPage, // Indicate if full page was captured
-      width: width, // Final width used
-      height: actualHeight, // Final height used (calculated or preset)
-      url: currentUrl // Add the URL to the result
+      preset: preset,
+      isFullPage: captureFullPage,
+      width: width,
+      height: actualHeight,
+      url: currentUrl,
+      // NEW: Add a flag and message for detected mount issues
+      detectedMountIssue: wasMountIssueDetectedInRendering,
+      mountIssueMessage: wasMountIssueDetectedInRendering
+        ? finalDetectedMountIssueMessage
+        : null,
+      error: false, // Explicitly set error to false if we reached here, even with mount issues
     };
-    // --- END MODIFICATION ---
 
-
-    // Clean up by resetting the iframe and emit the completion event.
     iframe.src = "about:blank";
     events.emit(events.events.SCREENSHOT_TAKEN, { url: currentUrl, result });
-
     return result;
-
   } catch (error) {
-    // Clean up observer
-     observer.disconnect();
-
-
-    // On error, reset the iframe and propagate the error.
+    // This catch block now primarily handles non-mount-related errors
+    observer.disconnect();
     iframe.src = "about:blank";
-    // Ensure error includes relevant context
-    const errorMessage = error instanceof errorHandling.ScreenshotError ? error.message : `Failed to capture screenshot for ${url}: ${error.message}`;
+    const errorMessage =
+      error instanceof errorHandling.ScreenshotError
+        ? error.message
+        : `Failed to capture screenshot for ${url}: ${error.message}`;
+    // If it was a mount issue that somehow re-threw as a generic error, treat it as a detected issue for consistency.
+    const isOriginalMountError =
+      errorMessage.includes("No view configured") ||
+      errorMessage.includes("Mount definition");
+
     const captureError = new errorHandling.ScreenshotError(
       errorMessage,
       url,
-      error.reason || error.message // Include original reason if available
+      error.reason || error.message
     );
-    events.emit(events.events.CAPTURE_FAILED, { url, error: captureError });
-    throw captureError; // Rethrow the standardized error
-  }
-} // End takeScreenshot
 
+    if (isOriginalMountError) {
+      console.warn(
+        `Treating originally thrown mount error as a detectable issue for URL: ${url}`
+      );
+      // For CAPTURE_FAILED, we might need to decide if we send a "pretend success" result
+      // or the actual error. For now, let's emit the error but app.js will handle it.
+      // The key is that takeScreenshot itself shouldn't throw if the goal was to capture the error state.
+      // This path implies html2canvas or a preceding step failed *after* a mount error was detected
+      // but before we could successfully mark it as `detectedMountIssue: true` and `error: false`.
+      events.emit(events.events.CAPTURE_FAILED, {
+        url,
+        error: captureError, // Original error
+      });
+    } else {
+      events.emit(events.events.CAPTURE_FAILED, { url, error: captureError });
+    }
+    throw captureError; // Rethrow the standardized error for App.js to handle
+  }
+}
 
 /**
  * Load a URL into the iframe.
@@ -258,279 +294,257 @@ function loadUrlInIframe(iframe, url) {
     const timeoutDuration = 30000; // 30 seconds timeout for load
 
     const loadTimeout = setTimeout(() => {
-        if (!loadFired) {
-            console.error(`Iframe load timeout for ${url}`);
-            cleanup();
-            reject(new Error(`Timeout loading ${url} in iframe`));
-        }
+      if (!loadFired) {
+        console.error(`Iframe load timeout for ${url}`);
+        cleanup();
+        reject(new Error(`Timeout loading ${url} in iframe`));
+      }
     }, timeoutDuration);
 
-
     const handleLoad = () => {
-        if (loadFired) return; // Prevent multiple triggers
-        loadFired = true;
-        console.log(`Iframe load event fired for ${url}`);
-        cleanup();
-        // Even after load, wait a short moment for potential redirects or initial script exec
-        setTimeout(resolve, 200);
+      if (loadFired) return; // Prevent multiple triggers
+      loadFired = true;
+      console.log(`Iframe load event fired for ${url}`);
+      cleanup();
+      setTimeout(resolve, 200); // Wait for potential redirects/initial scripts
     };
-
 
     const handleError = (event) => {
-        console.error(`Iframe error event for ${url}:`, event);
-        cleanup();
-        reject(new Error(`Error loading ${url} in iframe`));
+      console.error(`Iframe error event for ${url}:`, event);
+      cleanup();
+      reject(new Error(`Error loading ${url} in iframe`));
     };
 
-     const cleanup = () => {
-         clearTimeout(loadTimeout);
-         iframe.removeEventListener('load', handleLoad);
-         iframe.removeEventListener('error', handleError);
-     };
+    const cleanup = () => {
+      clearTimeout(loadTimeout);
+      iframe.removeEventListener("load", handleLoad);
+      iframe.removeEventListener("error", handleError);
+    };
 
+    iframe.addEventListener("load", handleLoad);
+    iframe.addEventListener("error", handleError);
 
-    iframe.addEventListener('load', handleLoad);
-    iframe.addEventListener('error', handleError);
-
-
-    // Check if src is already the target URL and if it's loaded
     try {
-        if (iframe.contentWindow?.location?.href === url && iframe.contentDocument?.readyState === 'complete') {
-            console.log(`Iframe already loaded with ${url}`);
-            handleLoad(); // Treat as loaded
-            return;
-        }
+      if (
+        iframe.contentWindow?.location?.href === url &&
+        iframe.contentDocument?.readyState === "complete"
+      ) {
+        console.log(`Iframe already loaded with ${url}`);
+        handleLoad();
+        return;
+      }
     } catch (e) {
-        // Ignore cross-origin errors if just checking href
-        console.warn("Cross-origin check failed, proceeding with src assignment.");
+      console.warn(
+        "Cross-origin check failed, proceeding with src assignment."
+      );
     }
-
-
     iframe.src = url;
   });
-} // End loadUrlInIframe
+}
 
 /**
  * Wait for the page to render.
- * Also checks for specific errors like "No view configured for center mount"
+ * Checks for specific errors like "No view configured for center mount"
+ * but will resolve successfully, passing a flag if such an error is found.
  *
  * @param {string} url - The URL being captured.
  * @param {HTMLIFrameElement} iframe - The iframe containing the page.
- * @returns {Promise<{success: boolean, error: string|null}>} - Resolves when the rendering wait time is complete.
+ * @returns {Promise<{success: boolean, error: string|null, detectedMountIssue?: boolean, mountIssueMessage?: string|null}>}
  */
- function waitForRendering(url, iframe) {
+function waitForRendering(url, iframe) {
   return new Promise((resolve) => {
-    // --- MODIFIED: Get wait time from the input field directly ---
-    let waitTimeInSeconds = 10; // Default
+    let waitTimeInSeconds = 10;
     try {
-        const waitTimeInput = document.getElementById("waitTime") || document.getElementById("simpleWaitTime");
-        if (waitTimeInput && waitTimeInput.value) {
-            waitTimeInSeconds = parseInt(waitTimeInput.value, 10);
-             if (isNaN(waitTimeInSeconds) || waitTimeInSeconds < 1) {
-               waitTimeInSeconds = 10; // Fallback to default if invalid
-             }
+      const waitTimeInput =
+        document.getElementById("waitTime") ||
+        document.getElementById("simpleWaitTime");
+      if (waitTimeInput && waitTimeInput.value) {
+        waitTimeInSeconds = parseInt(waitTimeInput.value, 10);
+        if (isNaN(waitTimeInSeconds) || waitTimeInSeconds < 1) {
+          waitTimeInSeconds = 10;
         }
-    } catch(e) { console.warn("Error reading wait time, using default.", e); }
-    // --- END MODIFICATION ---
-
-    let secondsLeft = waitTimeInSeconds;
-    let consoleErrorFound = false;
-    let detectedErrorMsg = null; // Store specific error message found
-
-    // Clear previous timeout if exists
-    if (_waitTimeout) {
-        clearTimeout(_waitTimeout);
-        _waitTimeout = null;
+      }
+    } catch (e) {
+      console.warn("Error reading wait time, using default.", e);
     }
 
+    let secondsLeft = waitTimeInSeconds;
+    let consoleMountErrorFound = false;
+    let domMountErrorFound = false; // Specific flag for DOM-detected mount errors
+    let detectedMountIssueMsgInternal = null;
+    let generalErrorMsg = null; // For non-mount errors that should fail rendering
+
+    if (_waitTimeout) {
+      clearTimeout(_waitTimeout);
+      _waitTimeout = null;
+    }
 
     events.emit(events.events.CAPTURE_PROGRESS, {
       message: `Waiting for ${url} to render... (${secondsLeft}s remaining)`,
     });
 
-
-    // Override console.warn and console.error to catch mount errors (within the iframe context if possible)
     const iframeWin = iframe.contentWindow;
     const originalWarn = iframeWin ? iframeWin.console.warn : console.warn;
     const originalError = iframeWin ? iframeWin.console.error : console.error;
     let restoreConsoleNeeded = false;
 
-
     const checkAndRestoreConsole = () => {
-        if(restoreConsoleNeeded) {
-             if (iframeWin) {
-                 iframeWin.console.warn = originalWarn;
-                 iframeWin.console.error = originalError;
-             } else {
-                 console.warn = originalWarn;
-                 console.error = originalError;
-             }
-             restoreConsoleNeeded = false;
-             console.log("Restored console functions.");
+      if (restoreConsoleNeeded) {
+        if (iframeWin) {
+          iframeWin.console.warn = originalWarn;
+          iframeWin.console.error = originalError;
+        } else {
+          console.warn = originalWarn; // Fallback if iframeWin was not available
+          console.error = originalError;
         }
-    }
-
-
-    const consoleProxyHandler = (originalFunc, type) => (...args) => {
-         originalFunc.apply(console, args); // Log normally first
-
-
-         // Check if this is a mount error
-         const text = args.join(" ");
-         if (text.includes("No view configured for center mount") || text.includes("Mount definition should contain a property")) {
-           console.warn(`*** Mount Error Detected via console.${type} ***`);
-           consoleErrorFound = true;
-           detectedErrorMsg = "No view configured for center mount error detected in console";
-           // Resolve immediately if an error is found
-           checkAndRestoreConsole();
-           if (_waitTimeout) clearTimeout(_waitTimeout);
-           resolve({ success: false, error: detectedErrorMsg });
-         }
-       };
-
-
-     if (iframeWin) {
-         iframeWin.console.warn = consoleProxyHandler(originalWarn, 'warn');
-         iframeWin.console.error = consoleProxyHandler(originalError, 'error');
-         restoreConsoleNeeded = true;
-     } else {
-         console.warn = consoleProxyHandler(originalWarn, 'warn');
-         console.error = consoleProxyHandler(originalError, 'error');
-         restoreConsoleNeeded = true;
-     }
-
-
-    // Wait for the DOM content to be fully loaded and images to be loaded
-    const waitForImages = () => {
-      try {
-        if (!iframe.contentDocument) return false;
-
-        const imgElements = iframe.contentDocument.querySelectorAll('img');
-        // Check if all images are loaded (complete=true means loaded or error)
-        // Also check naturalWidth > 0 for successfully loaded images
-        const allImagesLoaded = Array.from(imgElements).every(img => img.complete && img.naturalWidth !== 0);
-
-        // Check for background images (basic check, less reliable)
-        // Note: This is harder to track reliably. Focus on <img> tags.
-
-        return allImagesLoaded;
-      } catch (e) {
-        console.warn("Error checking image loading status:", e);
-        return true; // Assume images are loaded if there's an error checking
+        restoreConsoleNeeded = false;
       }
     };
 
+    const consoleProxyHandler =
+      (originalFunc, type) =>
+      (...args) => {
+        originalFunc.apply(console, args);
+        const text = args.join(" ");
+        if (
+          text.includes("No view configured for center mount") ||
+          text.includes("Mount definition should contain a property")
+        ) {
+          console.warn(
+            `Mount issue Detected via console.${type} for ${url}: ${text}`
+          );
+          consoleMountErrorFound = true;
+          detectedMountIssueMsgInternal =
+            detectedMountIssueMsgInternal ||
+            `Console ${type}: ${text.substring(0, 100)}...`;
+          // Don't resolve here, let countdown finish to capture the page state
+        }
+      };
 
-    // Function to check for specific error messages in the DOM
-    const checkForErrors = () => {
+    if (iframeWin) {
+      // Check if iframe.contentWindow is accessible
+      iframeWin.console.warn = consoleProxyHandler(originalWarn, "warn");
+      iframeWin.console.error = consoleProxyHandler(originalError, "error");
+      restoreConsoleNeeded = true;
+    } else {
+      console.warn(
+        "Could not attach console proxy to iframe, console errors might not be caught for mount issue detection."
+      );
+    }
+
+    const waitForImages = () => {
       try {
-        if (!iframe.contentDocument) return { found: false };
+        if (!iframe.contentDocument) return false;
+        const imgElements = iframe.contentDocument.querySelectorAll("img");
+        return Array.from(imgElements).every(
+          (img) => img.complete && img.naturalWidth !== 0
+        );
+      } catch (e) {
+        console.warn("Error checking image loading status:", e);
+        return true;
+      }
+    };
 
+    const checkForDOMLoadErrors = () => {
+      try {
+        if (!iframe.contentDocument)
+          return { found: false, isMountIssue: false };
 
-        // Check for "No view configured for center mount" warning
-        const errorElements = iframe.contentDocument.querySelectorAll(
+        // Check for Perspective Mount Errors
+        const mountErrorElements = iframe.contentDocument.querySelectorAll(
           ".error-message, .warning-message, .error"
         );
-        for (const el of errorElements) {
+        for (const el of mountErrorElements) {
           const text = el.textContent || "";
-          if (text.includes("No view configured for center mount") || text.includes("Mount definition should contain a property")) {
-            return {
-              found: true,
-              message: "No view configured for center mount error detected in DOM",
-            };
+          if (
+            text.includes("No view configured for center mount") ||
+            text.includes("Mount definition should contain a property")
+          ) {
+            console.warn(`Mount issue Detected in DOM for ${url}: ${text}`);
+            domMountErrorFound = true; // Set DOM specific flag
+            detectedMountIssueMsgInternal =
+              detectedMountIssueMsgInternal ||
+              `DOM: ${text.substring(0, 100)}...`;
+            // This is a mount issue, not a general load error. We will proceed with screenshot.
+            // So, return isMountIssue: true but found: false for general errors.
           }
         }
 
-
-        // Check for other common error indicators
+        // Check for other common error indicators (these are general failures)
         const notFoundElements = iframe.contentDocument.querySelectorAll(
           '.not-found, .error-page, [data-error="not-found"]'
         );
         if (notFoundElements.length > 0) {
           return {
             found: true,
-            message: "Page not found or error page detected",
+            message: "Page not found or general error page detected",
+            isMountIssue: false,
           };
         }
-
-
-        return { found: false };
+        return { found: false, isMountIssue: domMountErrorFound }; // Return if a mount issue was found in DOM
       } catch (e) {
         console.warn("Error checking for page errors:", e);
-        return { found: false };
+        return { found: false, isMountIssue: false };
       }
     };
 
-
     const countdown = () => {
-       // Clear timeout if it's already resolved/rejected
-       if (!resolve) return;
+      if (!resolve) return; // Already resolved
 
-
-      // Check for errors immediately
-      const errorCheck = checkForErrors();
-      if (errorCheck.found) {
+      const domLoadErrorCheck = checkForDOMLoadErrors();
+      if (domLoadErrorCheck.found && !domLoadErrorCheck.isMountIssue) {
+        // A general, non-mount error was found
         checkAndRestoreConsole();
-        detectedErrorMsg = errorCheck.message;
-         if (_waitTimeout) clearTimeout(_waitTimeout);
-         _waitTimeout = null;
-         resolve({ success: false, error: detectedErrorMsg });
-         resolve = null; // Prevent multiple resolves
+        generalErrorMsg = domLoadErrorCheck.message;
+        if (_waitTimeout) clearTimeout(_waitTimeout);
+        _waitTimeout = null;
+        resolve({
+          success: false,
+          error: generalErrorMsg,
+          detectedMountIssue: false,
+        }); // Hard fail
+        resolve = null;
         return;
       }
-      // Check if console error was found by proxy
-      if (consoleErrorFound) {
-           // Already resolved in proxy, just ensure cleanup
-           checkAndRestoreConsole();
-            if (_waitTimeout) clearTimeout(_waitTimeout);
-            _waitTimeout = null;
-           resolve = null; // Prevent multiple resolves
-           return;
-      }
+      // If domLoadErrorCheck.isMountIssue is true, domMountErrorFound is already set.
 
-
-      // Check if all images are loaded
       const imagesLoaded = waitForImages();
 
-
-      // Check if countdown finished or images loaded
-      if ((secondsLeft <= 0 && imagesLoaded)) {
+      if (secondsLeft <= 0 && imagesLoaded) {
         checkAndRestoreConsole();
-        // Give a little extra time after images are loaded for any JavaScript rendering
         setTimeout(() => {
-           if (resolve) { // Check if not already resolved by error
-             resolve({ success: true, error: null });
-             resolve = null; // Prevent multiple resolves
-           }
+          // Extra grace period
+          if (resolve) {
+            const anyMountIssueFound =
+              domMountErrorFound || consoleMountErrorFound;
+            resolve({
+              success: true, // SUCCESS is true, screenshot will be taken
+              error: null, // No general error stopping the capture
+              detectedMountIssue: anyMountIssueFound,
+              mountIssueMessage: anyMountIssueFound
+                ? detectedMountIssueMsgInternal
+                : null,
+            });
+            resolve = null;
+          }
         }, 500);
         _waitTimeout = null;
         return;
       }
 
-
       events.emit(events.events.CAPTURE_PROGRESS, {
         message: `Waiting for ${url} to render... (${secondsLeft}s remaining)`,
       });
-
-
       secondsLeft--;
-
-
-      // Ensure timeout isn't rescheduled if already resolved
       if (resolve) {
-         _waitTimeout = setTimeout(countdown, 1000);
+        _waitTimeout = setTimeout(countdown, 1000);
       } else {
-           _waitTimeout = null; // Clear timeout ref if resolved
+        _waitTimeout = null;
       }
-
-
     };
-
-
-    _waitTimeout = setTimeout(countdown, 1000); // Start the countdown
+    _waitTimeout = setTimeout(countdown, 1000);
   });
-} // End waitForRendering
-
+}
 
 /**
  * Internal function to capture screenshot using html2canvas.
@@ -544,121 +558,93 @@ function loadUrlInIframe(iframe, url) {
 async function captureScreenshotInternal(iframe, url, width, height) {
   const doc = iframe.contentDocument;
 
-
   events.emit(events.events.CAPTURE_PROGRESS, {
     message: `Capturing screenshot (${width}x${height})...`,
   });
 
-
-  // --- MODIFIED: Set html2canvas options based on determined width/height ---
   const options = {
     ...config.screenshot.html2canvasOptions,
     width: width,
     height: height,
-    windowWidth: width, // Important: Tell html2canvas the intended window size
+    windowWidth: width,
     windowHeight: height,
-    x: 0, // Start capture from top-left
+    x: 0,
     y: 0,
-    scrollX: 0, // Ensure no scrolling offset is applied by html2canvas itself
+    scrollX: 0,
     scrollY: 0,
     ignoreElements: (element) => {
-        // Example: Ignore elements specifically marked
-        return element.classList && element.classList.contains('screenshot-ignore');
+      return (
+        element.classList && element.classList.contains("screenshot-ignore")
+      );
     },
     onclone: (documentClone) => {
-        // Ensure the cloned document reflects the correct height for full page captures
-        if (documentClone.body) {
-          documentClone.body.style.height = `${height}px`;
-          documentClone.body.style.overflow = 'visible'; // Prevent potential scrollbars in clone
-        }
-        if (documentClone.documentElement) {
-            documentClone.documentElement.style.height = `${height}px`;
-            documentClone.documentElement.style.overflow = 'visible';
-        }
-    }
-  };
-  // --- END MODIFICATION ---
-
-
-  // --- Temporarily handle fixed elements for better full page capture ---
-  let originalStyles = [];
-  if (height > iframe.contentWindow.innerHeight) { // Simple check if likely full page
-      try {
-         const fixedElements = Array.from(doc.querySelectorAll('*')).filter(el => {
-             try {
-                 return iframe.contentWindow.getComputedStyle(el).position === 'fixed';
-             } catch (e) { return false; } // Ignore elements that error on getComputedStyle
-         });
-
-
-         originalStyles = fixedElements.map(el => ({
-             element: el,
-             position: el.style.position,
-             // Store other relevant styles if needed (top, bottom, etc.)
-         }));
-
-
-         fixedElements.forEach(item => {
-             item.element.style.position = 'absolute'; // Change to absolute during capture
-         });
-         console.log(`Temporarily changed position for ${fixedElements.length} fixed elements.`);
-      } catch (e) {
-          console.warn("Error handling fixed elements:", e);
+      if (documentClone.body) {
+        documentClone.body.style.height = `${height}px`;
+        documentClone.body.style.overflow = "visible";
       }
+      if (documentClone.documentElement) {
+        documentClone.documentElement.style.height = `${height}px`;
+        documentClone.documentElement.style.overflow = "visible";
+      }
+    },
+  };
+
+  let originalStyles = [];
+  if (height > iframe.contentWindow.innerHeight) {
+    try {
+      const fixedElements = Array.from(doc.querySelectorAll("*")).filter(
+        (el) => {
+          try {
+            return (
+              iframe.contentWindow.getComputedStyle(el).position === "fixed"
+            );
+          } catch (e) {
+            return false;
+          }
+        }
+      );
+      originalStyles = fixedElements.map((el) => ({
+        element: el,
+        position: el.style.position,
+      }));
+      fixedElements.forEach((item) => {
+        item.element.style.position = "absolute";
+      });
+    } catch (e) {
+      console.warn("Error handling fixed elements:", e);
+    }
   }
-  // --- End fixed element handling ---
 
-
-  // Generate the canvas using html2canvas
   const canvas = await html2canvas(doc.documentElement, options);
 
+  if (originalStyles.length > 0) {
+    try {
+      originalStyles.forEach((item) => {
+        item.element.style.position = item.position;
+      });
+    } catch (e) {
+      console.warn("Error restoring fixed elements:", e);
+    }
+  }
 
-   // --- Restore fixed elements ---
-   if (originalStyles.length > 0) {
-       try {
-         originalStyles.forEach(item => {
-             item.element.style.position = item.position; // Restore original position
-         });
-         console.log(`Restored position for ${originalStyles.length} fixed elements.`);
-       } catch (e) {
-           console.warn("Error restoring fixed elements:", e);
-       }
-   }
-   // --- End restore ---
-
-
-  // Overlay the URL onto the canvas
   const ctx = canvas.getContext("2d");
-  const overlayHeight = 30; // Height of the URL overlay bar
-  const textY = canvas.height - overlayHeight / 2; // Center text vertically in the bar
-
-  // Draw overlay bar
-  ctx.fillStyle = "rgba(0, 0, 0, 0.6)"; // Slightly darker overlay
+  const overlayHeight = 30;
+  const textY = canvas.height - overlayHeight / 2;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
   ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
-
-
-  // Draw URL text
-  ctx.font = "14px Arial"; // Slightly smaller font
+  ctx.font = "14px Arial";
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-
-
-  // Add padding to the text
   const textX = 10;
   ctx.fillText(url, textX, textY);
 
-  // Convert canvas to data URL
-  const screenshotData = canvas.toDataURL("image/png"); // Use PNG for better quality
-
-  // Clean up canvas to free memory
+  const screenshotData = canvas.toDataURL("image/png");
   canvas.width = 1;
   canvas.height = 1;
 
-
   return { screenshotData };
-} // End captureScreenshotInternal
-
+}
 
 /**
  * Download the screenshot as a file.
@@ -668,28 +654,24 @@ async function captureScreenshotInternal(iframe, url, width, height) {
  */
 export function downloadScreenshot(screenshotData, filename) {
   try {
-      if (!screenshotData || !filename) {
-          console.error("Missing data or filename for download.");
-          return;
-      }
-      const link = document.createElement("a");
-      link.href = screenshotData;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      events.emit(events.events.SCREENSHOT_SAVED, { filename });
+    if (!screenshotData || !filename) {
+      console.error("Missing data or filename for download.");
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = screenshotData;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    events.emit(events.events.SCREENSHOT_SAVED, { filename });
   } catch (error) {
-      console.error("Error during screenshot download:", error);
-       // Optionally show an error to the user
-       // UI.utils.showStatus(`Error downloading ${filename}: ${error.message}`, true);
+    console.error("Error during screenshot download:", error);
   }
-} // End downloadScreenshot
+}
 
 /**
  * Take sequential screenshots by executing different action sequences.
- * NOTE: This function is primarily for Advanced Mode and might not be used
- * in the Simple Mode implemented currently. Kept for potential future use.
  * Process results immediately after each capture.
  *
  * @param {string} url - The base URL to capture.
@@ -699,50 +681,70 @@ export function downloadScreenshot(screenshotData, filename) {
  * @param {Function} [processCallback=null] - Optional callback to process each result immediately
  * @returns {Promise<Array>} - An array of screenshot results.
  */
- export async function takeSequentialScreenshots(
+export async function takeSequentialScreenshots(
   url,
   preset = "fullHD",
-  captureFullPage = false, // Added flag
+  captureFullPage = false,
   actionSequences = [],
   processCallback = null
 ) {
   const results = [];
   if (!actionSequences || actionSequences.length === 0) {
-      console.warn("takeSequentialScreenshots called without action sequences. Taking single screenshot.");
-       // Fallback to taking a single screenshot if no sequences provided
-       try {
-           const singleResult = await takeScreenshot(url, preset, captureFullPage, []);
-            const timestamp = URLProcessor.getTimestamp();
-            const fullPageSuffix = captureFullPage ? "_FullPage" : "";
-            singleResult.fileName = URLProcessor.generateFilename(url, 0, "").replace(".png", `${fullPageSuffix}_${timestamp}.png`);
-            singleResult.sequenceName = "Base Page"; // Assign a default name
-            results.push(singleResult);
-            if (typeof processCallback === "function") {
-                 processCallback(singleResult);
-             }
-       } catch (error) {
-           console.error(`Error taking base screenshot for sequential capture: ${url}`, error);
-            const errorResult = {
-                sequenceName: "Base Page (Error)",
-                error: true,
-                errorMessage: error.message,
-                 url: url // Include URL in error result
-             };
-             results.push(errorResult);
-              if (typeof processCallback === "function") {
-                 processCallback(errorResult);
-             }
-           // Decide if the entire process should stop on base page error
-           throw new errorHandling.ScreenshotError(`Base screenshot failed for sequential capture: ${error.message}`, url, error.reason);
-       }
-      return results; // Return the single result or error
+    console.warn(
+      "takeSequentialScreenshots called without action sequences. Taking single screenshot."
+    );
+    try {
+      const singleResult = await takeScreenshot(
+        url,
+        preset,
+        captureFullPage,
+        []
+      );
+      // Filename generation is now centralized in app.js based on the result.
+      // Here, we just add sequence-specific info.
+      singleResult.sequenceName = "Base Page";
+      results.push(singleResult); // singleResult contains detectedMountIssue flags
+      if (typeof processCallback === "function") {
+        processCallback(singleResult);
+      }
+    } catch (error) {
+      // This catch is for errors from the single takeScreenshot call
+      const errorResult = {
+        sequenceName: "Base Page (Error)",
+        error: true, // This is a genuine capture error
+        errorMessage: error.message,
+        url: url,
+        // Populate mount issue flags from the error if it was a ScreenshotError with that info
+        detectedMountIssue:
+          error instanceof errorHandling.ScreenshotError &&
+          (error.message?.includes("No view configured") ||
+            error.message?.includes("Mount definition")),
+        mountIssueMessage:
+          error instanceof errorHandling.ScreenshotError &&
+          (error.message?.includes("No view configured") ||
+            error.message?.includes("Mount definition"))
+            ? error.message
+            : null,
+      };
+      results.push(errorResult);
+      if (typeof processCallback === "function") {
+        processCallback(errorResult);
+      }
+      // Rethrow to indicate the base capture failed, which might be critical
+      throw new errorHandling.ScreenshotError(
+        `Base screenshot failed for sequential capture: ${error.message}`,
+        url,
+        error.reason
+      );
+    }
+    return results;
   }
-
 
   try {
     for (let i = 0; i < actionSequences.length; i++) {
       const sequence = actionSequences[i];
       const sequenceName = sequence.name || `Step ${i + 1}`;
+      let screenshotDataResult;
 
       try {
         events.emit(events.events.CAPTURE_PROGRESS, {
@@ -751,36 +753,28 @@ export function downloadScreenshot(screenshotData, filename) {
           })`,
         });
 
-        // Take the screenshot with the sequence actions
-        // --- MODIFIED: Pass captureFullPage ---
-        const screenshotData = await takeScreenshot(
-          url, // Use the base URL, actions should navigate
+        screenshotDataResult = await takeScreenshot(
+          url,
           preset,
           captureFullPage,
           sequence.actions
         );
-        // --- END MODIFICATION ---
 
-        // Add sequence info
-        const result = {
-          ...screenshotData,
+        // screenshotDataResult from takeScreenshot already includes:
+        // detectedMountIssue, mountIssueMessage, and error (which should be false if captured)
+        const resultWithSequenceInfo = {
+          ...screenshotDataResult,
           sequenceName: sequenceName,
           sequenceIndex: i,
+          // 'error' field from screenshotDataResult is preserved.
+          // If takeScreenshot "succeeded" by capturing a mount error page, screenshotDataResult.error is false.
         };
+        // Filename generation will happen in app.js
 
-         // Generate filename including sequence name and timestamp
-         const timestamp = URLProcessor.getTimestamp();
-          const safeSequenceName = URLProcessor.sanitizeFilename(sequenceName);
-          const fullPageSuffix = captureFullPage ? "_FullPage" : "";
-          result.fileName = `${safeSequenceName}${fullPageSuffix}_${timestamp}.png`;
+        results.push(resultWithSequenceInfo);
 
-
-        // Add to results array
-        results.push(result);
-
-        // Process this result immediately if callback provided
         if (typeof processCallback === "function") {
-          processCallback(result);
+          processCallback(resultWithSequenceInfo);
         }
 
         events.emit(events.events.CAPTURE_PROGRESS, {
@@ -788,114 +782,63 @@ export function downloadScreenshot(screenshotData, filename) {
             actionSequences.length
           })`,
         });
-
-        // Emit a custom event for this specific screenshot
         events.emit("SCREENSHOT_SEQUENCE_TAKEN", {
           url,
-          result,
+          result: resultWithSequenceInfo,
+          sequenceName,
+          sequenceIndex: i,
+          totalSequences: actionSequences.length,
+        });
+      } catch (sequenceError) {
+        // This catches errors if takeScreenshot itself threw for this sequence
+        console.error(`Error in sequence "${sequenceName}":`, sequenceError);
+        // This is a hard failure for this sequence if takeScreenshot threw.
+        const errorResult = {
+          sequenceName: sequenceName + " (Capture Error)",
+          sequenceIndex: i,
+          error: true, // Mark as a hard error for this sequence step
+          errorMessage: sequenceError.message,
+          url: sequenceError.url || url,
+          // Check if the error from takeScreenshot was due to a mount issue that couldn't even be captured
+          detectedMountIssue:
+            sequenceError instanceof errorHandling.ScreenshotError &&
+            (sequenceError.message?.includes("No view configured") ||
+              sequenceError.message?.includes("Mount definition")),
+          mountIssueMessage:
+            sequenceError instanceof errorHandling.ScreenshotError &&
+            (sequenceError.message?.includes("No view configured") ||
+              sequenceError.message?.includes("Mount definition"))
+              ? sequenceError.message
+              : null,
+        };
+        results.push(errorResult);
+
+        if (typeof processCallback === "function") {
+          processCallback(errorResult);
+        }
+        events.emit("SCREENSHOT_SEQUENCE_ERROR", {
+          url,
+          error: errorResult,
           sequenceName,
           sequenceIndex: i,
           totalSequences: actionSequences.length,
         });
 
-      } catch (sequenceError) {
-           console.error(`Error in sequence "${sequenceName}":`, sequenceError);
-           const timestamp = URLProcessor.getTimestamp();
-           const safeSequenceName = URLProcessor.sanitizeFilename(sequenceName);
-            const fullPageSuffix = captureFullPage ? "_FullPage" : ""; // Include suffix even for errors
-           const errorFileName = `${safeSequenceName}${fullPageSuffix}_Error_${timestamp}.png`;
-
-
-        // If this is a mount error, log it and create an error result
-        if (
-          sequenceError.message &&
-          (sequenceError.message.includes("No view configured") ||
-            sequenceError.message.includes("Mount definition"))
-        ) {
-          console.warn(
-            `Skipping sequence "${sequenceName}" due to mount error:`,
-            sequenceError.message
-          );
-          events.emit(events.events.CAPTURE_PROGRESS, {
-            message: `Skipped sequence: ${sequenceName} due to mount error (${
-              i + 1
-            }/${actionSequences.length})`,
-          });
-
-          // Create an error result
-          const errorResult = {
-            sequenceName: sequenceName + " (Error: No view configured)",
-            sequenceIndex: i,
-            error: true,
-            errorMessage: sequenceError.message,
-             fileName: errorFileName, // Add filename to error result
-             url: sequenceError.url || url // Add URL if available in error
-          };
-
-          results.push(errorResult); // Add error result to array
-
-          // Process this error result immediately if callback provided
-          if (typeof processCallback === "function") {
-            processCallback(errorResult);
-          }
-
-          // Emit an error event
-          events.emit("SCREENSHOT_SEQUENCE_ERROR", {
-            url,
-            error: errorResult,
-            sequenceName,
-            sequenceIndex: i,
-            totalSequences: actionSequences.length,
-          });
-
-          // Decide whether to continue or stop on mount errors
-          // continue; // Skip to next sequence if desired
-
-          // OR: Stop the entire process on mount error
-           throw new errorHandling.ScreenshotError(`Mount error during sequence "${sequenceName}": ${sequenceError.message}`, url, sequenceError.reason);
-
-
-        } else {
-             // Handle other errors during a sequence
-             const errorResult = {
-                 sequenceName: sequenceName + " (Error)",
-                 sequenceIndex: i,
-                 error: true,
-                 errorMessage: sequenceError.message,
-                 fileName: errorFileName,
-                 url: sequenceError.url || url
-             };
-             results.push(errorResult);
-
-
-             if (typeof processCallback === "function") {
-                 processCallback(errorResult);
-             }
-             events.emit("SCREENSHOT_SEQUENCE_ERROR", { url, error: errorResult, sequenceName, sequenceIndex: i, totalSequences: actionSequences.length });
-
-
-             // Rethrow to stop the entire process on other sequence errors
-             throw sequenceError;
-        }
-      } // End catch sequenceError
-
-        // Optional delay between sequences
-        await new Promise(r => setTimeout(r, 200));
-
-
-    } // End for loop
-
+        // Rethrow to stop the entire sequential process on any hard sequence error.
+        // If you want to continue to the next sequence on error, use `continue;` instead.
+        throw sequenceError;
+      }
+      await new Promise((r) => setTimeout(r, 200)); // Optional delay between sequences
+    }
     return results;
-
   } catch (error) {
-     // Catch errors that stop the entire sequential process
+    // Catch errors that stop the entire sequential process
     const sequentialError = new errorHandling.ScreenshotError(
       `Error during sequential screenshots for ${url}: ${error.message}`,
       url,
-      error.message
+      error.message // Use the original error message for reason
     );
-    // Emit a general failure event if the loop was aborted
-     events.emit(events.events.CAPTURE_FAILED, { url, error: sequentialError });
-    throw sequentialError; // Rethrow to be caught by the calling function (e.g., captureScreenshots in app.js)
+    events.emit(events.events.CAPTURE_FAILED, { url, error: sequentialError });
+    throw sequentialError;
   }
-} // End takeSequentialScreenshots
+}
