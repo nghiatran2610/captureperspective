@@ -84,22 +84,26 @@ class App {
     console.log("Application initialized.");
   }
 
-  // NEW Helper method to disable/enable form inputs during capture
+  // Helper method to disable/enable form inputs during capture
   _setCaptureUIsDisabled(disabled) {
     const baseUrlInput = document.getElementById("baseUrlInput");
     const capturePresetSelect = UI.elements.capturePreset;
     const fullPageCheckbox = document.getElementById("fullPageCheckbox");
     const simpleWaitTimeInput = document.getElementById("simpleWaitTime");
-    const pageSourceRadios = document.querySelectorAll(
-      'input[name="pageSourceOption"]'
-    );
-    const manualJsonTextArea = document.getElementById("manualJsonText");
-    const manualJsonFileInput = document.getElementById("manualJsonFile");
-    const loadManualJsonBtn = document.getElementById("loadManualJsonBtn");
 
-    // URL Selector specific elements (if initialized)
-    const urlSearchInput = document.getElementById("urlSearch");
-    const toggleSelectionBtn = document.getElementById("toggleSelectionBtn");
+    // ** MODIFICATION START: Pages section elements are NO LONGER disabled here **
+    // const pageSourceRadios = document.querySelectorAll('input[name="pageSourceOption"]');
+    // const manualJsonTextArea = document.getElementById("manualJsonText");
+    // const manualJsonFileInput = document.getElementById("manualJsonFile");
+    // const loadManualJsonBtn = document.getElementById("loadManualJsonBtn");
+    // const urlSearchInput = document.getElementById("urlSearch");
+    // const toggleSelectionBtn = document.getElementById("toggleSelectionBtn");
+    // const captureSettingsToggle = document.getElementById("captureSettingsToggle");
+    // ** MODIFICATION END **
+
+    const loginOptionRadios = document.querySelectorAll(
+      'input[name="loginOption"]'
+    );
 
     if (baseUrlInput) baseUrlInput.disabled = disabled;
 
@@ -108,42 +112,35 @@ class App {
     if (fullPageCheckbox) fullPageCheckbox.disabled = disabled;
     if (simpleWaitTimeInput) simpleWaitTimeInput.disabled = disabled;
 
-    // Page Source and Manual JSON Area
-    pageSourceRadios.forEach((radio) => (radio.disabled = disabled));
-    if (manualJsonTextArea) manualJsonTextArea.disabled = disabled;
-    if (manualJsonFileInput) manualJsonFileInput.disabled = disabled;
-    if (loadManualJsonBtn) loadManualJsonBtn.disabled = disabled;
-
-    // URL Selector controls
-    if (urlSearchInput) urlSearchInput.disabled = disabled;
-    if (toggleSelectionBtn) toggleSelectionBtn.disabled = disabled;
-
-    // Disable category checkboxes and URL item checkboxes within the URL selector
-    if (urlSelector && urlSelector.categoriesContainer) {
-      urlSelector.categoriesContainer
-        .querySelectorAll(".category-checkbox, .url-checkbox")
-        .forEach((cb) => (cb.disabled = disabled));
-    }
-    // Also disable toggling of the "Pages" section header
-    const captureSettingsToggle = document.getElementById(
-      "captureSettingsToggle"
-    );
-    if (captureSettingsToggle) {
-      if (disabled) {
-        captureSettingsToggle.style.pointerEvents = "none";
-        captureSettingsToggle.style.opacity = "0.7";
-      } else {
-        captureSettingsToggle.style.pointerEvents = "";
-        captureSettingsToggle.style.opacity = "1";
-      }
-    }
     // Disable login option radios
-    const loginOptionRadios = document.querySelectorAll(
-      'input[name="loginOption"]'
-    );
     loginOptionRadios.forEach((radio) => (radio.disabled = disabled));
 
-    console.log(`Capture UIs ${disabled ? "Disabled" : "Enabled"}`);
+    // ** MODIFICATION: The following elements related to "Pages" section are NOT disabled **
+    // pageSourceRadios.forEach(radio => radio.disabled = disabled);
+    // if (manualJsonTextArea) manualJsonTextArea.disabled = disabled;
+    // if (manualJsonFileInput) manualJsonFileInput.disabled = disabled;
+    // if (loadManualJsonBtn) loadManualJsonBtn.disabled = disabled;
+    // if (urlSearchInput) urlSearchInput.disabled = disabled;
+    // if (toggleSelectionBtn) toggleSelectionBtn.disabled = disabled;
+    // if (urlSelector && urlSelector.categoriesContainer) {
+    //     urlSelector.categoriesContainer.querySelectorAll('.category-checkbox, .url-checkbox')
+    //         .forEach(cb => cb.disabled = disabled);
+    // }
+    // if (captureSettingsToggle) {
+    //     if(disabled) {
+    //         captureSettingsToggle.style.pointerEvents = "none";
+    //         captureSettingsToggle.style.opacity = "0.7";
+    //     } else {
+    //         captureSettingsToggle.style.pointerEvents = "";
+    //         captureSettingsToggle.style.opacity = "1";
+    //     }
+    // }
+
+    console.log(
+      `Critical Capture UIs (URL, Settings, Login Options) ${
+        disabled ? "Disabled" : "Enabled"
+      }. Pages section remains editable.`
+    );
   }
 
   _handleBaseUrlInput(event) {
@@ -383,44 +380,17 @@ class App {
       ".screen-size-row.important-setting-group"
     );
     if (!screenSizeRow) {
-      console.error(
-        "Critical UI Error: .screen-size-row.important-setting-group not found within captureSettingsContent."
-      );
-      return;
+      // This element is now directly in index.html in the "Screenshot Capture Settings" card
+      // So, we just ensure its containing card is visible if simple mode settings are to be shown.
+      // console.error("Critical UI Error: .screen-size-row.important-setting-group not found within captureSettingsContent.");
+      // return;
     }
-    screenSizeRow.style.display = "flex";
+    // screenSizeRow.style.display = "flex"; // This is managed by HTML structure now.
+
     let waitTimeContainer = document.getElementById("simpleWaitTimeContainer");
     let simpleWaitTimeInput = document.getElementById("simpleWaitTime");
-    if (!waitTimeContainer) {
-      waitTimeContainer = document.createElement("div");
-      waitTimeContainer.id = "simpleWaitTimeContainer";
-      waitTimeContainer.className = "setting-container important-setting-group";
-      const waitTimeLabel = document.createElement("label");
-      waitTimeLabel.textContent = "Wait Time (sec)";
-      waitTimeLabel.htmlFor = "simpleWaitTime";
-      waitTimeContainer.appendChild(waitTimeLabel);
-      simpleWaitTimeInput = document.createElement("input");
-      simpleWaitTimeInput.type = "number";
-      simpleWaitTimeInput.id = "simpleWaitTime";
-      simpleWaitTimeInput.className = "wait-time-input";
-      simpleWaitTimeInput.min = "1";
-      simpleWaitTimeInput.max = config.timing.maxWaitTime / 1000 || 120;
-      const hiddenWait =
-        document.getElementById("hiddenWaitTime") || UI.elements.waitTime;
-      simpleWaitTimeInput.value =
-        hiddenWait?.value || config.ui.defaultWaitTime || 5;
-      waitTimeContainer.appendChild(simpleWaitTimeInput);
-      events.addDOMEventListener(simpleWaitTimeInput, "change", (event) => {
-        const hidden = document.getElementById("hiddenWaitTime");
-        if (hidden) hidden.value = event.target.value;
-      });
-      screenSizeRow.insertAdjacentElement("afterend", waitTimeContainer);
-    } else {
-      waitTimeContainer.style.display = "flex";
-      if (!waitTimeContainer.classList.contains("important-setting-group")) {
-        waitTimeContainer.classList.add("important-setting-group");
-      }
-    }
+
+    // The wait time input is also directly in index.html now
     if (simpleWaitTimeInput && UI.elements.waitTime !== simpleWaitTimeInput) {
       UI.elements.waitTime = simpleWaitTimeInput;
       const hiddenWaitTime = document.getElementById("hiddenWaitTime");
@@ -870,7 +840,7 @@ class App {
       return;
     }
 
-    this._setCaptureUIsDisabled(true); // Disable UIs at the start
+    this._setCaptureUIsDisabled(true); // Disable CRITICAL UIs at the start
 
     this.startTotalTime = performance.now();
     let urlList = [];
@@ -878,7 +848,7 @@ class App {
     try {
       AppState.reset();
       UI.utils.resetUI();
-      this._setCaptureSettingsCollapsed(true);
+      this._setCaptureSettingsCollapsed(true); // Collapse "Pages" section
       const capturePreset =
         UI.elements.capturePreset?.value || config.screenshot.defaultPreset;
       const fullPageCheckbox = document.getElementById("fullPageCheckbox");
@@ -923,7 +893,7 @@ class App {
       errorInCaptureSetup = true;
       handleError(error, { logToConsole: true, showToUser: true });
       this._processingQueue = false; // Ensure this is reset on setup error
-      this._setCaptureSettingsCollapsed(false);
+      this._setCaptureSettingsCollapsed(false); // Re-open "Pages" section on error
       if (
         errorInCaptureSetup &&
         AppState.screenshots.size === 0 &&
@@ -943,7 +913,7 @@ class App {
 
       if (!this.isPaused) {
         this._processingQueue = false;
-        this._setCaptureUIsDisabled(false); // Re-enable UIs if not paused and finished
+        this._setCaptureUIsDisabled(false); // Re-enable CRITICAL UIs if not paused and finished
         if (isQueueFullyProcessed && this.startTotalTime > 0) {
           UI.progress.updateStats(
             this.captureQueue.length,
@@ -993,7 +963,6 @@ class App {
           }
         }
       } else {
-        // If paused, UIs remain disabled until resumed and completed
         if (this.startTotalTime > 0)
           UI.progress.updateStats(
             this.captureQueue.length,
@@ -1002,7 +971,7 @@ class App {
             totalTimeTakenSec
           );
       }
-      this._checkCaptureButtonState(); // This will re-enable captureBtn if conditions met
+      this._checkCaptureButtonState();
       this.updatePauseResumeButton();
       const pdfBtnVisible = AppState.screenshots.size > 0;
       const combineAllPdfBtn = document.querySelector(".combine-all-pdf-btn");
@@ -1026,9 +995,7 @@ class App {
   async processCaptureQueue() {
     if (this.isPaused || this.currentCaptureIndex >= this.captureQueue.length) {
       if (this.isPaused) {
-        this._processingQueue = false; // Mark as not processing if paused
-        this._setCaptureUIsDisabled(false); // Re-enable UIs if paused and user might want to change settings before resuming (though pause button will be primary action)
-        // Or keep them disabled: this._setCaptureUIsDisabled(true);
+        this._processingQueue = false;
       }
       if (
         !this.isPaused &&
@@ -1038,7 +1005,7 @@ class App {
           "captureWarningMessage"
         );
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
-        this._setCaptureUIsDisabled(false); // Re-enable UIs when queue is fully done
+        this._setCaptureUIsDisabled(false); // Re-enable CRITICAL UIs when queue is fully done
       }
       return;
     }
@@ -1047,7 +1014,7 @@ class App {
     );
     if (!this._processingQueue) {
       this._processingQueue = true;
-      this._setCaptureUIsDisabled(true); // Ensure UIs are disabled when processing starts/resumes
+      this._setCaptureUIsDisabled(true); // Ensure CRITICAL UIs are disabled
       this.updatePauseResumeButton();
       if (
         captureWarningMessage &&
@@ -1091,7 +1058,7 @@ class App {
         );
         if (this.isPaused) {
           this._processingQueue = false;
-          /* UI disable state handled by pauseResumeCapture */ break;
+          break;
         }
 
         const timestamp = URLProcessor.getTimestamp();
@@ -1117,7 +1084,7 @@ class App {
       } catch (error) {
         if (this.isPaused) {
           this._processingQueue = false;
-          /* UI disable state handled by pauseResumeCapture */ break;
+          break;
         }
         handleError(error, { logToConsole: true, showToUser: false });
         const timestamp = URLProcessor.getTimestamp();
@@ -1159,13 +1126,13 @@ class App {
         await new Promise((resolve) => setTimeout(resolve, 250));
       if (this.isPaused) {
         this._processingQueue = false;
-        /* UI disable state handled by pauseResumeCapture */ break;
+        break;
       }
     }
     const isFinished = this.currentCaptureIndex >= totalUrls;
     if (isFinished && !this.isPaused) {
       this._processingQueue = false;
-      this._setCaptureUIsDisabled(false); // Re-enable UIs when queue is fully done
+      this._setCaptureUIsDisabled(false); // Re-enable CRITICAL UIs
       if (captureWarningMessage) captureWarningMessage.style.display = "none";
     } else if (this.isPaused) {
       if (UI.elements.progress)
@@ -1177,11 +1144,9 @@ class App {
           0
         );
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
-      // UIs remain disabled while paused, handled by pauseResumeCapture or initial call to captureScreenshots
     } else {
-      // Should ideally not happen if logic is correct
       this._processingQueue = false;
-      this._setCaptureUIsDisabled(false); // Fallback to enable
+      this._setCaptureUIsDisabled(false); // Fallback
       if (captureWarningMessage) captureWarningMessage.style.display = "none";
     }
   }
@@ -1216,13 +1181,11 @@ class App {
     if (this.isPaused) {
       console.log("Pause requested.");
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
-      // When pausing, critical UIs should remain disabled.
-      // _setCaptureUIsDisabled(true) is implicitly handled as it's not re-enabled here.
-      // The "Pause" button itself will become "Resume" and stay enabled if queue not empty.
+      // Critical UIs remain disabled. Pages section is always enabled.
     } else {
       // Resuming
       console.log("Resume requested.");
-      this._setCaptureUIsDisabled(true); // Explicitly ensure UI is disabled upon resuming
+      this._setCaptureUIsDisabled(true); // Re-disable critical UIs before resuming
       if (UI.elements.progress) UI.utils.showStatus("", false, 1);
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
       if (
@@ -1236,7 +1199,7 @@ class App {
         );
       } else {
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
-        this._setCaptureUIsDisabled(false); // Re-enable if resuming but queue was already finished
+        this._setCaptureUIsDisabled(false);
       }
     }
     this.updatePauseResumeButton();
@@ -1252,13 +1215,11 @@ class App {
       pauseResumeBtn.innerHTML = "▶️";
       pauseResumeBtn.title = "Resume capture";
       pauseResumeBtn.classList.add("paused");
-      pauseResumeBtn.disabled = !hasItemsToProcess; // Enable if there are items left
+      pauseResumeBtn.disabled = !hasItemsToProcess;
     } else {
-      // Not paused (either running or stopped)
       pauseResumeBtn.innerHTML = "⏸️";
       pauseResumeBtn.title = "Pause capture";
       pauseResumeBtn.classList.remove("paused");
-      // Disable Pause button if not processing OR if no items are left to process
       pauseResumeBtn.disabled = !isProcessing || !hasItemsToProcess;
     }
   }
@@ -1270,11 +1231,11 @@ class App {
       console.warn("Could not toggle settings: Content or wrapper not found.");
       return;
     }
-    // Only allow toggling if not processing
-    if (this._processingQueue) {
-      console.log("Cannot toggle settings: Capture in progress.");
-      return;
-    }
+    // ** MODIFICATION: Allow toggling "Pages" section even if capture is in progress **
+    // if (this._processingQueue) {
+    //     console.log("Cannot toggle settings: Capture in progress.");
+    //     return;
+    // }
     const isCollapsed = content.classList.toggle("collapsed");
     wrapper.classList.toggle("collapsed", isCollapsed);
     console.log(`Capture settings toggled. Collapsed: ${isCollapsed}`);

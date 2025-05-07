@@ -74,9 +74,7 @@
             class="setting-container important-setting-group page-source-selector"
             style="display: none"
           >
-            <label style="font-weight: bold; display: block"
-              >Load Pages</label
-            >
+            <label style="font-weight: bold; display: block">Load Pages</label>
             <div class="input-row">
               <label>
                 <input
@@ -143,25 +141,51 @@
             ></div>
           </div>
 
-          <div id="url-selector-host"></div> </div> </div> <div id="screenshotCaptureSettingsSection" class="card">
-            <h2 style="margin-top: 0; margin-bottom: 15px;">Screenshot Capture Settings</h2>
-            <div class="input-row screen-size-row setting-container" style="display: flex; align-items: center; gap: 15px;">
-            <label style="margin-bottom: 0">
-                Screen Size
-                <select id="capturePreset">
-                    <option value="fullHD" selected>🖥️ Full HD (1920x1080)</option>
-                    <option value="mobile">📱 Mobile (375x812)</option>
-                    <option value="tablet">▭ Tablet (768x1024)</option>
-                </select>
-            </label>
-            <label style="margin-bottom: 0; font-weight: normal" title="Attempt to capture the entire vertical height of the page at the selected width.">
-                <input type="checkbox" id="fullPageCheckbox" style="margin-right: 5px" />
-                Full Page Height
-            </label>
+          <div id="url-selector-host"></div>
         </div>
-        <div id="simpleWaitTimeContainer" class="setting-container" style="margin-top: 10px;">
-            <label for="simpleWaitTime">Wait Time (sec)</label>
-            <input type="number" id="simpleWaitTime" class="wait-time-input" min="1" max="120" value="5" />
+      </div>
+      <div id="screenshotCaptureSettingsSection" class="card">
+        <h2 style="margin-top: 0; margin-bottom: 15px">
+          Screenshot Capture Settings
+        </h2>
+        <div
+          class="input-row screen-size-row setting-container"
+          style="display: flex; align-items: center; gap: 15px"
+        >
+          <label style="margin-bottom: 0">
+            Screen Size
+            <select id="capturePreset">
+              <option value="fullHD" selected>🖥️ Full HD (1920x1080)</option>
+              <option value="mobile">📱 Mobile (375x812)</option>
+              <option value="tablet">▭ Tablet (768x1024)</option>
+            </select>
+          </label>
+          <label
+            style="margin-bottom: 0; font-weight: normal"
+            title="Attempt to capture the entire vertical height of the page at the selected width."
+          >
+            <input
+              type="checkbox"
+              id="fullPageCheckbox"
+              style="margin-right: 5px"
+            />
+            Full Page Height
+          </label>
+        </div>
+        <div
+          id="simpleWaitTimeContainer"
+          class="setting-container"
+          style="margin-top: 10px"
+        >
+          <label for="simpleWaitTime">Wait Time (sec)</label>
+          <input
+            type="number"
+            id="simpleWaitTime"
+            class="wait-time-input"
+            min="1"
+            max="120"
+            value="5"
+          />
         </div>
       </div>
       <div class="btn-container" id="buttonContainer">

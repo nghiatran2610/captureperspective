@@ -1289,7 +1289,6 @@ body.advanced-mode .simple-mode-settings {
 
 /* Login Section Styles */
 #loginSection {
-  margin-bottom: var(--spacing-xl);
   transition: all 0.3s ease;
 }
 .login-header {
