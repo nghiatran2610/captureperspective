@@ -645,11 +645,16 @@ textarea {
 .thumbnail-container.mount-issue-detected::before {
   content: "⚠️"; /* Warning emoji or you can use an SVG/font icon */
   position: absolute;
-  top: 3px;       /* Adjust as needed */
-  right: 3px;     /* Adjust as needed */
+  top: 3px; /* Adjust as needed */
+  right: 3px; /* Adjust as needed */
   font-size: 16px; /* Adjust icon size */
   color: #ffa000; /* Amber color for the icon itself */
-  background-color: rgba(255, 255, 255, 0.8); /* Optional: slight background for visibility */
+  background-color: rgba(
+    255,
+    255,
+    255,
+    0.8
+  ); /* Optional: slight background for visibility */
   border-radius: 50%;
   padding: 0px 3px; /* Adjust padding around icon */
   line-height: 1;
@@ -657,7 +662,6 @@ textarea {
   /* Optional: Add a small shadow to the icon */
   /* text-shadow: 0px 0px 2px rgba(0,0,0,0.3); */
 }
-
 
 .thumbnail-error-message {
   /* Error message text on error thumbnail */
@@ -668,7 +672,6 @@ textarea {
   margin-top: 3px;
   width: 100%;
 }
-
 
 .combine-pdf-btn {
   /* 'Combine to PDF' button within a category header */
@@ -1853,18 +1856,6 @@ body.advanced-mode .simple-mode-settings {
   background-color: #f0f0f0;
   color: #999;
 }
-
-.refresh-projects-btn {
-  padding: 6px 10px; /* Smaller padding for icon button */
-  font-size: 1.2em; /* Adjust icon size */
-  line-height: 1;
-  background-color: #6c757d; /* Secondary/neutral color */
-  min-width: auto; /* Allow button to be small */
-}
-.refresh-projects-btn:hover:not(:disabled) {
-  background-color: #5a6268;
-}
-
 
 /* Manual URL input container (if you want to style it separately) */
 .manual-url-input-container {
