@@ -104,22 +104,30 @@ export const events = {
   SCREENSHOT_TAKEN: "screenshotTaken",
   SCREENSHOT_SAVED: "screenshotSaved",
 
-  // URL processing events
-  URL_PROCESSING_STARTED: "urlProcessingStarted",
-  URL_PROCESSING_COMPLETED: "urlProcessingCompleted",
+  // URL (Page list) processing events
+  URL_PROCESSING_STARTED: "urlProcessingStarted", // For pages within a project
+  URL_PROCESSING_COMPLETED: "urlProcessingCompleted", // For pages within a project
 
-  // URL selection events (new)
+  // Project List fetching events (NEW)
+  PROJECT_LIST_LOADING_STARTED: "projectListLoadingStarted",
+  PROJECT_LIST_LOADING_COMPLETED: "projectListLoadingCompleted",
+  PROJECT_LIST_LOADING_FAILED: "projectListLoadingFailed",
+
+  // URL selection events
   URL_SELECTION_CHANGED: "URL_SELECTION_CHANGED",
 
   // UI events
   UI_RESET: "uiReset",
   DOWNLOAD_ALL_REQUESTED: "downloadAllRequested",
 
-  // New login-related events
+  // Login-related events
   LOGIN_STARTED: "LOGIN_STARTED",
   LOGIN_SUCCESSFUL: "LOGIN_SUCCESSFUL",
   LOGIN_FAILED: "LOGIN_FAILED",
   LOGIN_STATUS_CHANGED: "LOGIN_STATUS_CHANGED",
+  LOGIN_OPTION_SELECTED: "LOGIN_OPTION_SELECTED", // Existing, from loginHandler
+  LOGIN_COMPLETE: "LOGIN_COMPLETE", // Existing, from loginHandler
+  AUTO_LOGOUT_DETECTED: "AUTO_LOGOUT_DETECTED", // Existing, from loginHandler
 };
 
 export default {

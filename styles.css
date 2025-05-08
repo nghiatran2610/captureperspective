@@ -1828,3 +1828,68 @@ body.advanced-mode .simple-mode-settings {
   width: 100%; /* Make it take full width of the button container area */
   box-sizing: border-box;
 }
+
+/* styles.css additions */
+
+/* Project Selection Area in baseUrlSection */
+.project-selection-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px; /* Space before the manual URL input */
+}
+
+.project-selector-dropdown {
+  flex-grow: 1; /* Allow dropdown to take available space */
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: white;
+  min-width: 200px; /* Minimum width */
+}
+
+.project-selector-dropdown:disabled {
+  background-color: #f0f0f0;
+  color: #999;
+}
+
+.refresh-projects-btn {
+  padding: 6px 10px; /* Smaller padding for icon button */
+  font-size: 1.2em; /* Adjust icon size */
+  line-height: 1;
+  background-color: #6c757d; /* Secondary/neutral color */
+  min-width: auto; /* Allow button to be small */
+}
+.refresh-projects-btn:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+
+/* Manual URL input container (if you want to style it separately) */
+.manual-url-input-container {
+  display: flex; /* To align label and input */
+  align-items: center;
+  /* Styles for this are mostly covered by .base-url-container existing styles */
+}
+
+/* Ensure baseUrlInput is visually distinct if read-only */
+#baseUrlInput[readonly] {
+  background-color: #e9ecef; /* Light grey for read-only */
+  color: #495057;
+  cursor: default;
+}
+
+/* Minor adjustment for the label next to the dropdown */
+.project-selection-container > .base-url-label {
+  font-weight: 600;
+  white-space: nowrap;
+  color: #333;
+}
+
+/* Adjustments if baseUrlInput is hidden or less prominent */
+/* If you decide to hide baseUrlInput completely:
+.manual-url-input-container {
+  display: none;
+}
+*/

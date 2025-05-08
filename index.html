@@ -13,14 +13,25 @@
     <h1>Ignition Perspective Screenshot Capture</h1>
 
     <div id="baseUrlSection" class="card">
-      <div class="base-url-container">
-        <label for="baseUrlInput" class="base-url-label">Project URL</label>
+      <div class="project-selection-container">
+        <label for="projectSelectorDropdown" class="base-url-label"
+          >Select Project</label
+        >
+        <select id="projectSelectorDropdown" class="project-selector-dropdown">
+          <option value="">Loading projects...</option>
+        </select>
+      </div>
+      <div class="base-url-container manual-url-input-container">
+        <label for="baseUrlInput" class="base-url-label"
+          >Project URL (auto-populated)</label
+        >
         <input
           type="text"
-          placeholder="http://GATEWAY_IP:PORT/data/perspective/client/PROJECT_NAME"
+          placeholder="Select a project above or enter manually"
           class="base-url-input"
           id="baseUrlInput"
           aria-describedby="baseUrlStatus"
+          readonly
         />
         <div id="baseUrlStatus" class="input-status-message"></div>
       </div>
@@ -84,7 +95,7 @@
                   id="sourceAutomatic"
                   checked
                 />
-                Automatically
+                Automatically (from selected project)
               </label>
               <label>
                 <input
