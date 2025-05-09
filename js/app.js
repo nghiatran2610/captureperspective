@@ -124,7 +124,7 @@ class App {
 
   async _fetchAndPopulateProjects() {
     const projectDropdown = document.getElementById("projectSelectorDropdown");
-    // const baseUrlStatus = document.getElementById("baseUrlStatus"); // REMOVED
+    const excludedProjectName = "PerspectiveCapture"; // Define the project to exclude
 
     if (!projectDropdown /*|| !baseUrlStatus*/) return; // ADJUSTED condition
 
@@ -138,10 +138,13 @@ class App {
         '<option value="">-- Select a Project --</option>';
       if (projects && projects.length > 0) {
         projects.forEach((project) => {
-          const option = document.createElement("option");
-          option.value = project;
-          option.textContent = project;
-          projectDropdown.appendChild(option);
+          // *** ADDED FILTER HERE ***
+          if (project !== excludedProjectName) {
+            const option = document.createElement("option");
+            option.value = project;
+            option.textContent = project;
+            projectDropdown.appendChild(option);
+          }
         });
         projectDropdown.disabled = false;
         // baseUrlStatus.textContent = "Select a project to continue."; // REMOVED
