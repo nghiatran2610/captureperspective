@@ -18,18 +18,13 @@
           >Select Project</label
         >
         <select id="projectSelectorDropdown" class="project-selector-dropdown">
-          <option value="">Loading projects...</option>
+          {...options...}
         </select>
       </div>
+
       <div class="base-url-container manual-url-input-container">
         <label for="baseUrlInput" class="base-url-label">Project URL</label>
-        <input
-          type="text"
-          placeholder="Select a project above"
-          class="base-url-input"
-          id="baseUrlInput"
-          readonly
-        />
+        <input type="text" id="baseUrlInput" class="base-url-input" readonly />
       </div>
     </div>
 

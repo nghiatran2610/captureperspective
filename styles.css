@@ -1878,9 +1878,55 @@ body.advanced-mode .simple-mode-settings {
   color: #333;
 }
 
-/* Adjustments if baseUrlInput is hidden or less prominent */
-/* If you decide to hide baseUrlInput completely:
-.manual-url-input-container {
-  display: none;
+/* styles.css - CORRECTED rules for #baseUrlSection alignment */
+
+#baseUrlSection.card {
+  display: grid;
+  grid-template-columns: auto 1fr; /* Column 1 for labels, Column 2 for inputs/selects */
+  gap: 12px 15px;       /* Row gap, Column gap */
+  align-items: center;    /* Vertically center items in each row */
+  padding: var(--spacing-xl, 20px); /* Ensure card has padding */
 }
+
+/*
+  The .project-selection-container and .manual-url-input-container divs
+  will now act as simple wrappers. The actual grid items for alignment
+  will be the <label> and <select>/<input> directly.
+  We need to make sure these wrappers don't interfere with the parent grid.
+  This is done by making them span the full grid or by using 'display: contents'.
+  'display: contents' is cleaner here as it makes their children direct grid items of #baseUrlSection.
 */
+
+#baseUrlSection .project-selection-container,
+#baseUrlSection .manual-url-input-container {
+  display: contents; /* Treat children of these containers as direct grid items of #baseUrlSection */
+}
+
+/* Style for ALL labels within #baseUrlSection */
+#baseUrlSection .base-url-label {
+  grid-column: 1 / 2;   /* All labels go into the first column */
+  text-align: left;     /* Or 'right' if you prefer labels right-aligned */
+  font-weight: 600;
+  white-space: nowrap;  /* Prevent labels from wrapping */
+  padding-right: 5px; /* Add a little space if text-align: right and label is long */
+}
+
+/* Style for ALL input/select elements within #baseUrlSection */
+#baseUrlSection .project-selector-dropdown,
+#baseUrlSection .base-url-input {
+  grid-column: 2 / 3;   /* All inputs/selects go into the second column */
+  width: 100%;          /* Make them take full width of their column */
+  box-sizing: border-box;
+}
+
+/*
+  Remove any specific margin-bottom from the individual row containers if they exist,
+  as the 'gap' on #baseUrlSection will handle row spacing.
+*/
+.project-selection-container { /* From your existing CSS */
+  margin-bottom: 0; /* Override existing margin if #baseUrlSection's 'gap' handles it */
+}
+/* You might have a 'manual-url-input-container' if it's different from .base-url-container */
+.manual-url-input-container {
+    margin-bottom: 0;
+}
