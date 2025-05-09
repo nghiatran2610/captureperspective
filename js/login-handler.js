@@ -260,7 +260,7 @@ class VisualLoginHandler {
         );
         this.updateLoginStatus(
           "checking",
-          "Login page loaded, monitoring session..."
+          "Waiting..."
         );
         this.startSessionPolling(); // Start polling for INITIAL login
       };
