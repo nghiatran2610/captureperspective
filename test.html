@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Vector Capture</title>
+    <!-- HTML-to-Image library -->
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        
+        #svgContainer {
+            background-color: #eee;
+            width: 200px;
+            height: 230px;
+            position: relative;
+            border: 1px dashed green;
+            overflow: visible;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 15px;
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        button:hover {
+            background-color: #0063b1;
+        }
+        
+        #output {
+            margin-top: 20px;
+        }
+        
+        #resultImage {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+        }
+        
+        #notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #107c10;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>SVG Vector Capture</h1>
+    
+    <div id="svgContainer">
+        <!-- SVG elements -->
+        <svg id="topCircle" viewBox="0 0 100 100" preserveAspectRatio="none" 
+             style="fill: rgb(235, 235, 235); stroke: rgb(46, 46, 46); stroke-width: 1px; 
+                    position: absolute; left: -0.89%; top: 0.92%; width: 100%; height: 37%; overflow: visible;">
+            <circle cx="50" cy="50" r="48"></circle>
+        </svg>
+        <svg id="bottomCircle" viewBox="0 0 100 100" preserveAspectRatio="none" 
+             style="fill: rgb(235, 235, 235); stroke: rgb(46, 46, 46); stroke-width: 1px; 
+                    position: absolute; left: -0.89%; top: 63.58%; width: 100%; height: 37%; overflow: visible;">
+            <circle cx="50" cy="50" r="48"></circle>
+        </svg>
+        <svg id="middleRect" viewBox="0 0 100 100" preserveAspectRatio="none" 
+             style="fill: rgb(235, 235, 235); stroke: rgb(46, 46, 46); stroke-width: 1px; 
+                    position: absolute; left: -0.01%; top: 17.51%; width: 98.29%; height: 65.78%; overflow: visible;">
+            <rect x="1" y="1" width="98" height="98"></rect>
+        </svg>
+    </div>
+    
+    <button onclick="captureAsSVG()">Capture as SVG</button>
+    
+    <div id="output">
+        <div id="resultImage"></div>
+    </div>
+    
+    <div id="notification">SVG capture complete!</div>
+    
+    <script>
+        // Capture SVG as vector SVG
+        function captureAsSVG() {
+            const element = document.getElementById('svgContainer');
+            const outputDiv = document.getElementById('resultImage');
+            
+            // Clear previous result
+            outputDiv.innerHTML = '';
+            
+            // Check if toSvg method exists
+            if (typeof htmlToImage.toSvg !== 'function') {
+                // Fallback to manual SVG creation if method not available
+                createManualSVG();
+                return;
+            }
+            
+            // Capture as SVG using HTML-to-Image
+            htmlToImage.toSvg(element)
+                .then(function(dataUrl) {
+                    // Create image and add to output
+                    const img = new Image();
+                    img.src = dataUrl;
+                    outputDiv.appendChild(img);
+                    
+                    // Show notification
+                    showNotification();
+                })
+                .catch(function(error) {
+                    console.error('Error capturing SVG:', error);
+                    outputDiv.innerHTML = '<p style="color: red;">Error capturing as SVG</p>';
+                    
+                    // Try fallback method
+                    createManualSVG();
+                });
+        }
+        
+        // Alternative method: Create SVG manually by combining elements
+        function createManualSVG() {
+            const element = document.getElementById('svgContainer');
+            const outputDiv = document.getElementById('resultImage');
+            
+            try {
+                // Clear previous result
+                outputDiv.innerHTML = '';
+                
+                // Create a combined SVG
+                const svgNS = "http://www.w3.org/2000/svg";
+                const containerSvg = document.createElementNS(svgNS, "svg");
+                
+                // Get dimensions from the target div
+                const width = element.offsetWidth;
+                const height = element.offsetHeight;
+                
+                // Set SVG attributes
+                containerSvg.setAttribute("width", width);
+                containerSvg.setAttribute("height", height);
+                containerSvg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+                containerSvg.setAttribute("xmlns", svgNS);
+                
+                // Add background
+                const background = document.createElementNS(svgNS, "rect");
+                background.setAttribute("width", width);
+                background.setAttribute("height", height);
+                background.setAttribute("fill", getComputedStyle(element).backgroundColor);
+                
+                // Add dashed border if present
+                if (element.style.border && element.style.border.includes('dashed')) {
+                    background.setAttribute("stroke", "green");
+                    background.setAttribute("stroke-width", "1");
+                    background.setAttribute("stroke-dasharray", "3,3");
+                }
+                
+                containerSvg.appendChild(background);
+                
+                // Process each SVG element
+                const svgElements = element.querySelectorAll('svg');
+                svgElements.forEach(svg => {
+                    const style = getComputedStyle(svg);
+                    
+                    // Get position and size
+                    let left = parseFloat(style.left);
+                    let top = parseFloat(style.top);
+                    
+                    // Handle percentage values
+                    if (style.left.includes('%')) {
+                        left = (parseFloat(style.left) / 100) * width;
+                    }
+                    
+                    if (style.top.includes('%')) {
+                        top = (parseFloat(style.top) / 100) * height;
+                    }
+                    
+                    // Create a group for positioning
+                    const g = document.createElementNS(svgNS, "g");
+                    g.setAttribute("transform", `translate(${left}, ${top})`);
+                    
+                    // Clone the SVG content
+                    const content = svg.firstElementChild;
+                    if (content) {
+                        const clone = content.cloneNode(true);
+                        
+                        // Set fill and stroke
+                        clone.setAttribute("fill", style.fill);
+                        clone.setAttribute("stroke", style.stroke);
+                        clone.setAttribute("stroke-width", style.strokeWidth);
+                        
+                        g.appendChild(clone);
+                        containerSvg.appendChild(g);
+                    }
+                });
+                
+                // Convert to SVG string and create data URL
+                const serializer = new XMLSerializer();
+                const svgString = serializer.serializeToString(containerSvg);
+                const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+                
+                // Create image and add to output
+                const img = new Image();
+                img.src = dataUrl;
+                outputDiv.appendChild(img);
+                
+                // Show notification
+                showNotification('SVG created manually');
+                
+            } catch (error) {
+                console.error('Error creating manual SVG:', error);
+                outputDiv.innerHTML = '<p style="color: red;">Error creating SVG manually</p>';
+            }
+        }
+        
+        // Show notification briefly
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message || 'SVG capture complete!';
+            notification.style.display = 'block';
+            
+            setTimeout(function() {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

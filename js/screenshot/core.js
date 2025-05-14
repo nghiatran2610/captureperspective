@@ -577,8 +577,7 @@ async function captureScreenshotInternal(iframe, url, width, height) {
         element.classList && element.classList.contains("screenshot-ignore")
       );
     },
-    onclone: (documentClone) => {
-      if (documentClone.body) {
+    onclone: (documentClone) => {      if (documentClone.body) {
         documentClone.body.style.height = `${height}px`;
         documentClone.body.style.overflow = "visible";
       }
