@@ -848,18 +848,32 @@ class App {
     // Generic progress updates
     events.on(events.events.CAPTURE_PROGRESS, (data) => {
       if (data && data.message && UI.elements.progress) {
-        let messageWithIcon = data.message;
-        // Add an icon if not already present for visual cue
+        let messageToShow = data.message;
+
+        // Check if the message already contains our specific spinner span or other known icons
+        const hasSpinner = messageToShow.includes(
+          '<span class="status-spinner">'
+        );
+        const hasStandardSuccessIcon = messageToShow.startsWith("✓ ");
+        const hasStandardErrorIcon = messageToShow.startsWith("✗ ");
+        const hasStandardWarningIcon = messageToShow.startsWith("⚠️ ");
+        const hasStandardInfoIcon = messageToShow.startsWith("ℹ️ ");
+        // Note: The "⏳ " (space after emoji) check for plain text hourglass is no longer strictly needed
+        // if core.js now always wraps it in <span class="status-spinner">.
+
         if (
-          !messageWithIcon.startsWith("✓ ") &&
-          !messageWithIcon.startsWith("✗ ") &&
-          !messageWithIcon.startsWith("⚠️ ") &&
-          !messageWithIcon.startsWith("ℹ️ ") &&
-          !messageWithIcon.startsWith("⏳ ")
+          !hasSpinner &&
+          !hasStandardSuccessIcon &&
+          !hasStandardErrorIcon &&
+          !hasStandardWarningIcon &&
+          !hasStandardInfoIcon
         ) {
-          messageWithIcon = "⏳ " + data.message; // Default to loading icon
+          // If no specific icon structure is found (e.g. message comes from another part of app),
+          // prepend a default informational icon.
+          // We assume messages from waitForRendering will always have the spinner span.
+          messageToShow = "ℹ️ " + data.message;
         }
-        UI.progress.updateProgressMessage(messageWithIcon);
+        UI.progress.updateProgressMessage(messageToShow);
       }
     });
 
@@ -869,45 +883,53 @@ class App {
 
       const preset = data.result.preset || "N/A";
       const presetName = config.screenshot.presets[preset]?.name || preset;
-      const width = data.result.width || "?";
-      const height = data.result.height || "?";
+      const targetWidth = data.result.width || "?"; // Original target width
+      const targetHeight = data.result.height || "?"; // Original target height
+      const actualWidth = data.result.actualWidth || targetWidth; // Actual output width
+      const actualHeight = data.result.actualHeight || targetHeight; // Actual output height
+
       const timeTaken = data.result.timeTaken || "?";
       const isFullPage = data.result.isFullPage || false;
+
+      // Display based on actual output dimensions for clarity, noting the target preset
       const sizeDesc = isFullPage
-        ? `Full Page (${width}x${height})`
-        : `${presetName}`;
+        ? `Full Page (${actualWidth}x${actualHeight})` // Show actual full page size
+        : `${presetName} (Output: ${actualWidth}x${actualHeight})`; // Show preset name and actual output
+
       const url = data.url || data.result.url || "Unknown URL";
-      const pageName = url.split("/").pop() || url; // Get last part of URL as a simple name
+      const pageName = url.split("/").pop() || url;
+
+      let statusMessageText;
+      let isErrorType = false;
 
       if (data.result.detectedMountIssue) {
-        UI.utils.showStatus(
-          `⚠️ Captured with mount issue: ${pageName} (${sizeDesc}) (${timeTaken}s)`,
-          false,
-          7000
-        );
+        statusMessageText = `⚠️ Captured with mount issue: ${pageName} - ${sizeDesc} (${timeTaken}s)`;
+        // Not strictly an error for the status color, but a warning
       } else {
-        UI.utils.showStatus(
-          `✓ Captured: ${pageName} (${sizeDesc}) (${timeTaken}s)`,
-          false,
-          5000
-        );
+        statusMessageText = `✓ Captured: ${pageName} - ${sizeDesc} (${timeTaken}s)`;
       }
+      UI.utils.showStatus(
+        statusMessageText,
+        isErrorType,
+        data.result.detectedMountIssue ? 7000 : 5000
+      );
     });
 
     // When URL selection changes in the URL selector component
-    events.on("URL_SELECTION_CHANGED", (data) =>
-      this._checkCaptureButtonState()
+    events.on(
+      "URL_SELECTION_CHANGED",
+      (
+        data // Corrected event name if it was a typo
+      ) => this._checkCaptureButtonState()
     );
 
     // When login option (Guest/Authenticated) changes
-    events.on("LOGIN_OPTION_SELECTED", (data) => {
-      // Prevent attempting login actions if base URL is not yet valid
+    events.on(events.events.LOGIN_OPTION_SELECTED, (data) => {
       if (!this.baseUrlValid && data.option === "login") {
         UI.utils.showStatus(
           "Please select or enter a valid Project URL first.",
           true
         );
-        // Uncheck the radio button if it was 'login'
         const radioLogin = document.getElementById("optionLogin");
         if (radioLogin) radioLogin.checked = false;
         return;
@@ -919,16 +941,14 @@ class App {
         "pageSourceSelection"
       );
 
-      // Show capture form and page source selection if guest or already logged in
       if (
         data.option === "continueWithoutLogin" ||
         (data.option === "login" && this.loginHandler.isLoggedIn)
       ) {
         if (captureForm) captureForm.style.display = "";
         if (pageSourceSelection) pageSourceSelection.style.display = "";
-        this._updateUIMode(); // This will also handle initial URL fetching if conditions are met
+        this._updateUIMode();
       } else if (data.option === "login" && !this.loginHandler.isLoggedIn) {
-        // If "login" is chosen but user is not logged in, hide forms until login is complete
         if (captureForm) captureForm.style.display = "none";
         if (pageSourceSelection) pageSourceSelection.style.display = "none";
       }
@@ -936,7 +956,8 @@ class App {
     });
 
     // After login process completes (successfully or not)
-    events.on("LOGIN_COMPLETE", (data) => {
+    events.on(events.events.LOGIN_COMPLETE, (data) => {
+      // Using LOGIN_COMPLETE from loginHandler
       const captureForm = UI.elements.captureForm;
       const pageSourceSelection = document.getElementById(
         "pageSourceSelection"
@@ -945,10 +966,10 @@ class App {
       if (data.loggedIn) {
         if (captureForm) captureForm.style.display = "";
         if (pageSourceSelection) pageSourceSelection.style.display = "";
-        this._updateUIMode(); // This re-evaluates UI, including potentially fetching URLs
+        this._updateUIMode();
       } else {
-        // If login failed and "login" option was selected, show error
-        if (this.loginHandler.getSelectedLoginOption() === "login") {
+        if (this.loginHandler.selectedLoginOption === "login") {
+          // Check current selection
           UI.utils.showStatus(
             "Login failed. Select 'Continue as Guest' or try login again.",
             true
@@ -961,7 +982,7 @@ class App {
     });
 
     // Handle auto-logout
-    events.on("AUTO_LOGOUT_DETECTED", (data) => {
+    events.on(events.events.AUTO_LOGOUT_DETECTED, (data) => {
       console.log(
         `App received AUTO_LOGOUT_DETECTED for user: ${
           data ? data.username : "unknown"
@@ -970,10 +991,9 @@ class App {
       UI.utils.showStatus(
         `Your session has expired. Please log in again.`,
         true,
-        0
-      ); // Persistent message
+        0 // Persistent message
+      );
 
-      // Hide main functional areas
       const captureForm = UI.elements.captureForm;
       const progressOutput = UI.elements.progressOutput;
       const pageSourceSelection = document.getElementById(
@@ -987,7 +1007,6 @@ class App {
       if (progressOutput) progressOutput.style.display = "none";
       if (pageSourceSelection) pageSourceSelection.style.display = "none";
 
-      // Collapse settings if open
       if (
         captureSettingsContent &&
         !captureSettingsContent.classList.contains("collapsed")
@@ -997,7 +1016,6 @@ class App {
 
       if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
 
-      // Reset any ongoing capture
       if (this.isPaused) {
         this.isPaused = false;
         this.updatePauseResumeButton();
@@ -1007,8 +1025,8 @@ class App {
       this.currentCaptureIndex = 0;
 
       AppState.reset();
-      UI.utils.resetUI(); // Clear thumbnails, etc.
-      this._checkCaptureButtonState(); // Re-evaluate button states
+      UI.utils.resetUI();
+      this._checkCaptureButtonState();
     });
   }
 

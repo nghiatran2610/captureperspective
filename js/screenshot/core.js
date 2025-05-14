@@ -380,7 +380,7 @@ function waitForRendering(url, iframe) {
     }
 
     events.emit(events.events.CAPTURE_PROGRESS, {
-      message: `Waiting for ${url} to render... (${secondsLeft}s remaining)`,
+      message: `<span class="status-spinner">⏳</span> Waiting for ${url} to render... (${secondsLeft}s remaining)`,
     });
 
     const iframeWin = iframe.contentWindow;
@@ -533,7 +533,7 @@ function waitForRendering(url, iframe) {
       }
 
       events.emit(events.events.CAPTURE_PROGRESS, {
-        message: `Waiting for ${url} to render... (${secondsLeft}s remaining)`,
+        message: `<span class="status-spinner">⏳</span> Waiting for ${url} to render... (${secondsLeft}s remaining)`,
       });
       secondsLeft--;
       if (resolve) {
@@ -577,7 +577,8 @@ async function captureScreenshotInternal(iframe, url, width, height) {
         element.classList && element.classList.contains("screenshot-ignore")
       );
     },
-    onclone: (documentClone) => {      if (documentClone.body) {
+    onclone: (documentClone) => {
+      if (documentClone.body) {
         documentClone.body.style.height = `${height}px`;
         documentClone.body.style.overflow = "visible";
       }

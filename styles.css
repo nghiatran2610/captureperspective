@@ -1930,3 +1930,21 @@ body.advanced-mode .simple-mode-settings {
 .manual-url-input-container {
     margin-bottom: 0;
 }
+
+.status-spinner {
+  display: inline-block; /* Allows transform to work correctly */
+  animation: spinHourglass 1.5s linear infinite;
+  font-size: inherit; /* Use the parent's font size for the emoji */
+  line-height: inherit; /* Ensure proper vertical alignment */
+  margin-right: 6px; /* Add some space between the spinner and the text */
+  vertical-align: middle; /* Helps with alignment if text wraps or has different heights */
+}
+
+@keyframes spinHourglass {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
