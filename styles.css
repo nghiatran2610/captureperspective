@@ -53,7 +53,7 @@ h2 {
 }
 
 textarea,
-input[type="text"], /* Apply default styles only to text/number inputs initially */
+input[type="text"],
 input[type="number"],
 select {
   border: 1px solid #ccc;
@@ -62,20 +62,23 @@ select {
   padding: 8px 12px;
   font-size: 14px;
 }
-input[type="checkbox"] {
-  margin: 0; /* Remove default margin */
+input[type="checkbox"],
+input[type="radio"] {
+  /* Added radio for consistency */
+  margin: 0 5px 0 0; /* Standardized margin */
+  vertical-align: middle; /* Align better with text */
 }
 
 textarea {
   width: 100%;
   resize: vertical;
-  /* Removed fixed height */
 }
 
 .input-row {
   display: flex;
   gap: var(--spacing-lg);
   flex-wrap: wrap;
+  align-items: center; /* Vertically align items in the row */
 }
 
 .input-row label {
@@ -83,8 +86,8 @@ textarea {
   color: var(--text-color-light);
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  cursor: pointer; /* Make label clickable for radio/checkbox */
+  /* gap: var(--spacing-sm); /* Let radio/checkbox margin handle this */
+  cursor: pointer;
 }
 
 .input-row input[type="number"] {
@@ -98,7 +101,7 @@ textarea {
 .btn-container {
   text-align: center;
   margin-bottom: var(--spacing-xl);
-  display: flex; /* Use flex for button alignment */
+  display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
@@ -106,7 +109,7 @@ textarea {
 
 .btn {
   padding: 12px 24px;
-  background-color: var(--primary-color); /* Updated default button color */
+  background-color: var(--primary-color);
   color: #ffffff;
   border: none;
   border-radius: 4px;
@@ -117,11 +120,12 @@ textarea {
 }
 
 .btn:hover:not(:disabled) {
-  background-color: var(--primary-color-dark); /* Updated hover */
+  background-color: var(--primary-color-dark);
 }
 
 .btn:disabled {
   background-color: #ccc;
+  color: #666; /* Added for better contrast on disabled */
   cursor: not-allowed;
   opacity: 0.65;
 }
@@ -141,48 +145,32 @@ textarea {
   border-radius: 4px;
   text-align: center;
   transition: opacity 0.5s ease-out;
-  opacity: 1; /* Default to visible when it has content */
-  border: 1px solid transparent; /* Base border, can be overridden */
+  opacity: 1;
+  border: 1px solid transparent;
 }
 .status-message:empty {
   display: none;
 }
 
 .status-message.success {
-  /* Your existing success style */
   background-color: #d4edda;
   color: #155724;
-  border-color: #c3e6cb; /* Ensure border matches */
+  border-color: #c3e6cb;
 }
 
 .status-message.error {
-  /* Your existing error style */
   background-color: #f8d7da;
   color: #721c24;
-  border-color: #f5c6cb; /* Ensure border matches */
+  border-color: #f5c6cb;
 }
 
-/* New style for neutral progress updates */
 .status-message.progress-update {
-  background-color: #e9ecef; /* A light grey background */
-  color: #495057; /* A darker grey text for good contrast */
-  border-color: #ced4da; /* A slightly darker grey border */
-  /* You could also add a subtle left border for emphasis if desired: */
-  /* border-left: 3px solid #6c757d; */
-}
-
-.success {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.error {
-  background-color: #f8d7da;
-  color: #721c24;
+  background-color: #e9ecef;
+  color: #495057;
+  border-color: #ced4da;
 }
 
 .status-message.fading-out {
-  /* Added */
   opacity: 0;
 }
 
@@ -212,49 +200,11 @@ textarea {
   font-size: 14px;
 }
 
-.url-item {
-  /* Style for URL selector item */
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-bottom: 1px solid #f5f5f5;
-  transition: background-color 0.2s;
-  cursor: pointer;
-}
-
-.url-item:last-child {
-  border-bottom: none;
-}
-
-.url-item:hover {
-  background-color: #f8f9fa;
-}
-
-.url-text {
-  /* Redundant, kept for safety */
-  flex-grow: 1;
-  margin-right: var(--spacing-md);
-  word-break: break-all;
-  font-size: 14px;
-}
-
-.thumbnail {
-  /* Style for thumbnail in output */
-  width: 50px;
-  height: 50px;
-  object-fit: cover;
-  margin-right: var(--spacing-md);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-}
-
 #screenshotIframe {
   position: absolute;
   top: -9999px;
   left: -9999px;
-  border: 1px solid #ccc; /* Make it visible for debugging if needed */
-  /* Uncomment below to see the iframe during development */
-  /* position: relative; top: 0; left: 0; width: 100%; height: 500px; */
+  border: 1px solid #ccc;
 }
 
 .modal {
@@ -315,49 +265,6 @@ textarea {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.advanced-toggle {
-  /* Legacy, likely unused */
-  text-align: right;
-  margin-bottom: var(--spacing-md);
-}
-
-.btn-link {
-  /* Legacy, likely unused */
-  background: none;
-  border: none;
-  color: var(--primary-color);
-  text-decoration: underline;
-  cursor: pointer;
-  padding: var(--spacing-sm);
-  font-size: 14px;
-}
-
-.btn-link:hover {
-  color: var(--primary-color-dark);
-}
-
-.advanced-section {
-  /* Legacy, likely unused */
-  border-top: 1px solid #eee;
-  padding-top: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
-  display: none;
-}
-
-.optional-label {
-  /* Legacy, likely unused */
-  font-weight: normal;
-  color: #555;
-}
-
-.optional-label:after {
-  /* Legacy, likely unused */
-  content: " (optional)";
-  font-style: italic;
-  color: #888;
-  font-size: 0.9em;
-}
-
 .help-text {
   color: #777;
   font-size: 0.85em;
@@ -365,10 +272,8 @@ textarea {
   margin-bottom: 10px;
 }
 
-/* Styles for Live Thumbnails (Output Area) */
 #liveThumbnails {
-  /* Main container for thumbnails output */
-  display: none; /* Hide initially */
+  display: none;
   flex-direction: column;
   gap: 15px;
   margin: 15px 0;
@@ -379,22 +284,20 @@ textarea {
 }
 
 .thumbnail-category {
-  /* Container for thumbnails of one category */
   display: flex;
   flex-direction: column;
   background-color: white;
   border-radius: 6px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   overflow: hidden;
-  margin-bottom: 8px; /* Reduce space between categories */
-  border: 1px solid #e9ecef; /* Added border */
+  margin-bottom: 8px;
+  border: 1px solid #e9ecef;
 }
 
 .category-header {
-  /* Header for a category (title, count, pdf button) */
   display: flex;
   align-items: center;
-  padding: 8px 12px; /* Slightly more compact headers */
+  padding: 8px 12px;
   background-color: #edf2f7;
   cursor: pointer;
   border-bottom: 1px solid #e2e8f0;
@@ -410,17 +313,15 @@ textarea {
 }
 
 .category-header h4 {
-  /* Category title */
   margin: 0;
   font-size: 16px;
   color: #2d3748;
-  flex-grow: 1; /* Allow title to take available space */
-  margin-left: 8px; /* Space after toggle icon */
-  margin-right: 8px; /* Space before count */
+  flex-grow: 1;
+  margin-left: 8px;
+  margin-right: 8px;
 }
 
 .thumbnail-count {
-  /* Count of thumbnails in category */
   font-size: 12px;
   color: #718096;
   background-color: #e2e8f0;
@@ -430,16 +331,14 @@ textarea {
 }
 
 .category-content {
-  /* Container holding actual thumbnails */
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 10px; /* Reduce padding in the content area */
-  background-color: white; /* Added */
+  padding: 10px;
+  background-color: white;
 }
 
 .thumbnail-container {
-  /* Container for one thumbnail image + text */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -448,17 +347,16 @@ textarea {
   padding: 8px;
   border-radius: 6px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  position: relative; /* Needed for absolute positioning of badges/icons */
+  position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .thumbnail-container:hover {
   transform: translateY(-3px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Enhanced hover shadow */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .thumbnail-image {
-  /* The thumbnail image itself */
   width: 120px;
   height: 90px;
   object-fit: cover;
@@ -466,7 +364,7 @@ textarea {
   margin-bottom: 5px;
   cursor: pointer;
   transition: transform 0.2s ease;
-  border-radius: 3px; /* Slight radius on image */
+  border-radius: 3px;
 }
 
 .thumbnail-image:hover {
@@ -474,14 +372,12 @@ textarea {
 }
 
 .thumbnail-container.toolbar-action {
-  /* Special style for toolbar action thumbs */
   background-color: #edf7ed;
   border-left: 3px solid #38a169;
 }
 
 .retry-badge,
 .error-badge {
-  /* Badge styling */
   position: absolute;
   top: -5px;
   right: -5px;
@@ -490,7 +386,7 @@ textarea {
   padding: 2px 6px;
   border-radius: 10px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  z-index: 10; /* Ensure badge is on top */
+  z-index: 10;
 }
 .retry-badge {
   background-color: #e53e3e;
@@ -500,7 +396,6 @@ textarea {
 }
 
 .thumbnail-filename {
-  /* Text below thumbnail */
   font-size: 12px;
   text-align: center;
   overflow: hidden;
@@ -510,33 +405,19 @@ textarea {
   color: #4a5568;
 }
 
-.thumbnail-sequence-name {
-  /* Optional sequence name text */
-  font-size: 11px;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  width: 100%;
-  color: #718096;
-  font-style: italic;
-  margin-bottom: 3px;
-}
 .thumbnail-subcategory-name {
-  /* Added Style */
   font-size: 11px;
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   width: 100%;
-  color: #2c3e50; /* Darker than filename */
+  color: #2c3e50;
   font-weight: 500;
-  margin-bottom: 2px; /* Space before filename */
+  margin-bottom: 2px;
 }
 
 .thumbnail-download-btn {
-  /* Download button on thumbnail */
   position: absolute;
   bottom: 5px;
   right: 5px;
@@ -568,8 +449,7 @@ textarea {
 }
 
 .combine-all-pdf-container {
-  /* Container for the 'Combine All to PDF' button */
-  display: none; /* Hide by default, show when screenshots are available */
+  display: none;
   justify-content: center;
   margin-top: 15px;
   border-top: 1px solid #e1e5ea;
@@ -578,7 +458,6 @@ textarea {
 }
 
 .combine-all-pdf-btn {
-  /* 'Combine All to PDF' button */
   background-color: #805ad5;
   color: white;
   border: none;
@@ -602,13 +481,11 @@ textarea {
 }
 
 .thumbnail-container.error-thumbnail {
-  /* Styling for error thumbnails */
   background-color: #fff2f2;
   border-left: 3px solid #dc3545;
 }
 
 .thumbnail-error-message {
-  /* Error message text on thumbnail */
   font-size: 11px;
   text-align: center;
   color: #dc3545;
@@ -618,7 +495,6 @@ textarea {
 }
 
 .error-image {
-  /* Placeholder image for error thumbnails */
   border: 1px dashed #dc3545;
   background-color: #f8d7da;
   display: flex;
@@ -627,7 +503,6 @@ textarea {
   cursor: default;
 }
 
-/* Make sure error thumbnails don't have hover effects */
 .thumbnail-container.error-thumbnail:hover {
   transform: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -637,46 +512,26 @@ textarea {
 }
 
 .thumbnail-container.mount-issue-detected {
-  border-left: 3px solid #ffc107; /* Amber/Warning border */
-  /* background-color: #fff8e1; /* Optional: very light yellow background */
+  border-left: 3px solid #ffc107;
 }
 
-/* NEW: Warning Icon for Mount Issue Detected Thumbnails */
 .thumbnail-container.mount-issue-detected::before {
-  content: "⚠️"; /* Warning emoji or you can use an SVG/font icon */
+  content: "⚠️";
   position: absolute;
-  top: 3px; /* Adjust as needed */
-  right: 3px; /* Adjust as needed */
-  font-size: 16px; /* Adjust icon size */
-  color: #ffa000; /* Amber color for the icon itself */
-  background-color: rgba(
-    255,
-    255,
-    255,
-    0.8
-  ); /* Optional: slight background for visibility */
+  top: 3px;
+  right: 3px;
+  font-size: 16px;
+  color: #ffa000;
+  background-color: rgba(255, 255, 255, 0.8);
   border-radius: 50%;
-  padding: 0px 3px; /* Adjust padding around icon */
+  padding: 0px 3px;
   line-height: 1;
-  z-index: 10; /* Ensure it's above the image */
-  /* Optional: Add a small shadow to the icon */
-  /* text-shadow: 0px 0px 2px rgba(0,0,0,0.3); */
-}
-
-.thumbnail-error-message {
-  /* Error message text on error thumbnail */
-  font-size: 11px;
-  text-align: center;
-  color: #dc3545;
-  font-style: italic;
-  margin-top: 3px;
-  width: 100%;
+  z-index: 10;
 }
 
 .combine-pdf-btn {
-  /* 'Combine to PDF' button within a category header */
   background-color: #4299e1;
-  color: white !important; /* Ensure text is always white and visible */
+  color: white !important;
   border: none;
   font-weight: 500;
   padding: 6px 12px;
@@ -695,54 +550,23 @@ textarea {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 .category-header:hover .combine-pdf-btn {
-  /* Make button more visible on hover */
   background-color: #3182ce;
 }
 
-/* Visibility Control */
 .hidden {
   display: none !important;
 }
 
-/* Specific Mode Adjustments */
-body.simple-mode #advancedOptions {
-  display: none;
-}
-body.simple-mode #actionsField {
-  display: none;
-}
+body.simple-mode #advancedOptions,
+body.simple-mode #actionsField,
 body.simple-mode .context-actions-header {
   display: none;
-} /* Hide Generate/Load/Save buttons */
-/* body.simple-mode .stats {
-  display: flex !important;
-} /* Show stats in simple mode */
-
+}
 #stats {
-  display: none !important; /* Use !important to override any other display rules */
-}
-
-body.advanced-mode #urlList {
-  height: 50px;
-}
-*/ body.advanced-mode #advancedOptions {
-  display: block;
-  border-top: 1px solid #eee;
-  padding-top: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
-}
-body.advanced-mode #captureBtn.initially-hidden {
-  display: none;
-}
-body.advanced-mode .stats {
   display: none !important;
-} /* Hide stats in advanced mode */
-body.advanced-mode .simple-mode-settings {
-  display: none;
-} /* Hide simple wait time */
+}
 
 #advancedOptions h3 {
-  /* Heading for Advanced Options */
   font-size: 1.2em;
   color: var(--text-color-light);
   margin-bottom: var(--spacing-lg);
@@ -750,10 +574,8 @@ body.advanced-mode .simple-mode-settings {
   border-bottom: 1px solid #eee;
 }
 
-/* Context Menu Action Generation UI */
 .generation-status {
-  /* Status area below Generate button */
-  display: none; /* Hidden by default */
+  display: none;
   margin-top: 5px;
   margin-bottom: 10px;
   padding: 10px;
@@ -764,7 +586,6 @@ body.advanced-mode .simple-mode-settings {
   color: #6c757d;
 }
 .generation-status .status-progress-bar-container {
-  /* Progress bar inside status */
   height: 4px;
   background-color: #dee2e6;
   border-radius: 2px;
@@ -801,29 +622,25 @@ body.advanced-mode .simple-mode-settings {
 }
 
 .context-actions-header {
-  /* Container for label + Generate/Load/Save buttons */
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 15px;
   padding-bottom: 10px;
   border-bottom: 1px solid #eaeaea;
-  flex-wrap: wrap; /* Allow wrapping if needed */
+  flex-wrap: wrap;
 }
 .context-actions-label {
-  /* Label "Context Actions (JSON format):" */
   font-weight: 600;
   color: #333;
   font-size: 15px;
   margin-right: auto;
 }
 .context-actions-buttons {
-  /* Container for Generate/Load/Save */
   display: flex;
   gap: 8px;
 }
 .action-btn {
-  /* Base style for Generate/Load/Save */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -880,7 +697,6 @@ body.advanced-mode .simple-mode-settings {
 }
 
 #menu-selection-badges {
-  /* Container for selected menu item badges */
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
@@ -889,9 +705,8 @@ body.advanced-mode .simple-mode-settings {
 }
 #menu-selection-badges::-webkit-scrollbar {
   display: none;
-} /* Hide scrollbar */
+}
 .menu-selection-badge {
-  /* Individual badge */
   display: inline-flex;
   padding: 4px 8px;
   background-color: #f0f7ff;
@@ -908,7 +723,6 @@ body.advanced-mode .simple-mode-settings {
   margin-bottom: 0;
 }
 .count-badge {
-  /* "+N" badge */
   background-color: #f0f7ff;
   color: #0066cc;
   font-weight: 600;
@@ -920,19 +734,17 @@ body.advanced-mode .simple-mode-settings {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .collapse-badge {
-  /* "Collapse" badge */
   background-color: #f0f0f0;
   color: #666;
   font-weight: 600;
   border: 1px solid #ddd;
-  cursor: pointer; /* Added */
+  cursor: pointer;
 }
 .collapse-badge:hover {
   background-color: #e0e0e0;
 }
 
 .action-item-messages {
-  /* Container for per-item processing messages */
   margin-top: 8px;
   max-height: 120px;
   overflow-y: auto;
@@ -941,7 +753,6 @@ body.advanced-mode .simple-mode-settings {
   padding-top: 8px;
 }
 .action-message {
-  /* Single processing message */
   padding: 3px 6px;
   margin-bottom: 2px;
   border-radius: 3px;
@@ -956,37 +767,13 @@ body.advanced-mode .simple-mode-settings {
 }
 
 #urlHelpText {
-  /* Help text below URL label */
   color: #777;
   font-size: 0.85em;
-  margin-top: -15px; /* Pull up closer to label */
+  margin-top: -15px;
   margin-bottom: 10px;
   font-style: italic;
 }
-#urlHelpText.advanced-mode {
-  /* Optional emphasis in advanced mode */
-  border-left: 3px solid #2980b9;
-  padding-left: 8px;
-  color: #666;
-  background-color: #f8f9fa;
-  padding: 4px 8px;
-}
 
-/* Warning message for tab visibility */
-.warning-message {
-  text-align: center;
-  padding: 8px 16px;
-  margin: -10px auto 20px auto;
-  max-width: 800px;
-  background-color: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeeba;
-  border-radius: var(--border-radius);
-  font-size: 14px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-/* URL display in screenshot modal */
 .screenshot-url-container {
   margin-bottom: 15px;
   padding: 8px 12px;
@@ -1008,9 +795,7 @@ body.advanced-mode .simple-mode-settings {
   text-decoration: underline;
 }
 
-/* URL Selector Styles */
 .url-selector-container {
-  /* Main container for URL selector */
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -1021,7 +806,6 @@ body.advanced-mode .simple-mode-settings {
   box-shadow: var(--shadow);
 }
 .url-selector-toolbar {
-  /* Top bar with search/actions */
   display: flex;
   justify-content: space-between;
   padding: 10px 15px;
@@ -1029,17 +813,16 @@ body.advanced-mode .simple-mode-settings {
   background-color: #f8f9fa;
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
-  flex-wrap: wrap; /* Allow wrap on small screens */
+  flex-wrap: wrap;
 }
 .url-selector-search {
-  /* Search input */
   flex: 1;
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
   transition: border-color 0.3s;
-  min-width: 150px; /* Prevent excessive shrinking */
+  min-width: 150px;
 }
 .url-selector-search:focus {
   border-color: #2980b9;
@@ -1047,14 +830,12 @@ body.advanced-mode .simple-mode-settings {
   box-shadow: 0 0 0 2px rgba(41, 128, 185, 0.2);
 }
 .url-selector-actions {
-  /* Container for Select All/Clear/Count */
   display: flex;
   align-items: center;
   gap: 10px;
   margin-left: 15px;
 }
 .selection-counter {
-  /* "N selected" text */
   padding: 4px 10px;
   background-color: #e9f5ff;
   color: #2980b9;
@@ -1065,23 +846,20 @@ body.advanced-mode .simple-mode-settings {
   text-align: center;
 }
 .url-categories-container {
-  /* Scrollable area for categories/URLs */
   max-height: 200px;
   overflow-y: auto;
   padding: 5px;
 }
 .url-category {
-  /* Container for one category */
   margin-bottom: 8px;
   border: 1px solid #eee;
   border-radius: 4px;
   overflow: hidden;
 }
 .url-category-header {
-  /* Header for category (checkbox, title) */
   display: flex;
   align-items: center;
-  padding: 10px; /* Updated padding */
+  padding: 10px;
   background-color: #f8f9fa;
   cursor: pointer;
   border-bottom: 1px solid #eee;
@@ -1091,40 +869,37 @@ body.advanced-mode .simple-mode-settings {
   background-color: #f1f3f5;
 }
 .url-category-header h3 {
-  /* Category title */
   margin: 0;
   flex: 1;
   font-size: 14px;
   font-weight: 600;
   margin-left: 8px;
 }
-.toggle-icon {
-  /* Legacy - no longer used for URL selector */
-  margin-left: auto;
-  font-size: 14px;
-  color: #6c757d;
-  transition: transform 0.2s;
-  padding: 0 8px;
-}
 .url-items-container {
-  /* Container for URLs within a category */
-  max-height: none; /* Always expanded */
-  transition: none; /* No transition */
+  max-height: none;
+  transition: none;
 }
-.url-items-container.collapsed {
-  /* Legacy - no longer applies */
-  max-height: 0;
-  overflow: hidden;
+.url-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f5f5f5;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+.url-item:last-child {
+  border-bottom: none;
+}
+.url-item:hover {
+  background-color: #f8f9fa;
 }
 .url-title {
-  /* URL title text */
   font-weight: 500;
   flex: 1;
   font-size: 13px;
   padding-left: 8px;
 }
 .url-path {
-  /* Faded URL path text */
   color: #6c757d;
   font-size: 11px;
   margin-left: 6px;
@@ -1135,7 +910,6 @@ body.advanced-mode .simple-mode-settings {
 }
 .category-checkbox,
 .url-checkbox {
-  /* Checkboxes */
   width: 16px;
   height: 16px;
   cursor: pointer;
@@ -1143,23 +917,7 @@ body.advanced-mode .simple-mode-settings {
   flex-shrink: 0;
   margin-right: 8px;
 }
-#selectAllBtn {
-  background-color: #2980b9;
-  color: white;
-  border-color: #2980b9;
-}
-#selectAllBtn:hover {
-  background-color: #3498db;
-}
-#clearSelectionBtn {
-  background-color: #f8f9fa;
-  color: #333;
-}
-#clearSelectionBtn:hover {
-  background-color: #e9ecef;
-}
 .no-results-message {
-  /* Message when search yields no results */
   padding: 20px;
   text-align: center;
   color: #6c757d;
@@ -1168,21 +926,19 @@ body.advanced-mode .simple-mode-settings {
 .url-selector-loading,
 .url-selector-initial,
 .url-selector-error {
-  /* Loading/Initial/Error states */
   padding: 20px;
   font-size: 13px;
-  text-align: center; /* Center align text */
-  color: #6c757d; /* Muted color */
+  text-align: center;
+  color: #6c757d;
 }
 .loading-spinner {
-  /* Simple spinner */
   border: 3px solid #f3f3f3;
   border-radius: 50%;
   border-top: 3px solid #3498db;
   width: 30px;
   height: 30px;
   animation: spin 1s linear infinite;
-  margin: 0 auto 10px auto; /* Center spinner */
+  margin: 0 auto 10px auto;
 }
 @keyframes spin {
   0% {
@@ -1192,23 +948,7 @@ body.advanced-mode .simple-mode-settings {
     transform: rotate(360deg);
   }
 }
-@media (max-width: 768px) {
-  /* Responsive adjustments */
-  .url-selector-toolbar {
-    flex-direction: column;
-    gap: 10px;
-  }
-  .url-selector-actions {
-    width: 100%;
-    margin-left: 0;
-    justify-content: space-between;
-  }
-  .url-path {
-    display: none;
-  }
-}
 
-/* Base URL Input Section */
 .base-url-container {
   display: flex;
   align-items: center;
@@ -1236,29 +976,13 @@ body.advanced-mode .simple-mode-settings {
 .input-status-message {
   font-size: 0.85em;
   margin-left: 5px;
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
-/* Simple Mode Settings (Screen Size, Wait Time) */
-.simple-mode-settings {
-  /* Container for screen size & wait time */
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-  background-color: #f5f7fa;
-  padding: 10px 15px;
-  border-radius: 4px;
-  border: 1px solid #dbe3ec;
-  flex-wrap: wrap; /* Allow wrapping */
-}
 .setting-container {
-  /* Container for one setting (e.g., wait time) */
   display: flex;
   align-items: center;
-  /* Removed padding - handled by parent */
-  /* margin-bottom: 10px; Remove margin between items if wrapped */
 }
 .setting-container label {
   font-weight: 500;
@@ -1267,7 +991,6 @@ body.advanced-mode .simple-mode-settings {
   color: #3f4a5a;
 }
 .wait-time-input {
-  /* Wait time number input */
   width: 50px;
   height: 30px;
   text-align: center;
@@ -1275,27 +998,11 @@ body.advanced-mode .simple-mode-settings {
   border-radius: 4px;
   padding: 4px;
 }
-@media (max-width: 768px) {
-  /* Responsive for settings */
-  .simple-mode-settings {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .setting-container {
-    margin-bottom: 8px;
-    width: 100%;
-  }
-  .setting-container:last-child {
-    margin-bottom: 0;
-  }
-}
 
-/* Login Section Styles */
 #loginSection {
   transition: all 0.3s ease;
 }
 .login-header {
-  /* Container for "Authentication" + Status */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1304,20 +1011,18 @@ body.advanced-mode .simple-mode-settings {
 .login-header h2 {
   margin: 0;
   font-size: 1.3em;
-  display: flex; /* To align icon */
+  display: flex;
   align-items: center;
 }
 .login-header h2::before {
-  /* Lock icon */
   content: "🔒";
   margin-right: 10px;
   font-size: 18px;
 }
 #loginStatus {
-  /* Status indicator (Logged in/out/checking) */
   display: flex;
   align-items: center;
-  padding: 3px 10px; /* Compact padding */
+  padding: 3px 10px;
   border: 1px solid #e2e8f0;
   border-radius: 4px;
   font-size: 13px;
@@ -1326,21 +1031,23 @@ body.advanced-mode .simple-mode-settings {
 #loginStatus.logged-out {
   background: #f8d7da;
   border-color: #f5c6cb;
+  color: #721c24; /* Added text color for contrast */
 }
 #loginStatus.checking {
   background: #fff3cd;
   border-color: #ffeeba;
+  color: #856404; /* Added text color for contrast */
 }
 #loginStatus.logged-in {
   background: #d4edda;
   border-color: #c3e6cb;
+  color: #155724; /* Added text color for contrast */
 }
 .login-status-icon {
   margin-right: 5px;
   font-size: 12px;
 }
 .login-frame-container {
-  /* Container for the login iframe */
   margin: 10px 0;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -1348,18 +1055,16 @@ body.advanced-mode .simple-mode-settings {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 .login-frame {
-  /* Login iframe itself */
   width: 100%;
   height: 350px;
   border: none;
 }
 .login-frame-container.hidden {
-  display: none;
-} /* Hide iframe container */
+  display: none !important; /* Ensure this hides it */
+}
 
-/* Pause/Resume Button */
 .pause-resume-btn {
-  background-color: #f0ad4e; /* Amber */
+  background-color: #f0ad4e;
   color: white;
   margin-left: 10px;
   position: relative;
@@ -1370,39 +1075,35 @@ body.advanced-mode .simple-mode-settings {
 }
 .pause-resume-btn.paused {
   background-color: #5cb85c;
-} /* Green when paused (shows Resume icon) */
+}
 .pause-resume-btn.paused:hover:not(:disabled) {
   background-color: #449d44;
 }
 .pause-resume-btn:disabled {
-  background-color: #f8d5ae; /* Light amber disabled */
+  background-color: #f8d5ae;
   cursor: not-allowed;
   opacity: 0.7;
 }
 .pause-resume-btn.paused:disabled {
-  background-color: #a3d7a3; /* Light green paused disabled */
+  background-color: #a3d7a3;
   cursor: not-allowed;
   opacity: 0.7;
 }
 
-/* Login Option Section */
-.login-option-section h2 {
-  margin-bottom: 15px;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 10px;
-}
+
 .login-option-section .input-row {
-  justify-content: flex-start;
-  gap: 30px;
+  justify-content: flex-start; /* Align items to the start */
+  gap: 20px; /* Adjust gap as needed */
 }
 .login-option-section label {
-  font-size: 16px;
+  /* Styles for radio button labels */
+  font-size: 15px; /* Slightly larger font for these options */
+  cursor: pointer;
 }
 #loginOptionSection {
   display: none;
-} /* Default state is hidden */
+}
 
-/* Icon Button Styling */
 .icon-btn {
   font-size: 1.5em;
   padding: 8px 12px;
@@ -1410,46 +1111,35 @@ body.advanced-mode .simple-mode-settings {
   min-width: 50px;
   text-align: center;
 }
-/* styles.css */
-
-/* --- Capture Button (#captureBtn) - Enhanced Standard Style --- */
 #captureBtn {
-  /* Inherits .btn and .icon-btn base styles */
   background: linear-gradient(
     145deg,
     var(--secondary-color-bright),
     var(--secondary-color)
-  ); /* Keep vibrant green */
-  border: 2px solid var(--secondary-color-dark); /* << THICKER border */
+  );
+  border: 2px solid var(--secondary-color-dark);
   color: white;
-  padding: 14px 24px; /* << INCREASED padding */
-  font-size: 2em; /* << INCREASED icon size */
-  box-shadow: 0 5px 10px rgba(46, 204, 113, 0.45); /* << STRONGER shadow */
+  padding: 14px 24px;
+  font-size: 2em;
+  box-shadow: 0 5px 10px rgba(46, 204, 113, 0.45);
   font-weight: 600;
   transition: all 0.2s ease;
   vertical-align: middle;
   line-height: 1;
-  /* Optional: Add subtle pulse animation - uncomment below and @keyframes if desired */
-  /* animation: subtlePulse 2s infinite ease-in-out; */
 }
-
-/* Adjust hover/active states slightly */
 #captureBtn:hover:not(:disabled) {
   background: linear-gradient(
     145deg,
     var(--secondary-color),
     var(--secondary-color-dark)
   );
-  box-shadow: 0 7px 14px rgba(46, 204, 113, 0.55); /* Enhanced hover shadow */
-  transform: translateY(-3px); /* More lift */
+  box-shadow: 0 7px 14px rgba(46, 204, 113, 0.55);
+  transform: translateY(-3px);
 }
-
 #captureBtn:active:not(:disabled) {
-  transform: translateY(-1px); /* Press effect */
+  transform: translateY(-1px);
   box-shadow: 0 3px 6px rgba(46, 204, 113, 0.4);
 }
-
-/* Keep standard disabled state */
 #captureBtn:disabled {
   background: #e9ecef;
   border-color: #ced4da;
@@ -1458,16 +1148,13 @@ body.advanced-mode .simple-mode-settings {
   transform: none;
   cursor: not-allowed;
   opacity: 0.65;
-  /* animation: none; */ /* Disable animation when disabled */
 }
 
-/* --- Collapsible Header Logic (applies only to Pages header) --- */
 .card-header-toggle-wrapper {
-  /* Wrapper for H2 + Indicator */
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--spacing-lg); /* Default margin below header */
+  margin-bottom: var(--spacing-lg);
   cursor: pointer;
   position: relative;
   background-color: transparent;
@@ -1475,14 +1162,12 @@ body.advanced-mode .simple-mode-settings {
   padding: 0;
 }
 .card-header-toggle-wrapper h2 {
-  /* The H2 title itself */
   margin: 0;
   font-size: 1.5em;
   color: var(--text-color-light);
   flex-grow: 1;
 }
 .collapse-indicator {
-  /* The ▼/► indicator */
   font-size: 1.1em;
   color: var(--primary-color);
   margin-left: 10px;
@@ -1493,28 +1178,26 @@ body.advanced-mode .simple-mode-settings {
   padding: 2px;
 }
 .card-header-toggle-wrapper.collapsed .collapse-indicator {
-  transform: rotate(-90deg); /* Point right when collapsed */
+  transform: rotate(-90deg);
 }
 .card-header-toggle-wrapper:not(.collapsed) .collapse-indicator {
-  transform: rotate(0deg); /* Point down when expanded */
+  transform: rotate(0deg);
 }
 .card-header-toggle-wrapper.collapsed {
-  margin-bottom: 0; /* Remove margin below header when collapsed */
+  margin-bottom: 0;
 }
 
-/* --- Collapsible Content Logic (applies ONLY to captureSettingsContent) --- */
 #captureSettingsContent {
   overflow: hidden;
   transition: max-height 0.4s ease-out, opacity 0.4s ease-out,
     margin-top 0.4s ease-out, border-top-width 0.4s ease-out,
     padding-top 0.4s ease-out;
-  max-height: 1000px; /* Adjust max-height to fit content */
+  max-height: 1000px;
   opacity: 1;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid #eee; /* Separator line when expanded */
+  border-top: 1px solid #eee;
 }
-
 #captureSettingsContent.collapsed {
   max-height: 0;
   opacity: 0;
@@ -1523,47 +1206,40 @@ body.advanced-mode .simple-mode-settings {
   border-top-width: 0;
 }
 
-/* --- Important Settings (Screen Size, Wait Time) --- */
-/* Ensure these are visually grouped */
 .important-setting-group {
-  /* Applies to screen size row and wait time container */
   padding: 10px 15px;
-  background-color: #f0f7ff; /* Light blue background */
-  border: 1px solid #cce4ff; /* Blue border */
-  margin-bottom: 0; /* Remove bottom margin to connect if needed */
-  display: flex; /* Align label and input */
+  background-color: #f0f7ff;
+  border: 1px solid #cce4ff;
+  margin-bottom: 0;
+  display: flex;
   align-items: center;
-  flex-wrap: wrap; /* Allow wrapping */
+  flex-wrap: wrap;
   gap: 15px;
 }
 .screen-size-row.important-setting-group {
-  border-radius: 4px 4px 0 0; /* Rounded top corners */
-  border-bottom: none; /* Remove bottom border if wait time is below */
-  margin-top: 15px; /* Margin above the important settings group */
+  border-radius: 4px 4px 0 0;
+  border-bottom: none;
+  margin-top: 15px;
 }
 #simpleWaitTimeContainer.important-setting-group {
-  border-radius: 0 0 4px 4px; /* Rounded bottom corners */
-  margin-bottom: 15px; /* Restore bottom margin after the group */
-  border-top: none; /* Remove top border */
+  border-radius: 0 0 4px 4px;
+  margin-bottom: 15px;
+  border-top: none;
 }
-
 .important-setting-group label {
-  /* Labels within important settings */
-  font-weight: 600; /* Bolder labels */
-  color: #0056b3; /* Darker blue text */
+  font-weight: 600;
+  color: #0056b3;
   margin-bottom: 0;
 }
 .screen-size-row label[for="fullPageCheckbox"] {
-  /* Keep checkbox label normal */
   font-weight: normal;
   color: var(--text-color-light);
 }
 .important-setting-group select,
 .important-setting-group input {
-  /* Inputs/Selects within important settings */
   border-color: #99caff;
   box-shadow: 0 0 0 1px rgba(0, 123, 255, 0.1);
-  background-color: white; /* Ensure white background */
+  background-color: white;
 }
 .important-setting-group select:focus,
 .important-setting-group input:focus {
@@ -1571,35 +1247,302 @@ body.advanced-mode .simple-mode-settings {
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
 }
 .important-setting-group .wait-time-input {
-  /* Wait time input specific width */
   width: 60px;
 }
 
-/* Page Source Selection Styling */
 .page-source-selector {
-  background-color: #f8f9fa; /* Subtle background */
+  background-color: #f8f9fa;
   border: 1px solid #e9ecef;
   border-radius: 4px;
   padding: 10px 15px;
-  margin-bottom: 15px; /* Space below */
+  margin-bottom: 15px;
 }
 .page-source-selector > label {
-  /* Main "Page Source:" label */
-  font-weight: 600 !important; /* Override general label style */
+  font-weight: 600 !important;
   color: var(--text-color-light) !important;
 }
 .page-source-selector .input-row {
-  margin-bottom: 0; /* Remove default margin */
+  margin-bottom: 0;
   gap: 20px;
 }
 .page-source-selector .input-row label {
-  /* Radio button labels */
   font-size: 14px;
   font-weight: normal !important;
   color: var(--text-color) !important;
 }
 
-/* Responsive adjustments for smaller screens */
+.manual-input-options {
+  flex-direction: column;
+  align-items: flex-start;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  padding: 15px;
+  background-color: #fdfdff;
+  margin-top: 10px;
+}
+.manual-input-group {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
+  margin-bottom: 10px;
+}
+.manual-paste-group,
+.manual-file-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.manual-input-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 5px;
+}
+#manualJsonText {
+  flex-grow: 1;
+  min-height: 80px;
+  font-size: 13px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.manual-or-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #aaa;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  padding: 0 5px;
+  flex-shrink: 0;
+}
+.file-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0; /* Changed */
+  background-color: #f9f9f9;
+  min-height: 34px;
+  flex-grow: 1;
+  position: relative; /* Added */
+  overflow: hidden; /* Added */
+}
+#manualJsonFile {
+  flex-grow: 1;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+}
+.file-input-wrapper::before {
+  content: "Choose File";
+  display: inline-block;
+  background: #eee;
+  border: 1px solid #ccc; /* Corrected from border-color */
+  border-radius: 3px; /* Corrected from border */
+  padding: 4px 8px;
+  outline: none;
+  white-space: nowrap;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 12px;
+  margin: 5px; /* Added margin to position it inside */
+}
+.file-input-wrapper:hover::before {
+  background-color: #ddd;
+}
+.file-name-display {
+  font-size: 12px;
+  color: #666;
+  margin-left: 10px; /* Space after the "Choose File" pseudo-element */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+  padding: 5px 0;
+  flex-grow: 1;
+}
+.load-manual-btn {
+  align-self: flex-start;
+  background-color: var(--secondary-color);
+  color: white;
+  border: none;
+}
+.load-manual-btn:hover:not(:disabled) {
+  background-color: #218c53;
+}
+#captureWarningMessage {
+  /* Was .warning-message, now specific ID */
+  text-align: center;
+  padding: 8px 16px; /* Adjusted padding */
+  margin-top: 10px; /* Added margin-top */
+  /* margin: -10px auto 20px auto; /* Removed conflicting margin */
+  max-width: 800px; /* Keep if desired */
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+  border-radius: var(--border-radius);
+  font-size: 14px; /* Adjusted font size */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  width: 100%; /* Ensure it spans if in flex container */
+  box-sizing: border-box; /* Ensure padding/border included in width */
+}
+
+.project-selection-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* margin-bottom: 15px; /* Removed, handled by grid gap */
+}
+.project-selector-dropdown {
+  flex-grow: 1;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: white;
+  min-width: 200px;
+}
+.project-selector-dropdown:disabled {
+  background-color: #f0f0f0;
+  color: #999;
+}
+#baseUrlInput[readonly] {
+  background-color: #e9ecef;
+  color: #495057;
+  cursor: default;
+}
+.project-selection-container > .base-url-label {
+  font-weight: 600;
+  white-space: nowrap;
+  color: #333;
+}
+
+#baseUrlSection.card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px 15px;
+  align-items: center;
+  padding: var(--spacing-xl, 20px);
+}
+#baseUrlSection .project-selection-container,
+#baseUrlSection .manual-url-input-container {
+  display: contents;
+}
+#baseUrlSection .base-url-label {
+  grid-column: 1 / 2;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  padding-right: 5px;
+}
+#baseUrlSection .project-selector-dropdown,
+#baseUrlSection .base-url-input {
+  grid-column: 2 / 3;
+  width: 100%;
+  box-sizing: border-box;
+}
+.project-selection-container {
+  margin-bottom: 0;
+}
+.manual-url-input-container {
+  margin-bottom: 0;
+}
+
+.status-spinner {
+  display: inline-block;
+  animation: spinHourglass 1.5s linear infinite;
+  font-size: inherit;
+  line-height: inherit;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+@keyframes spinHourglass {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Styling for #logoutBtn */
+#logoutBtn {
+  background-color: #dc3545; /* Red */
+  color: white;
+  border-color: #dc3545; /* Match background */
+  /* margin-left is handled by .input-row gap or can be adjusted here if needed */
+  /* e.g., margin-left: var(--spacing-md); */
+}
+
+#logoutBtn:hover:not(:disabled) {
+  background-color: #c82333; /* Darker red */
+  border-color: #bd2130;
+}
+
+#logoutBtn:disabled {
+  background-color: #f5c6cb; /* Lighter red for disabled state */
+  border-color: #f5c6cb;
+  /* color: #721c24; /* Optional: darker text for disabled if needed */
+}
+
+/* Optional: if you want to style the "Continue as [Username]" text */
+#textForOptionLogin.has-username {
+  font-weight: 600;
+  /* color: var(--primary-color); */ /* Example: make it blue */
+}
+
+@media (max-width: 768px) {
+  .url-selector-toolbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .url-selector-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+  }
+  .url-path {
+    display: none;
+  }
+  .important-setting-group {
+    gap: 10px;
+  }
+  .simple-mode-settings {
+    /* This class seems unused, but keeping rule if it's for future */
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .setting-container {
+    /* margin-bottom: 8px; /* Already there */
+    width: 100%; /* Already there */
+  }
+  .setting-container:last-child {
+    margin-bottom: 0;
+  }
+  .manual-input-group {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+  .manual-or-divider {
+    writing-mode: horizontal-tb;
+    padding: 5px 0;
+    width: 100%;
+    text-align: center;
+  }
+  .file-name-display {
+    max-width: calc(100% - 100px);
+  }
+}
+
 @media (max-width: 576px) {
   .btn-container .btn {
     flex: 1 0 100%;
@@ -1611,340 +1554,17 @@ body.advanced-mode .simple-mode-settings {
   }
   .context-actions-buttons {
     width: 100%;
-    justify-content: flex-start; /* Or space-between */
+    justify-content: flex-start;
   }
-  .url-selector-toolbar {
-    flex-direction: column;
-    gap: 10px;
-  }
-  .url-selector-actions {
-    /* Container for Toggle Button/Count */
-    width: 100%;
-    margin-left: 0;
-    justify-content: space-between;
-  }
-
-  .simple-mode-settings {
+  /* Ensure login options also stack well */
+  #loginOptionSection .input-row {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px; /* Reduce gap when stacked */
   }
-  .setting-container {
-    margin-bottom: 8px;
-    width: 100%;
-  }
-  .setting-container:last-child {
-    margin-bottom: 0;
-  }
-  .important-setting-group {
-    gap: 10px; /* Reduce gap on small screens */
-  }
-}
-
-/* --- UPDATED: Styles for the single Toggle Button --- */
-.toggle-select-btn {
-  /* Inherits .btn and .btn-small */
-  min-width: 110px; /* Ensure enough space for text */
-  text-align: center;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
-  /* Default state (Select All) */
-  background-color: #2980b9;
-  color: white;
-  border-color: #2980b9;
-}
-
-.toggle-select-btn:hover:not(:disabled) {
-  background-color: #3498db; /* Lighter blue on hover for Select All */
-  border-color: #3498db;
-}
-
-/* State when button means "Clear Selection" */
-.toggle-select-btn.clear-mode {
-  background-color: #e74c3c; /* Red for Clear Selection */
-  border-color: #e74c3c;
-  color: white;
-}
-
-.toggle-select-btn.clear-mode:hover:not(:disabled) {
-  background-color: #c0392b; /* Darker red on hover for Clear */
-  border-color: #c0392b;
-}
-
-.toggle-select-btn:disabled {
-  background-color: #bdc3c7; /* Grey disabled */
-  border-color: #bdc3c7;
-  color: #7f8c8d;
-  cursor: not-allowed;
-}
-
-/* --- ADDED: Styles for Manual JSON Input Area --- */
-.manual-input-options {
-  flex-direction: column; /* Stack elements vertically */
-  align-items: flex-start; /* Align items to the start */
-  border: 1px solid #eee; /* Add border */
-  border-radius: 4px; /* Add radius */
-  padding: 15px; /* Add padding */
-  background-color: #fdfdff; /* Slightly off-white background */
-  margin-top: 10px; /* Space above */
-}
-
-.manual-input-group {
-  display: flex;
-  gap: 20px;
-  width: 100%;
-  align-items: stretch; /* Make groups equal height */
-  margin-bottom: 10px;
-}
-
-.manual-paste-group,
-.manual-file-group {
-  flex: 1; /* Each group takes half the space */
-  display: flex;
-  flex-direction: column;
-}
-
-.manual-input-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #555;
-  margin-bottom: 5px;
-}
-
-#manualJsonText {
-  flex-grow: 1; /* Allow textarea to grow */
-  min-height: 80px; /* Adjust min height */
-  font-size: 13px;
-  padding: 8px;
-  border: 1px solid #ccc; /* Restore border */
-  border-radius: 4px; /* Restore radius */
-}
-
-.manual-or-divider {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  color: #aaa;
-  writing-mode: vertical-lr; /* Vertical text */
-  text-orientation: mixed;
-  padding: 0 5px;
-  flex-shrink: 0;
-}
-
-.file-input-wrapper {
-  display: flex;
-  align-items: center;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 5px 10px;
-  background-color: #f9f9f9;
-  min-height: 34px; /* Match input height approx */
-  flex-grow: 1; /* Allow wrapper to take height */
-}
-
-#manualJsonFile {
-  flex-grow: 1;
-  font-size: 13px;
-  cursor: pointer;
-  /* Hide default browser file input appearance */
-  opacity: 0;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  left: 0;
-  top: 0;
-}
-.file-input-wrapper {
-  /* Add position relative */
-  position: relative;
-  padding: 0; /* Remove padding, handled by button/span */
-  overflow: hidden; /* Hide the actual input */
-}
-.file-input-wrapper::before {
-  /* Style a fake button */
-  content: "Choose File";
-  display: inline-block;
-  background: #eee;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  padding: 4px 8px;
-  outline: none;
-  white-space: nowrap;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 12px;
-  margin: 5px;
-}
-.file-input-wrapper:hover::before {
-  background-color: #ddd;
-}
-
-.file-name-display {
-  font-size: 12px;
-  color: #666;
-  margin-left: 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 150px; /* Limit filename display width */
-  padding: 5px 0; /* Align text vertically */
-  flex-grow: 1; /* Take remaining space */
-}
-
-.load-manual-btn {
-  align-self: flex-start; /* Align button to the left */
-  background-color: var(--secondary-color); /* Green button */
-  color: white; /* Ensure text is white */
-  border: none; /* Remove border if .btn adds one */
-}
-.load-manual-btn:hover:not(:disabled) {
-  background-color: #218c53; /* Darker green */
-}
-
-/* Responsive adjustments for manual input */
-@media (max-width: 768px) {
-  .manual-input-group {
-    flex-direction: column; /* Stack vertically on small screens */
-    gap: 10px;
-    align-items: stretch;
-  }
-  .manual-or-divider {
-    writing-mode: horizontal-tb; /* Horizontal text */
-    padding: 5px 0;
-    width: 100%;
-    text-align: center;
-  }
-
-  .file-name-display {
-    max-width: calc(100% - 100px); /* Adjust max width relative to button */
-  }
-}
-
-#captureWarningMessage {
-  text-align: center;
-  padding: 5px 10px;
-  margin-top: 10px; /* Adjust as needed for spacing */
-  background-color: #fff3cd; /* Light yellow background */
-  color: #856404; /* Dark yellow/brown text */
-  border: 1px solid #ffeeba; /* Yellow border */
-  border-radius: var(--border-radius);
-  font-size: 0.9em; /* Slightly smaller font */
-  width: 100%; /* Make it take full width of the button container area */
-  box-sizing: border-box;
-}
-
-/* styles.css additions */
-
-/* Project Selection Area in baseUrlSection */
-.project-selection-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 15px; /* Space before the manual URL input */
-}
-
-.project-selector-dropdown {
-  flex-grow: 1; /* Allow dropdown to take available space */
-  padding: 8px 12px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 14px;
-  background-color: white;
-  min-width: 200px; /* Minimum width */
-}
-
-.project-selector-dropdown:disabled {
-  background-color: #f0f0f0;
-  color: #999;
-}
-
-/* Manual URL input container (if you want to style it separately) */
-.manual-url-input-container {
-  display: flex; /* To align label and input */
-  align-items: center;
-  /* Styles for this are mostly covered by .base-url-container existing styles */
-}
-
-/* Ensure baseUrlInput is visually distinct if read-only */
-#baseUrlInput[readonly] {
-  background-color: #e9ecef; /* Light grey for read-only */
-  color: #495057;
-  cursor: default;
-}
-
-/* Minor adjustment for the label next to the dropdown */
-.project-selection-container > .base-url-label {
-  font-weight: 600;
-  white-space: nowrap;
-  color: #333;
-}
-
-/* styles.css - CORRECTED rules for #baseUrlSection alignment */
-
-#baseUrlSection.card {
-  display: grid;
-  grid-template-columns: auto 1fr; /* Column 1 for labels, Column 2 for inputs/selects */
-  gap: 12px 15px;       /* Row gap, Column gap */
-  align-items: center;    /* Vertically center items in each row */
-  padding: var(--spacing-xl, 20px); /* Ensure card has padding */
-}
-
-/*
-  The .project-selection-container and .manual-url-input-container divs
-  will now act as simple wrappers. The actual grid items for alignment
-  will be the <label> and <select>/<input> directly.
-  We need to make sure these wrappers don't interfere with the parent grid.
-  This is done by making them span the full grid or by using 'display: contents'.
-  'display: contents' is cleaner here as it makes their children direct grid items of #baseUrlSection.
-*/
-
-#baseUrlSection .project-selection-container,
-#baseUrlSection .manual-url-input-container {
-  display: contents; /* Treat children of these containers as direct grid items of #baseUrlSection */
-}
-
-/* Style for ALL labels within #baseUrlSection */
-#baseUrlSection .base-url-label {
-  grid-column: 1 / 2;   /* All labels go into the first column */
-  text-align: left;     /* Or 'right' if you prefer labels right-aligned */
-  font-weight: 600;
-  white-space: nowrap;  /* Prevent labels from wrapping */
-  padding-right: 5px; /* Add a little space if text-align: right and label is long */
-}
-
-/* Style for ALL input/select elements within #baseUrlSection */
-#baseUrlSection .project-selector-dropdown,
-#baseUrlSection .base-url-input {
-  grid-column: 2 / 3;   /* All inputs/selects go into the second column */
-  width: 100%;          /* Make them take full width of their column */
-  box-sizing: border-box;
-}
-
-/*
-  Remove any specific margin-bottom from the individual row containers if they exist,
-  as the 'gap' on #baseUrlSection will handle row spacing.
-*/
-.project-selection-container { /* From your existing CSS */
-  margin-bottom: 0; /* Override existing margin if #baseUrlSection's 'gap' handles it */
-}
-/* You might have a 'manual-url-input-container' if it's different from .base-url-container */
-.manual-url-input-container {
-    margin-bottom: 0;
-}
-
-.status-spinner {
-  display: inline-block; /* Allows transform to work correctly */
-  animation: spinHourglass 1.5s linear infinite;
-  font-size: inherit; /* Use the parent's font size for the emoji */
-  line-height: inherit; /* Ensure proper vertical alignment */
-  margin-right: 6px; /* Add some space between the spinner and the text */
-  vertical-align: middle; /* Helps with alignment if text wraps or has different heights */
-}
-
-@keyframes spinHourglass {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
+  #logoutBtn {
+    margin-left: 0; /* Remove left margin when stacked */
+    margin-top: 10px; /* Add top margin when stacked */
+    width: 100%; /* Make logout button full width on very small screens */
   }
 }

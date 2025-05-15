@@ -17,9 +17,10 @@
         <label for="projectSelectorDropdown" class="base-url-label"
           >Select Project</label
         >
-        <select id="projectSelectorDropdown" class="project-selector-dropdown">
-          {...options...}
-        </select>
+        <select
+          id="projectSelectorDropdown"
+          class="project-selector-dropdown"
+        ></select>
       </div>
 
       <div class="base-url-container manual-url-input-container">
@@ -44,7 +45,7 @@
           />
           Continue as Guest
         </label>
-        <label>
+        <label id="labelForOptionLogin">
           <input
             type="radio"
             name="loginOption"
@@ -52,8 +53,20 @@
             id="optionLogin"
             disabled
           />
-          Continue with Authentication
+          <span id="textForOptionLogin">Continue with Authentication</span>
         </label>
+        <button
+          id="logoutBtn"
+          class="btn btn-small"
+          style="
+            display: none;
+            margin-left: 15px;
+            background-color: #dc3545;
+            color: white;
+          "
+        >
+          Logout
+        </button>
       </div>
     </div>
 
@@ -133,6 +146,7 @@
               id="loadManualJsonBtn"
               class="btn btn-small load-manual-btn"
               style="margin-top: 10px"
+              disabled
             >
               Load Pages
             </button>
@@ -190,7 +204,7 @@
           />
         </div>
       </div>
-      <div class="btn-container" id="buttonContainer">
+      <div class="btn-container" id="buttonContainer" style="display: none">
         <button
           id="captureBtn"
           class="btn icon-btn"
@@ -199,7 +213,15 @@
         >
           📸
         </button>
-        <div id="captureWarningMessage" style="display: none"></div>
+        <div
+          id="captureWarningMessage"
+          style="
+            display: none;
+            color: orange;
+            font-size: 0.9em;
+            margin-top: 5px;
+          "
+        ></div>
       </div>
     </div>
 
@@ -221,9 +243,13 @@
     <iframe
       id="screenshotIframe"
       title="Screenshot Capture Area"
-      style="border: 1px solid #ccc"
+      style="
+        border: 1px solid #ccc;
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+      "
     ></iframe>
-
     <script>
       // Determine if we're in development mode
       const isDev =
