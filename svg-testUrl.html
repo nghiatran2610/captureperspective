@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>URL Capture with dom-to-image-more</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image-more/3.1.6/dom-to-image-more.min.js"></script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 20px;
+      }
+      #controls {
+        margin-bottom: 20px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      #controls input[type="url"],
+      #controls input[type="number"] {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      #controls input[type="url"] {
+        flex-grow: 1;
+      }
+      button {
+        padding: 8px 12px;
+        background-color: #0078d4;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0063b1;
+      }
+      #iframeContainer {
+        border: 1px solid #ccc;
+        margin-bottom: 20px;
+        overflow: hidden; /* Important for consistent sizing */
+      }
+      #screenshotIframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+      }
+      #result img {
+        max-width: 100%;
+        border: 1px solid #ddd;
+        margin-top: 10px;
+        background-color: #f0f0f0;
+      }
+      #log {
+        background-color: #f5f5f5;
+        border: 1px solid #ddd;
+        padding: 10px;
+        height: 250px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+        margin-top: 20px;
+      }
+      .log-entry {
+        padding: 2px 0;
+        border-bottom: 1px dotted #ccc;
+      }
+      .log-entry:last-child {
+        border-bottom: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Capture Webpage from URL with dom-to-image-more</h1>
+
+    <div id="controls">
+      <input
+        type="url"
+        id="urlInput"
+        placeholder="Enter URL (same-origin or CORS-friendly)"
+        value="http://localhost:8088/data/perspective/client/Bordertown/RO/BalanceTank"
+      />
+      <input
+        type="number"
+        id="captureWidth"
+        value="1280"
+        title="Capture Width (px)"
+      />
+      <input
+        type="number"
+        id="captureHeight"
+        value="720"
+        title="Capture Height (px)"
+      />
+      <button id="loadAndCaptureBtn">Load & Capture</button>
+    </div>
+
+    <div id="iframeContainer">
+      <iframe
+        id="screenshotIframe"
+        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+      ></iframe>
+    </div>
+
+    <h2>Result</h2>
+    <div id="result"></div>
+
+    <h2>Log</h2>
+    <div id="log"></div>
+
+    <script>
+      function log(message, type = "info") {
+        const logElement = document.getElementById("log");
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        const timestamp = new Date().toLocaleTimeString();
+        entry.textContent = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+        if (type === "error") {
+          entry.style.color = "red";
+        } else if (type === "warn") {
+          entry.style.color = "orange";
+        }
+        logElement.appendChild(entry);
+        logElement.scrollTop = logElement.scrollHeight;
+        const consoleMethod =
+          type === "error" ? "error" : type === "warn" ? "warn" : "log";
+        console[consoleMethod](`[${timestamp}] ${message}`);
+      }
+
+      const svgUtils = {
+        prepareSVGs: function (docContext, windowContext) {
+          if (!docContext || !windowContext) {
+            log(
+              "svgUtils.prepareSVGs: Document or window context is missing.",
+              "warn"
+            );
+            return 0;
+          }
+          try {
+            const svgs = docContext.querySelectorAll("svg");
+            if (!svgs || svgs.length === 0) {
+              log("svgUtils.prepareSVGs: No SVGs found.", "info");
+              return 0;
+            }
+            log(
+              `svgUtils.prepareSVGs: Found ${svgs.length} SVGs to prepare.`,
+              "info"
+            );
+
+            svgs.forEach((svg, index) => {
+              try {
+                const computedStyle = windowContext.getComputedStyle(svg);
+                const parentElement = svg.parentElement;
+                if (!parentElement) {
+                  log(
+                    `svgUtils.prepareSVGs: SVG #${
+                      index + 1
+                    } has no parent. Skipping.`,
+                    "warn"
+                  );
+                  return;
+                }
+                let pWidth = parentElement.clientWidth;
+                let pHeight = parentElement.clientHeight;
+                let tempParent = parentElement;
+                while (
+                  (pWidth === 0 || pHeight === 0) &&
+                  tempParent.parentElement &&
+                  tempParent !== docContext.body
+                ) {
+                  tempParent = tempParent.parentElement;
+                  pWidth = tempParent.clientWidth;
+                  pHeight = tempParent.clientHeight;
+                }
+                if (pWidth === 0)
+                  pWidth =
+                    parseInt(docContext.body.clientWidth) ||
+                    parseInt(windowContext.innerWidth);
+                if (pHeight === 0)
+                  pHeight =
+                    parseInt(docContext.body.clientHeight) ||
+                    parseInt(windowContext.innerHeight);
+
+                const toPx = (valStr, base) => {
+                  if (typeof valStr !== "string" || !valStr)
+                    return parseFloat(valStr) || 0;
+                  if (valStr.endsWith("%"))
+                    return (parseFloat(valStr) / 100) * base;
+                  if (valStr.endsWith("vw"))
+                    return (
+                      (parseFloat(valStr) / 100) * windowContext.innerWidth
+                    );
+                  if (valStr.endsWith("vh"))
+                    return (
+                      (parseFloat(valStr) / 100) * windowContext.innerHeight
+                    );
+                  return parseFloat(valStr);
+                };
+
+                let W_str = svg.getAttribute("width") || computedStyle.width;
+                let H_str = svg.getAttribute("height") || computedStyle.height;
+                let W = toPx(W_str, pWidth);
+                let H = toPx(H_str, pHeight);
+
+                const viewBox = svg.getAttribute("viewBox");
+                if (
+                  viewBox &&
+                  (W === 0 || H === 0 || W_str === "auto" || H_str === "auto")
+                ) {
+                  const parts = viewBox.split(/\s+|,/).map(parseFloat);
+                  if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                    const vbWidth = parts[2];
+                    const vbHeight = parts[3];
+                    if (W > 0 && H === 0) H = W * (vbHeight / vbWidth);
+                    else if (H > 0 && W === 0) W = H * (vbWidth / vbHeight);
+                    else if (W === 0 && H === 0 && pWidth > 0 && pHeight > 0) {
+                      if ((pWidth / vbWidth) * vbHeight <= pHeight) {
+                        W = pWidth;
+                        H = pWidth * (vbHeight / vbWidth);
+                      } else {
+                        H = pHeight;
+                        W = pHeight * (vbWidth / vbHeight);
+                      }
+                    }
+                  }
+                }
+                if (
+                  W <= 0 &&
+                  typeof svg.width === "object" &&
+                  svg.width.baseVal &&
+                  svg.width.baseVal.value > 0
+                )
+                  W = svg.width.baseVal.value;
+                if (
+                  H <= 0 &&
+                  typeof svg.height === "object" &&
+                  svg.height.baseVal &&
+                  svg.height.baseVal.value > 0
+                )
+                  H = svg.height.baseVal.value;
+                if (W <= 0) {
+                  W = 150;
+                }
+                if (H <= 0) {
+                  H = 100;
+                }
+
+                svg.setAttribute("width", String(W));
+                svg.setAttribute("height", String(H)); // Ensure string values
+                svg.style.width = `${W}px`;
+                svg.style.height = `${H}px`;
+                if (!svg.getAttribute("xmlns"))
+                  svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                if (!svg.getAttribute("xmlns:xlink"))
+                  svg.setAttribute(
+                    "xmlns:xlink",
+                    "http://www.w3.org/1999/xlink"
+                  );
+                if (computedStyle.position === "absolute") {
+                  svg.style.left = `${toPx(computedStyle.left, pWidth)}px`;
+                  svg.style.top = `${toPx(computedStyle.top, pHeight)}px`;
+                }
+                svg.style.overflow = computedStyle.overflow || "visible";
+              } catch (e) {
+                log(
+                  `svgUtils: Err processing SVG #${index + 1}: ${e.message}`,
+                  "error"
+                );
+              }
+            });
+            return svgs.length;
+          } catch (e) {
+            log(`svgUtils: General error: ${e.message}`, "error");
+            return 0;
+          }
+        },
+      };
+
+      async function loadAndCaptureUrl() {
+        const urlInput = document.getElementById("urlInput");
+        const iframe = document.getElementById("screenshotIframe");
+        const resultElement = document.getElementById("result");
+        const captureWidthInput = document.getElementById("captureWidth");
+        const captureHeightInput = document.getElementById("captureHeight");
+
+        const targetUrl = urlInput.value.trim();
+        const captureWidth = parseInt(captureWidthInput.value) || 1280;
+        const captureHeight = parseInt(captureHeightInput.value) || 720;
+
+        resultElement.innerHTML = "<p>Loading iframe...</p>";
+        if (!targetUrl) {
+          log("Please enter a URL.", "warn");
+          resultElement.innerHTML =
+            "<p style='color:orange;'>Please enter a URL.</p>";
+          return;
+        }
+
+        log(
+          `Loading URL: ${targetUrl} (${captureWidth}x${captureHeight})`,
+          "info"
+        );
+
+        const iframeContainer = document.getElementById("iframeContainer");
+        iframeContainer.style.width = `${captureWidth}px`;
+        iframeContainer.style.height = `${captureHeight}px`;
+
+        iframe.removeAttribute("srcdoc");
+        iframe.src = "about:blank";
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        iframe.src = targetUrl;
+
+        iframe.onload = async () => {
+          log(`Iframe onload. Waiting for content to stabilize...`, "info");
+          const RENDER_DELAY_MS = 3000; // Adjust as needed
+          await new Promise((resolve) => setTimeout(resolve, RENDER_DELAY_MS));
+          log(`Waited ${RENDER_DELAY_MS / 1000}s. Capturing...`, "info");
+
+          let iframeWin, iframeDoc;
+          try {
+            if (
+              !iframe.contentWindow ||
+              !iframe.contentWindow.document ||
+              !iframe.contentWindow.document.body
+            ) {
+              log(
+                "Iframe contentWindow/document/body not accessible.",
+                "error"
+              );
+              resultElement.innerHTML = `<p style="color:red;">Failed to access iframe content window.</p>`;
+              return;
+            }
+            iframeWin = iframe.contentWindow;
+            iframeDoc = iframeWin.document;
+            log("Accessed iframe document.", "info");
+
+            // It's important that the iframe's root element (documentElement or body)
+            // actually occupies the dimensions we want to capture if we rely on its own scrollWidth/Height.
+            // Or, we explicitly pass width/height to dom-to-image.
+            // Forcing scroll to top-left for consistency before capture.
+            iframeWin.scrollTo(0, 0);
+            log("Scrolled iframe to top-left.", "info");
+          } catch (e) {
+            log(`Error accessing iframe doc: ${e.message}`, "error");
+            resultElement.innerHTML = `<p style="color:red;">Could not access iframe content.</p>`;
+            return;
+          }
+
+          try {
+            log("Preparing SVGs in live iframe...", "info");
+            svgUtils.prepareSVGs(iframeDoc, iframeWin);
+          } catch (e) {
+            log(`Error in SVG utils: ${e.message}`, "error");
+          }
+
+          log("Starting dom-to-image capture...", "info");
+          try {
+            const nodeToCapture = iframeDoc.documentElement;
+
+            // Ensure the node itself has the correct dimensions visually BEFORE capture if relying on its bounds.
+            // dom-to-image options for width/height define the output image viewport.
+            // nodeToCapture.style.width = `${captureWidth}px`;
+            // nodeToCapture.style.height = `${captureHeight}px`;
+            // nodeToCapture.style.overflow = 'hidden'; // Optional: ensure no scrollbars from the element itself
+
+            const options = {
+              width: captureWidth,
+              height: captureHeight,
+              bgcolor: "#ffffff", // Set a default background color for transparency
+              imagePlaceholder:
+                "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", // Optional: placeholder for broken images
+              cacheBust: true, // Might help with fetching fresh resources
+              filter: (element) => {
+                if (!element || !element.tagName) return true; // Keep non-element nodes or nodes without tagName
+
+                // Your ignore logic from before
+                let elSrc = "";
+                if (element.tagName === "IMG") {
+                  elSrc = element.src || "";
+                } else if (element.tagName === "image") {
+                  // SVG <image> uses href
+                  elSrc =
+                    element.getAttribute("href") ||
+                    element.getAttributeNS(
+                      "http://www.w3.org/1999/xlink",
+                      "href"
+                    ) ||
+                    "";
+                }
+
+                if (elSrc.startsWith("data:image/svg+xml")) {
+                  log(
+                    `Filter: Excluding ${
+                      element.tagName
+                    } with SVG data URI. Preview: ${elSrc.substring(
+                      0,
+                      100
+                    )}...`,
+                    "warn"
+                  );
+                  return false; // Exclude this element
+                }
+                if (element.tagName === "SCRIPT") {
+                  log(`Filter: Excluding SCRIPT tag.`, "info");
+                  return false; // Exclude script tags
+                }
+                return true; // Keep the element
+              },
+            };
+
+            log(
+              `dom-to-image options: width=${options.width}, height=${options.height}`,
+              "info"
+            );
+
+            const dataUrl = await domtoimage.toPng(nodeToCapture, options);
+
+            resultElement.innerHTML = "";
+            log("dom-to-image capture successful.", "info");
+            const img = document.createElement("img");
+            // The output image from dom-to-image should already be at captureWidth x captureHeight
+            // img.style.width = `${captureWidth}px`;
+            // img.style.height = `${captureHeight}px`;
+            img.src = dataUrl;
+            resultElement.appendChild(img);
+            log("Capture displayed.", "info");
+
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            const hostname = targetUrl.startsWith("about:")
+              ? "blank_page"
+              : new URL(targetUrl).hostname;
+            link.download = `screenshot-${hostname}-${Date.now()}.png`;
+            link.textContent = "Download Screenshot";
+            link.style.display = "block";
+            link.style.marginTop = "10px";
+            resultElement.appendChild(link);
+          } catch (error) {
+            log(
+              `dom-to-image capture error: ${
+                error ? error.message || error.toString() : "Unknown error"
+              }`,
+              "error"
+            );
+            console.error("Raw dom-to-image error object:", error);
+            // dom-to-image errors might not have a 'target' property like html2canvas image load errors
+            resultElement.innerHTML = `<p style="color:red;">Screenshot failed. Check logs. The content might have resources that dom-to-image cannot handle (e.g., certain cross-origin items if not proxied, or complex unsupported CSS/SVG features).</p>`;
+          }
+        };
+
+        iframe.onerror = (event) => {
+          log(
+            `Iframe loading error for URL: ${targetUrl}. Check X-Frame-Options/CSP.`,
+            "error"
+          );
+          resultElement.innerHTML = `<p style="color:red;">Failed to load URL in iframe.</p>`;
+        };
+      }
+
+      document
+        .getElementById("loadAndCaptureBtn")
+        .addEventListener("click", loadAndCaptureUrl);
+      log("Page initialized. Using dom-to-image-more.", "info");
+      log(
+        "NOTE: Capturing complex apps like Perspective may require adjusting RENDER_DELAY_MS.",
+        "warn"
+      );
+    </script>
+  </body>
+</html>

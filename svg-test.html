@@ -63,25 +63,60 @@
     <h1>SVG Clone with Utils Test</h1>
 
     <div id="svgContainer">
+      <!-- SVG elements -->
       <svg
-        viewBox="0 0 24 24"
-        class=""
-        data-component="ia.display.icon"
-        data-component-path="T[0].0:6"
-        data-icon="material/alarm"
+        id="topCircle"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
         style="
-          fill: rgb(255, 255, 255);
-          cursor: pointer;
-          padding: 7px 0px;
-          flex: 0 0 33px;
-          margin-right: 0px;
+          fill: rgb(235, 235, 235);
+          stroke: rgb(46, 46, 46);
+          stroke-width: 1px;
+          position: absolute;
+          left: -0.89%;
+          top: 0.92%;
+          width: 100%;
+          height: 37%;
+          overflow: visible;
         "
       >
-        <g class="icon" id="alarm">
-          <path
-            d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"
-          ></path>
-        </g>
+        <circle cx="50" cy="50" r="48"></circle>
+      </svg>
+      <svg
+        id="bottomCircle"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style="
+          fill: rgb(235, 235, 235);
+          stroke: rgb(46, 46, 46);
+          stroke-width: 1px;
+          position: absolute;
+          left: -0.89%;
+          top: 63.58%;
+          width: 100%;
+          height: 37%;
+          overflow: visible;
+        "
+      >
+        <circle cx="50" cy="50" r="48"></circle>
+      </svg>
+      <svg
+        id="middleRect"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style="
+          fill: rgb(235, 235, 235);
+          stroke: rgb(46, 46, 46);
+          stroke-width: 1px;
+          position: absolute;
+          left: -0.01%;
+          top: 17.51%;
+          width: 98.29%;
+          height: 65.78%;
+          overflow: visible;
+        "
+      >
+        <rect x="1" y="1" width="98" height="98"></rect>
       </svg>
     </div>
 
@@ -235,7 +270,7 @@
           const canvas = await html2canvas(clone, {
             allowTaint: true,
             useCORS: true,
-            scale: 2,
+            scale: window.devicePixelRatio,
             logging: true,
             foreignObjectRendering: true,
           });
