@@ -3,14 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SVG Raster Capture with html2canvas - Improved</title>
+    <title>SVG Raster Capture (clone-and-capture)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-      /* ... your existing CSS ... */
       body {
         font-family: system-ui, sans-serif;
         margin: 20px;
-        line-height: 1.6;
       }
       #svgContainer {
         background-color: #eee;
@@ -21,8 +19,11 @@
         overflow: visible;
         margin-bottom: 20px;
       }
+      .toggle-group {
+        margin-bottom: 12px;
+      }
       button {
-        padding: 10px 15px;
+        padding: 8px 12px;
         background-color: #0078d4;
         color: white;
         border: none;
@@ -33,13 +34,11 @@
       button:hover {
         background-color: #0063b1;
       }
-      #output {
-        margin-top: 20px;
-      }
-      #resultImageContainer img {
+      #resultImageContainer canvas {
+        display: block;
         max-width: 100%;
         border: 1px solid #ddd;
-        margin-top: 10px;
+        margin-top: 12px;
       }
       #notification {
         position: fixed;
@@ -47,7 +46,7 @@
         right: 20px;
         background-color: #107c10;
         color: white;
-        padding: 10px 15px;
+        padding: 8px 12px;
         border-radius: 4px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         display: none;
@@ -55,15 +54,23 @@
     </style>
   </head>
   <body>
-    <h1>SVG Raster Capture with html2canvas - Improved</h1>
+    <h1>SVG Raster Capture (clone-and-capture)</h1>
+
+    <div class="toggle-group">
+      <label
+        ><input type="checkbox" id="toggleForeign" checked /> Use
+        <code>foreignObjectRendering</code></label
+      >
+    </div>
+
     <div id="svgContainer">
       <svg
         id="topCircle"
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         style="
-          fill: rgb(235, 235, 235);
-          stroke: rgb(46, 46, 46);
+          fill: #ebebeb;
+          stroke: #2e2e2e;
           stroke-width: 1px;
           position: absolute;
           left: -0.89%;
@@ -80,8 +87,8 @@
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         style="
-          fill: rgb(235, 235, 235);
-          stroke: rgb(46, 46, 46);
+          fill: #ebebeb;
+          stroke: #2e2e2e;
           stroke-width: 1px;
           position: absolute;
           left: -0.89%;
@@ -98,8 +105,8 @@
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         style="
-          fill: rgb(235, 235, 235);
-          stroke: rgb(46, 46, 46);
+          fill: #ebebeb;
+          stroke: #2e2e2e;
           stroke-width: 1px;
           position: absolute;
           left: -0.01%;
@@ -112,98 +119,87 @@
         <rect x="1" y="1" width="98" height="98"></rect>
       </svg>
     </div>
+
     <button onclick="captureWithHtml2Canvas()">
       Capture as PNG (html2canvas)
     </button>
-    <div id="output"><div id="resultImageContainer"></div></div>
-    <div id="notification">PNG capture complete!</div>
+    <div id="resultImageContainer"></div>
+    <div id="notification"></div>
 
     <script>
       function captureWithHtml2Canvas() {
-        const elementToCapture = document.getElementById("svgContainer");
-        const outputDiv = document.getElementById("resultImageContainer");
-        outputDiv.innerHTML = "";
+        const useForeign = document.getElementById("toggleForeign").checked;
+        const orig = document.getElementById("svgContainer");
+        const output = document.getElementById("resultImageContainer");
+        output.innerHTML = "";
 
-        if (typeof html2canvas !== "function") {
-          outputDiv.innerHTML =
-            '<p style="color: red;">Error: html2canvas library not found.</p>';
-          return;
-        }
+        // 1) Patch SVGs so they serialize correctly
+        Array.from(orig.querySelectorAll("svg")).forEach((svg) => {
+          const cs = getComputedStyle(svg);
+          const toPx = (v, base) =>
+            v.endsWith("%") ? (parseFloat(v) / 100) * base : parseFloat(v);
+          const W = toPx(cs.width, orig.clientWidth);
+          const H = toPx(cs.height, orig.clientHeight);
+          const L = toPx(cs.left, orig.clientWidth);
+          const T = toPx(cs.top, orig.clientHeight);
 
-        const svgElements = elementToCapture.querySelectorAll("svg");
-        const originalStyles = [];
-        const containerWidth = elementToCapture.offsetWidth;
-        const containerHeight = elementToCapture.offsetHeight;
-
-        // Temporarily set explicit pixel sizes for SVGs
-        svgElements.forEach((svg) => {
-          originalStyles.push({ el: svg, style: svg.getAttribute("style") }); // Save original inline style
-
-          const computedStyle = getComputedStyle(svg);
-          let newStyles = `position: absolute; overflow: visible;`; // Keep essential fixed styles
-          newStyles += `fill: ${computedStyle.fill}; stroke: ${computedStyle.stroke}; stroke-width: ${computedStyle.strokeWidth};`;
-
-          const parseValue = (value, base) => {
-            if (value.includes("%")) {
-              return (parseFloat(value) / 100) * base;
-            }
-            return parseFloat(value); // Assumes px or unitless already
-          };
-
-          const leftPx = parseValue(computedStyle.left, containerWidth);
-          const topPx = parseValue(computedStyle.top, containerHeight);
-          const widthPx = parseValue(computedStyle.width, containerWidth);
-          const heightPx = parseValue(computedStyle.height, containerHeight);
-
-          newStyles += `left: ${leftPx}px; top: ${topPx}px; width: ${widthPx}px; height: ${heightPx}px;`;
-          svg.setAttribute("style", newStyles);
+          svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+          svg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+          svg.setAttribute("width", W);
+          svg.setAttribute("height", H);
+          Object.assign(svg.style, {
+            position: "absolute",
+            left: `${L}px`,
+            top: `${T}px`,
+            width: `${W}px`,
+            height: `${H}px`,
+            overflow: "visible",
+            fill: cs.fill,
+            stroke: cs.stroke,
+            strokeWidth: cs.strokeWidth,
+          });
         });
 
-        const options = {
+        // 2) Clone container at 0,0 to isolate
+        const clone = orig.cloneNode(true);
+        Object.assign(clone.style, {
+          position: "absolute",
+          top: "0",
+          left: "0",
+          margin: "0",
+          overflow: "visible",
+          zIndex: 9999,
+          backgroundColor: getComputedStyle(orig).backgroundColor,
+        });
+        document.body.appendChild(clone);
+
+        // 3) Capture
+        html2canvas(clone, {
           allowTaint: true,
           useCORS: true,
-          backgroundColor: getComputedStyle(elementToCapture).backgroundColor, // Use actual BG
           scale: window.devicePixelRatio || 1,
+          foreignObjectRendering: useForeign,
           logging: true,
-          // Explicitly set width and height for html2canvas based on the target element
-          width: containerWidth,
-          height: containerHeight,
-          // windowWidth/Height might not be necessary if capturing a specific div
-          // and can sometimes cause issues if not set thoughtfully.
-          // Try without them first, or set them to containerWidth/Height as well.
-          // windowWidth: containerWidth,
-          // windowHeight: containerHeight,
-        };
-
-        html2canvas(elementToCapture, options)
-          .then(function (canvas) {
-            const img = new Image();
-            img.src = canvas.toDataURL("image/png");
-            outputDiv.appendChild(img);
-            showNotification("PNG capture complete (html2canvas)!");
+        })
+          .then((canvas) => {
+            output.appendChild(canvas);
+            showNotification(
+              `PNG capture complete (foreignObjectRendering=${useForeign})`
+            );
           })
-          .catch(function (error) {
-            console.error("Error capturing with html2canvas:", error);
-            outputDiv.innerHTML =
-              '<p style="color: red;">Error capturing with html2canvas.</p>';
+          .catch((err) => {
+            console.error(err);
+            output.innerHTML =
+              '<p style="color:red">Error capturing with html2canvas.</p>';
           })
-          .finally(() => {
-            // Revert styles
-            originalStyles.forEach((item) => {
-              if (item.style) item.el.setAttribute("style", item.style);
-              else item.el.removeAttribute("style"); // If it had no style attr initially
-            });
-          });
+          .finally(() => document.body.removeChild(clone));
       }
 
-      function showNotification(message) {
-        // ... (showNotification function unchanged) ...
-        const notification = document.getElementById("notification");
-        notification.textContent = message || "Capture complete!";
-        notification.style.display = "block";
-        setTimeout(function () {
-          notification.style.display = "none";
-        }, 3000);
+      function showNotification(msg) {
+        const n = document.getElementById("notification");
+        n.textContent = msg;
+        n.style.display = "block";
+        setTimeout(() => (n.style.display = "none"), 2000);
       }
     </script>
   </body>

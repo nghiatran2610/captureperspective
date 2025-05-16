@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SVG Clone with Utils Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      #svgContainer {
+        background-color: #eee;
+        width: 200px;
+        height: 230px;
+        position: relative;
+        border: 1px dashed green;
+        overflow: visible;
+        margin-bottom: 20px;
+      }
+
+      button {
+        padding: 8px 12px;
+        background-color: #0078d4;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+        margin-bottom: 20px;
+      }
+
+      button:hover {
+        background-color: #0063b1;
+      }
+
+      #result img {
+        max-width: 100%;
+        border: 1px solid #ddd;
+      }
+
+      #log {
+        background-color: #f5f5f5;
+        border: 1px solid #ddd;
+        padding: 10px;
+        height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+        margin-top: 20px;
+      }
+
+      .log-entry {
+        padding: 2px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>SVG Clone with Utils Test</h1>
+
+    <div id="svgContainer">
+      <svg
+        viewBox="0 0 24 24"
+        class=""
+        data-component="ia.display.icon"
+        data-component-path="T[0].0:6"
+        data-icon="material/alarm"
+        style="
+          fill: rgb(255, 255, 255);
+          cursor: pointer;
+          padding: 7px 0px;
+          flex: 0 0 33px;
+          margin-right: 0px;
+        "
+      >
+        <g class="icon" id="alarm">
+          <path
+            d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"
+          ></path>
+        </g>
+      </svg>
+    </div>
+
+    <button id="captureBtn">Capture with Clone + SVG Utils</button>
+
+    <h2>Result</h2>
+    <div id="result"></div>
+
+    <h2>Log</h2>
+    <div id="log"></div>
+
+    <script>
+      // This is a simplified version of the ScreenshotError class
+      class ScreenshotError extends Error {
+        constructor(message, url, reason) {
+          super(message);
+          this.name = "ScreenshotError";
+          this.url = url;
+          this.reason = reason;
+        }
+      }
+
+      // Simple logging function
+      function log(message) {
+        const logElement = document.getElementById("log");
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logElement.appendChild(entry);
+        logElement.scrollTop = logElement.scrollHeight;
+      }
+
+      // SVG Utils Module (simplified version)
+      const svgUtils = {
+        prepareSVGs: function (container) {
+          if (!container) return 0;
+
+          const svgs = container.querySelectorAll("svg");
+          log(`Found ${svgs.length} SVGs to prepare`);
+
+          svgs.forEach((svg, index) => {
+            try {
+              const cs = getComputedStyle(svg);
+              const parentElement = svg.parentElement;
+              const parentWidth = parentElement.clientWidth;
+              const parentHeight = parentElement.clientHeight;
+
+              // Convert percentage values to pixels
+              const toPx = (v, base) => {
+                if (!v) return 0;
+                return v.endsWith("%")
+                  ? (parseFloat(v) / 100) * base
+                  : parseFloat(v);
+              };
+
+              // Calculate dimensions
+              const W = toPx(cs.width, parentWidth);
+              const H = toPx(cs.height, parentHeight);
+
+              // Calculate position for absolutely positioned SVGs
+              let L = 0,
+                T = 0;
+              if (cs.position === "absolute") {
+                L = toPx(cs.left, parentWidth);
+                T = toPx(cs.top, parentHeight);
+              }
+
+              // Add namespaces if missing
+              if (!svg.getAttribute("xmlns")) {
+                svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                log(`Added xmlns to SVG #${index + 1}: ${svg.id}`);
+              }
+              if (!svg.getAttribute("xmlns:xlink")) {
+                svg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+                log(`Added xmlns:xlink to SVG #${index + 1}: ${svg.id}`);
+              }
+
+              // Set explicit dimensions if not present
+              if (!svg.getAttribute("width")) {
+                svg.setAttribute("width", W);
+                log(`Set width=${W} on SVG #${index + 1}: ${svg.id}`);
+              }
+              if (!svg.getAttribute("height")) {
+                svg.setAttribute("height", H);
+                log(`Set height=${H} on SVG #${index + 1}: ${svg.id}`);
+              }
+
+              // Apply inline styles for consistent rendering
+              if (cs.position === "absolute") {
+                Object.assign(svg.style, {
+                  position: "absolute",
+                  width: `${W}px`,
+                  height: `${H}px`,
+                  left: `${L}px`,
+                  top: `${T}px`,
+                  overflow: cs.overflow || "visible",
+                });
+                log(
+                  `Applied position styles to SVG #${index + 1}: ${
+                    svg.id
+                  } (${W}x${H} at ${L},${T})`
+                );
+              } else {
+                Object.assign(svg.style, {
+                  width: `${W}px`,
+                  height: `${H}px`,
+                  overflow: cs.overflow || "visible",
+                });
+                log(
+                  `Applied dimension styles to SVG #${index + 1}: ${
+                    svg.id
+                  } (${W}x${H})`
+                );
+              }
+            } catch (e) {
+              log(`Error preparing SVG #${index + 1}: ${e.message}`);
+            }
+          });
+
+          return svgs.length;
+        },
+      };
+
+      // Clone and capture function
+      async function captureWithCloneAndSvgUtils() {
+        log("Starting clone-and-capture with SVG utils");
+
+        try {
+          const orig = document.getElementById("svgContainer");
+
+          // Create a clone
+          const clone = orig.cloneNode(true);
+          Object.assign(clone.style, {
+            position: "absolute",
+            top: "0",
+            left: "0",
+            margin: "0",
+            overflow: "visible",
+            zIndex: "9999",
+            backgroundColor: getComputedStyle(orig).backgroundColor,
+          });
+
+          document.body.appendChild(clone);
+          log("Clone created and added to DOM");
+
+          // Prepare SVGs in the clone
+          svgUtils.prepareSVGs(clone);
+
+          // Capture the clone
+          log("Starting html2canvas capture...");
+          const canvas = await html2canvas(clone, {
+            allowTaint: true,
+            useCORS: true,
+            scale: 2,
+            logging: true,
+            foreignObjectRendering: true,
+          });
+
+          // Remove the clone from DOM
+          document.body.removeChild(clone);
+          log("Clone removed from DOM");
+
+          // Display the result
+          const resultElement = document.getElementById("result");
+          resultElement.innerHTML = "";
+          resultElement.appendChild(canvas);
+
+          log("Capture completed successfully");
+        } catch (error) {
+          log(`Error during capture: ${error.message}`);
+
+          // Make sure the clone is removed if there was an error
+          const clone = document.querySelector(
+            '#svgContainer[style*="z-index: 9999"]'
+          );
+          if (clone) {
+            document.body.removeChild(clone);
+            log("Cleaned up clone after error");
+          }
+        }
+      }
+
+      // Set up the button event handler
+      document
+        .getElementById("captureBtn")
+        .addEventListener("click", captureWithCloneAndSvgUtils);
+
+      // Log initialization
+      log("Test page initialized. Click the button to capture.");
+    </script>
+  </body>
+</html>
