@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Capture Webpage from URL with dom-to-image-more</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image-more/3.3.0/dom-to-image-more.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      #webpage {
+        border: 1px solid #ccc;
+        width: 100%;
+        height: 600px;
+        display: block;
+      }
+      #result {
+        margin-top: 20px;
+      }
+      #result img {
+        max-width: 100%;
+        border: 1px solid #ccc;
+      }
+      #log {
+        margin-top: 20px;
+        white-space: pre-wrap;
+        font-family: monospace;
+      }
+      label {
+        margin-left: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Capture Webpage from URL with dom-to-image-more</h1>
+
+    <div>
+      <input
+        type="text"
+        id="url"
+        placeholder="Enter URL (e.g., https://example.com)"
+        size="50"
+      />
+      <label><input type="checkbox" id="fullPage" /> Full Page Capture</label>
+      <button onclick="captureWebpage()">Load & Capture</button>
+    </div>
+
+    <iframe id="webpage" sandbox="allow-scripts allow-same-origin"></iframe>
+
+    <h2>Result</h2>
+    <div id="result"></div>
+
+    <h2>Log</h2>
+    <div id="log"></div>
+
+    <script>
+      function log(message) {
+        const logDiv = document.getElementById("log");
+        logDiv.textContent += message + "\n";
+        console.log(message);
+      }
+
+      function calculateFullPageHeight(iframe) {
+        try {
+          const doc = iframe.contentDocument;
+          if (!doc) {
+            log("Error: Cannot access iframe content document.");
+            return 600; // Default height
+          }
+
+          // Standard height metrics
+          const bodyScrollHeight = doc.body ? doc.body.scrollHeight : 0;
+          const docScrollHeight = doc.documentElement
+            ? doc.documentElement.scrollHeight
+            : 0;
+          const bodyOffsetHeight = doc.body ? doc.body.offsetHeight : 0;
+          const docOffsetHeight = doc.documentElement
+            ? doc.documentElement.offsetHeight
+            : 0;
+
+          // Element-based height calculation
+          const allElements = doc.querySelectorAll("*");
+          let maxBottom = 0;
+          for (const el of allElements) {
+            try {
+              const rect = el.getBoundingClientRect();
+              const scrollTop =
+                iframe.contentWindow.pageYOffset ||
+                doc.documentElement.scrollTop ||
+                doc.body.scrollTop ||
+                0;
+              const bottom = rect.bottom + scrollTop;
+              if (bottom > maxBottom) {
+                maxBottom = bottom;
+              }
+            } catch (e) {
+              // Ignore errors (e.g., SVG or cross-origin elements)
+            }
+          }
+
+          // Return the maximum height, ensuring at least the default height
+          const defaultHeight = 600;
+          const calculatedHeight = Math.max(
+            bodyScrollHeight,
+            docScrollHeight,
+            bodyOffsetHeight,
+            docOffsetHeight,
+            maxBottom,
+            defaultHeight
+          );
+
+          log(
+            `Height metrics: bodyScrollHeight=${bodyScrollHeight}, docScrollHeight=${docScrollHeight}, bodyOffsetHeight=${bodyOffsetHeight}, docOffsetHeight=${docOffsetHeight}, maxBottom=${maxBottom}`
+          );
+          return calculatedHeight;
+        } catch (e) {
+          log(`Error calculating full page height: ${e.message}`);
+          return 600; // Fallback height
+        }
+      }
+
+      async function waitForRendering(iframe, maxWaitTime = 10000) {
+        return new Promise((resolve) => {
+          let secondsLeft = maxWaitTime / 1000;
+          let mutationCount = 0;
+          let lastMutationTime = Date.now();
+          let timeoutId = null;
+
+          const doc = iframe.contentDocument;
+          if (!doc) {
+            log("Warning: Cannot access iframe document for rendering check.");
+            resolve({ success: true });
+            return;
+          }
+
+          // Check if images are loaded
+          const areImagesLoaded = () => {
+            try {
+              const imgElements = doc.querySelectorAll("img");
+              return Array.from(imgElements).every(
+                (img) => img.complete && img.naturalWidth !== 0
+              );
+            } catch (e) {
+              log(`Warning: Error checking image loading: ${e.message}`);
+              return true; // Assume loaded to avoid blocking
+            }
+          };
+
+          // Check for Perspective-specific elements
+          const isPerspectiveLoaded = () => {
+            try {
+              return doc.querySelector(".perspective-view") !== null;
+            } catch (e) {
+              return true; // Assume loaded if check fails
+            }
+          };
+
+          // Check for DOM stability using MutationObserver
+          const observer = new MutationObserver((mutations) => {
+            mutationCount += mutations.length;
+            lastMutationTime = Date.now();
+          });
+
+          try {
+            observer.observe(doc, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+            });
+          } catch (e) {
+            log(`Warning: Could not observe DOM changes: ${e.message}`);
+          }
+
+          const checkRendering = () => {
+            const imagesLoaded = areImagesLoaded();
+            const perspectiveLoaded = isPerspectiveLoaded();
+            const isDomStable = Date.now() - lastMutationTime > 500; // No mutations for 500ms
+            const mutationRateLow = mutationCount < 5; // Few mutations in last check
+
+            log(
+              `Waiting for rendering (${secondsLeft}s left, images: ${
+                imagesLoaded ? "loaded" : "loading"
+              }, Perspective: ${
+                perspectiveLoaded ? "loaded" : "loading"
+              }, DOM: ${isDomStable ? "stable" : "changing"})...`
+            );
+
+            if (
+              (imagesLoaded &&
+                perspectiveLoaded &&
+                isDomStable &&
+                mutationRateLow) ||
+              secondsLeft <= 0
+            ) {
+              observer.disconnect();
+              clearTimeout(timeoutId);
+              resolve({ success: true });
+              return;
+            }
+
+            mutationCount = 0; // Reset for next check
+            secondsLeft--;
+            timeoutId = setTimeout(checkRendering, 1000);
+          };
+
+          timeoutId = setTimeout(checkRendering, 1000);
+        });
+      }
+
+      function checkContentPresence(iframe) {
+        try {
+          const doc = iframe.contentDocument;
+          if (!doc) return false;
+          const bodyScrollHeight = doc.body ? doc.body.scrollHeight : 0;
+          const elementCount = doc.querySelectorAll("*").length;
+          log(
+            `Content check: scrollHeight=${bodyScrollHeight}, elementCount=${elementCount}`
+          );
+          return bodyScrollHeight > 100 && elementCount > 10; // Arbitrary thresholds
+        } catch (e) {
+          log(`Warning: Error checking content presence: ${e.message}`);
+          return false;
+        }
+      }
+
+      async function captureWebpage() {
+        const urlInput = document.getElementById("url");
+        const fullPageCheckbox = document.getElementById("fullPage");
+        const iframe = document.getElementById("webpage");
+        const resultDiv = document.getElementById("result");
+        const url = urlInput.value.trim();
+
+        if (!url) {
+          log("Please enter a valid URL.");
+          return;
+        }
+
+        // Check if domtoimage is available
+        if (typeof domtoimage === "undefined") {
+          log(
+            "Error: dom-to-image-more library is not loaded. Please check the CDN or script inclusion."
+          );
+          return;
+        }
+
+        log(`Loading ${url}...`);
+        resultDiv.innerHTML = "";
+
+        try {
+          // Load URL in iframe
+          await new Promise((resolve, reject) => {
+            iframe.onload = () => resolve();
+            iframe.onerror = () => reject(new Error("Failed to load iframe"));
+            iframe.src = url;
+
+            // Timeout to prevent hanging
+            setTimeout(() => reject(new Error("Iframe load timeout")), 30000);
+          });
+
+          log("Iframe loaded. Waiting for rendering...");
+
+          // Wait for rendering (images, Perspective, and DOM stability)
+          await waitForRendering(iframe, 10000); // 10 seconds max
+
+          // Determine capture dimensions
+          const isFullPage = fullPageCheckbox.checked;
+          let captureHeight = 600; // Default height
+          if (isFullPage) {
+            captureHeight = calculateFullPageHeight(iframe);
+            log(`Calculated full page height: ${captureHeight}px`);
+
+            // Adjust iframe height only
+            try {
+              iframe.style.height = `${captureHeight}px`;
+              // Avoid modifying body/documentElement styles to prevent Perspective interference
+              log(
+                "Iframe height adjusted. Waiting for layout stabilization..."
+              );
+            } catch (e) {
+              log(`Warning: Could not adjust iframe height: ${e.message}`);
+            }
+
+            // Wait longer for layout stabilization
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Verify content is still present
+            if (!checkContentPresence(iframe)) {
+              log(
+                "Warning: Content appears empty after height adjustment. Retrying height calculation..."
+              );
+              captureHeight = calculateFullPageHeight(iframe);
+              log(`Recalculated full page height: ${captureHeight}px`);
+              iframe.style.height = `${captureHeight}px`;
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          }
+
+          // Check content one final time before capture
+          if (isFullPage && !checkContentPresence(iframe)) {
+            log("Error: Content is empty before capture. Aborting.");
+            throw new Error("Content disappeared before screenshot capture");
+          }
+
+          // Handle fixed elements
+          let originalStyles = [];
+          if (isFullPage && iframe.contentDocument) {
+            try {
+              const doc = iframe.contentDocument;
+              const fixedElements = Array.from(
+                doc.querySelectorAll("*")
+              ).filter((el) => {
+                try {
+                  return (
+                    iframe.contentWindow.getComputedStyle(el).position ===
+                    "fixed"
+                  );
+                } catch (e) {
+                  return false;
+                }
+              });
+              originalStyles = fixedElements.map((el) => ({
+                element: el,
+                position: el.style.position,
+              }));
+              fixedElements.forEach((el) => {
+                el.style.position = "absolute";
+              });
+            } catch (e) {
+              log(`Warning: Error handling fixed elements: ${e.message}`);
+            }
+          }
+
+          log(
+            `Capturing screenshot (${iframe.offsetWidth}x${captureHeight})...`
+          );
+
+          // Capture with dom-to-image-more
+          const node = iframe.contentDocument.body;
+          const dataUrl = await domtoimage.toPng(node, {
+            width: iframe.offsetWidth,
+            height: captureHeight,
+            style: {
+              transform: "none",
+              "transform-origin": "none",
+              position: "static",
+              left: "0",
+              top: "0",
+            },
+          });
+
+          // Restore fixed elements
+          if (originalStyles.length > 0) {
+            try {
+              originalStyles.forEach((item) => {
+                item.element.style.position = item.position;
+              });
+            } catch (e) {
+              log(`Warning: Error restoring fixed elements: ${e.message}`);
+            }
+          }
+
+          // Display result
+          const img = document.createElement("img");
+          img.src = dataUrl;
+          resultDiv.appendChild(img);
+          log("Captured!");
+
+          // Reset iframe
+          iframe.src = "about:blank";
+        } catch (error) {
+          log(`Error: ${error.message}`);
+          iframe.src = "about:blank";
+        }
+      }
+    </script>
+  </body>
+</html>
