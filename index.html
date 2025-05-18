@@ -34,6 +34,13 @@
       class="card login-option-section"
       style="display: none"
     >
+      <div class="login-header">
+        <h2>Authentication</h2>
+        <div id="loginStatus" class="login-status logged-out">
+          <span class="login-status-icon">⚪</span>
+          <span class="login-status-text">Not authenticated</span>
+        </div>
+      </div>
       <div class="input-row">
         <label>
           <input
@@ -53,7 +60,7 @@
             id="optionLogin"
             disabled
           />
-          <span id="textForOptionLogin">Continue with Authentication</span>
+          <span id="textForOptionLogin">Login with Authentication</span>
         </label>
         <button
           id="logoutBtn"
@@ -70,7 +77,11 @@
       </div>
     </div>
 
-    <div id="loginSection" class="card" style="display: none"></div>
+    <div
+      id="loginSection"
+      class="card"
+      style="display: none; text-align: center; padding: 10px"
+    ></div>
 
     <div id="captureForm" style="display: none">
       <div class="card" id="url-input-container">
@@ -258,12 +269,11 @@
         window.location.search.includes("dev=true");
 
       const script = document.createElement("script");
-      // Load the non-minified version for development, minified for production
       script.src = isDev
-        ? "dist/perspective-screenshot-capture.js" // Assumes non-minified bundle
-        : "dist/perspective-screenshot-capture.min.js"; // Assumes minified bundle
+        ? "dist/perspective-screenshot-capture.js"
+        : "dist/perspective-screenshot-capture.min.js";
 
-      script.type = "module"; // Ensure it's loaded as a module
+      script.type = "module";
       document.body.appendChild(script);
     </script>
   </body>
