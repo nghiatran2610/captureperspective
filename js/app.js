@@ -185,6 +185,15 @@ class App {
     // Reset login handler state related to current user/session
     this.loginHandler.updateLoginOptionsUI(null, false); // Reset login button text, logout visibility, uncheck radios
 
+    // MODIFIED: Explicitly uncheck both radio buttons and clear LoginHandler's selection
+    if (this.loginHandler.optionLoginRadio) {
+      this.loginHandler.optionLoginRadio.checked = false;
+    }
+    if (this.loginHandler.optionContinueGuestRadio) {
+      this.loginHandler.optionContinueGuestRadio.checked = false;
+    }
+    this.loginHandler.selectedLoginOption = ""; // Ensure internal state is cleared
+
     if (!selectedProjectName) {
       // No project selected
       baseUrlInputElement.value = "";
@@ -192,7 +201,7 @@ class App {
       this.baseUrlValid = false;
       this.loginHandler.isLoggedIn = false;
       this.loginHandler.loggedInUsername = null;
-      this.loginHandler.selectedLoginOption = "";
+      // this.loginHandler.selectedLoginOption = ""; // Already done above
       this.loginHandler.stopSessionMonitor();
       this.loginHandler.stopSessionPolling();
       this.loginHandler.updateLoginStatus("logged-out", "Project not selected");
@@ -237,7 +246,7 @@ class App {
         true,
         0 // Persist error
       );
-      loginOptionSection.style.display = "none";
+      if (loginOptionSection) loginOptionSection.style.display = "none";
       this.loginHandler.updateLoginOptionsUI(null, false);
       this.loginHandler.isLoggedIn = false;
       this.loginHandler.loggedInUsername = null;
@@ -250,43 +259,45 @@ class App {
       if (success) {
         this.baseUrl = urlFetcher.baseClientUrl;
         this.baseUrlValid = true;
-        loginOptionSection.style.display = "block"; // Ensure login options are visible
+        if (loginOptionSection) loginOptionSection.style.display = "block"; // Ensure login options are visible
 
         UI.utils.showStatus(
           `Project '${urlFetcher.projectName}' loaded. Checking session...`,
           false,
           4000
         );
+
         const sessionState =
           await this.loginHandler.checkInitialSessionAndSetupUI();
 
+        // MODIFIED: Ensure the capture form is hidden initially after project change,
+        // as the user now needs to make an explicit choice, regardless of session status.
+        this._hideCaptureFormAndPageSource();
+
         if (sessionState.isLoggedIn) {
           console.log(
-            `App: Initial session check found user: ${sessionState.username}. Login option UI updated.`
+            `App: Initial session check found user: ${sessionState.username}. Login option UI updated, but user must select an option.`
           );
-          // loginHandler.updateLoginOptionsUI pre-checked the "Continue as [User]" radio.
-          // We now need to ensure the capture form appears.
-          this._showCaptureFormAndPageSource();
+          // The loginHandler.updateLoginOptionsUI was called with preCheckLoginOption = false (due to our login-handler.js change),
+          // so no radio is selected. Capture form remains hidden until user selects an option via the LOGIN_OPTION_SELECTED event.
         } else {
           console.log(
             "App: No active session found on initial check. User needs to choose login option."
           );
-          // UI is reset by loginHandler, ensure capture form is hidden.
-          this._hideCaptureFormAndPageSource();
-          // Make sure login message section (formerly iframe section) is hidden if not actively logging in
+          // UI is reset by loginHandler, and _hideCaptureFormAndPageSource() was already called above.
+        }
+
+        // MODIFIED: Clean up login message section if not actively in a login flow
+        if (
+          this.loginHandler.loginSection &&
+          this.loginHandler.loginSection.style.display !== "none"
+        ) {
           if (
-            this.loginHandler.loginSection &&
-            this.loginHandler.loginSection.style.display !== "none"
+            !this.loginHandler._pollInterval &&
+            !this.loginHandler.loginTab // Not waiting for a new tab login
           ) {
-            // If not actively in a 'new tab' login flow, hide this.
-            // updateLoginStatus will control it better.
-            if (
-              !this.loginHandler._pollInterval &&
-              !this.loginHandler.loginTab
-            ) {
-              this.loginHandler.loginSection.style.display = "none";
-              this.loginHandler.loginSection.innerHTML = "";
-            }
+            this.loginHandler.loginSection.style.display = "none";
+            this.loginHandler.loginSection.innerHTML = "";
           }
         }
       } else {
@@ -294,7 +305,7 @@ class App {
         this.baseUrl = url;
         if (urlFetcher) urlFetcher.projectName = "";
         UI.utils.showStatus("Could not identify project from URL.", true, 0);
-        loginOptionSection.style.display = "none";
+        if (loginOptionSection) loginOptionSection.style.display = "none";
         this.loginHandler.updateLoginOptionsUI(null, false);
       }
     }
@@ -360,9 +371,6 @@ class App {
     } else {
       console.error("#manualJsonFile input not found!");
     }
-
-    // Advanced mode related listeners (if any were previously here, review if still needed)
-    // e.g., UI.elements.actionsField.addEventListener('input', this._handleActionsInput);
   }
 
   _initializeUI() {
@@ -436,7 +444,7 @@ class App {
     if (
       this.loginHandler.loginSection &&
       !this.loginHandler._pollInterval &&
-      !this.loginHandler.loginTab
+      !this.loginHandler.loginTab // Not waiting for a new tab login
     ) {
       // If not actively polling for a new tab login, hide the message section.
       this.loginHandler.loginSection.style.display = "none";
@@ -873,20 +881,19 @@ class App {
 
       if (
         data.option === "continueWithoutLogin" ||
-        (data.option === "login" && data.isLoggedIn) // Already logged in
+        (data.option === "login" &&
+          data.isLoggedIn &&
+          !data.loginPendingInNewTab) // User explicitly clicked "Continue as X" or login completed
       ) {
         this._showCaptureFormAndPageSource();
         if (this.loginHandler.loginSection) {
-          if (!data.loginPendingInNewTab) {
-            this.loginHandler.loginSection.style.display = "none";
-            this.loginHandler.loginSection.innerHTML = "";
-          }
+          this.loginHandler.loginSection.style.display = "none";
+          this.loginHandler.loginSection.innerHTML = "";
         }
       } else if (data.option === "login" && data.loginPendingInNewTab) {
+        // This case is when "Login with Authentication" is chosen, and a new tab is opened.
+        // The form should remain hidden. loginHandler.updateLoginStatus will show relevant messages.
         this._hideCaptureFormAndPageSource();
-        if (this.loginHandler.loginSection) {
-          // loginHandler.updateLoginStatus will handle showing this with messages
-        }
       }
       this._checkCaptureButtonState();
     });
@@ -899,6 +906,8 @@ class App {
           this.loginHandler.loginSection.innerHTML = "";
         }
       } else {
+        // This case should ideally not happen if LOGIN_COMPLETE means success.
+        // If it could mean failure, then hiding is correct.
         this._hideCaptureFormAndPageSource();
       }
       this._checkCaptureButtonState();
@@ -1092,18 +1101,6 @@ class App {
       const captureFullPage = fullPageCheckbox
         ? fullPageCheckbox.checked
         : false;
-
-      // Determine selected actions (currently only for advanced mode, but structure is here)
-      // const actionsText = UI.elements.actionsField ? UI.elements.actionsField.value : "";
-      // let actionSequences = [];
-      // if (this.currentMode === "advanced" && actionsText.trim() !== "") {
-      //   try {
-      //     actionSequences = JSON.parse(actionsText);
-      //     if (!Array.isArray(actionSequences)) throw new Error("Actions must be an array.");
-      //   } catch (e) {
-      //     throw new AppError(`Invalid JSON in Actions field: ${e.message}`);
-      //   }
-      // }
 
       // Get URLs from URL Selector
       if (typeof urlSelector.getSelectedUrlsForCapture === "function") {
@@ -1440,10 +1437,10 @@ class App {
       if (UI.elements.progress)
         UI.utils.showStatus(
           `⏳ Paused at ${
-            this.currentCaptureIndex + 1
+            this.currentCaptureIndex + 1 // Show 1-based index for user
           } of ${totalUrls}. Resume (▶️) to continue.`,
           false,
-          0
+          0 // Persist pause message
         );
       if (captureWarningMessage) captureWarningMessage.style.display = "block"; // Ensure warning visible if paused
     } else {
@@ -1511,7 +1508,7 @@ class App {
 
       if (
         this.currentCaptureIndex < this.captureQueue.length &&
-        !this._processingQueue
+        !this._processingQueue // Ensure it's not already trying to process (e.g. rapid clicks)
       ) {
         // If not already processing (e.g., was truly paused), start/resume the queue
         this.processCaptureQueue();
