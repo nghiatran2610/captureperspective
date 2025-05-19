@@ -1090,7 +1090,6 @@ body.simple-mode .context-actions-header {
   opacity: 0.7;
 }
 
-
 .login-option-section .input-row {
   justify-content: flex-start; /* Align items to the start */
   gap: 20px; /* Adjust gap as needed */
@@ -1379,20 +1378,21 @@ body.simple-mode .context-actions-header {
   background-color: #218c53;
 }
 #captureWarningMessage {
-  /* Was .warning-message, now specific ID */
   text-align: center;
-  padding: 8px 16px; /* Adjusted padding */
-  margin-top: 10px; /* Added margin-top */
-  /* margin: -10px auto 20px auto; /* Removed conflicting margin */
-  max-width: 800px; /* Keep if desired */
+  padding: 8px 16px;
+  margin-top: 10px;
+  margin-bottom: 10px; /* Added for spacing below the message */
+  /* max-width: 800px; */ /* If you want to constrain its width and center it */
+  /* margin-left: auto; */ /* Use with max-width for centering */
+  /* margin-right: auto; */ /* Use with max-width for centering */
   background-color: #fff3cd;
   color: #856404;
   border: 1px solid #ffeeba;
   border-radius: var(--border-radius);
-  font-size: 14px; /* Adjusted font size */
+  font-size: 14px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  width: 100%; /* Ensure it spans if in flex container */
-  box-sizing: border-box; /* Ensure padding/border included in width */
+  width: 100%; /* Makes it take full width, text-align centers content */
+  box-sizing: border-box;
 }
 
 .project-selection-container {
