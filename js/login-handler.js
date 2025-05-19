@@ -42,22 +42,17 @@ class VisualLoginHandler {
       events.addDOMEventListener(
         this.optionContinueGuestRadio,
         "change",
-        () => {
+        async () => {
           if (this.optionContinueGuestRadio.checked) {
-            this.handleLoginOptionChange("continueWithoutLogin");
-            events.emit(events.events.LOGIN_OPTION_SELECTED, {
-              option: "continueWithoutLogin",
-              isLoggedIn: this.isLoggedIn,
-              username: this.loggedInUsername,
-            });
+            await this.handleLoginOptionChange("continueWithoutLogin");
           }
         }
       );
     }
     if (this.optionLoginRadio) {
-      events.addDOMEventListener(this.optionLoginRadio, "change", () => {
+      events.addDOMEventListener(this.optionLoginRadio, "change", async () => {
         if (this.optionLoginRadio.checked) {
-          this.handleLoginOptionChange("login");
+          await this.handleLoginOptionChange("login");
         }
       });
     }
@@ -151,15 +146,15 @@ class VisualLoginHandler {
       this.isLoggedIn = true;
       this.loggedInUsername = activeUserSession.username;
       this.activeSessionId = activeUserSession.id;
-      this.selectedLoginOption = ""; // MODIFIED: Clear selected option, user must re-select
-      this.updateLoginOptionsUI(this.loggedInUsername, false); // MODIFIED: set preCheckLoginOption to false
+      this.selectedLoginOption = "";
+      this.updateLoginOptionsUI(this.loggedInUsername, false);
       this.updateLoginStatus(
-        "logged-in", // Status shows logged in, but choice is needed
+        "logged-in",
         `Active session for ${this.loggedInUsername}. Please select an option.`
       );
-      this.startSessionMonitor(); // Still monitor if a session is found
+      this.startSessionMonitor();
       return {
-        isLoggedIn: true, // Indicates a session exists
+        isLoggedIn: true,
         username: this.loggedInUsername,
         sessionId: this.activeSessionId,
       };
@@ -199,19 +194,16 @@ class VisualLoginHandler {
       this.logoutButton.style.display = "none";
       if (preCheckLoginOption === false) {
         this.optionLoginRadio.checked = false;
-        // It's also good practice to ensure the guest radio is also unchecked if no user and not pre-checking anything
-        // this.optionContinueGuestRadio.checked = false; // This is handled in app.js _handleProjectSelection
       }
     }
   }
 
-  handleLoginOptionChange(option) {
+  async handleLoginOptionChange(option) {
+    this.stopSessionMonitor();
     this.selectedLoginOption = option;
-    this.stopSessionMonitor(); // Stop previous monitor if any option is actively chosen
 
     if (option === "login") {
       if (this.isLoggedIn && this.loggedInUsername) {
-        // This path is taken if user clicks "Continue as X" when a session was found
         console.log(
           `Login option selected, continuing as authenticated user ${this.loggedInUsername} (Session ID: ${this.activeSessionId}).`
         );
@@ -219,7 +211,7 @@ class VisualLoginHandler {
           "logged-in",
           `Logged in as ${this.loggedInUsername}`
         );
-        this.startSessionMonitor(); // Restart monitor for this confirmed session
+        this.startSessionMonitor();
         events.emit(events.events.LOGIN_OPTION_SELECTED, {
           option: "login",
           isLoggedIn: this.isLoggedIn,
@@ -227,20 +219,31 @@ class VisualLoginHandler {
           sessionId: this.activeSessionId,
         });
       } else {
-        // This path is taken if user clicks "Login with Authentication" when no session was found
         console.log("Login option selected, preparing for new tab login...");
         this.isLoggedIn = false;
         this.loggedInUsername = null;
         this.activeSessionId = null;
-        this.prepareFrameLogin();
+        await this.prepareFrameLogin();
       }
     } else if (option === "continueWithoutLogin") {
       console.log("Continue without login selected.");
+      if (this.isLoggedIn && this.activeSessionId) {
+        console.log(
+          `User was logged in as ${this.loggedInUsername}. Performing logout before continuing as guest.`
+        );
+        await this.performLogout();
+      }
+
       this.isLoggedIn = false;
       this.loggedInUsername = null;
       this.activeSessionId = null;
-      this.stopSessionPolling(); // Ensure no polling if guest mode
+      this.stopSessionPolling();
+      this.stopSessionMonitor();
+
       this.updateLoginStatus("logged-out", "Continuing as Guest");
+      this.updateLoginOptionsUI(null, false);
+      if (this.optionLoginRadio) this.optionLoginRadio.checked = false;
+
       try {
         const screenshotIframe = document.getElementById("screenshotIframe");
         if (screenshotIframe && screenshotIframe.src !== "about:blank") {
@@ -263,8 +266,6 @@ class VisualLoginHandler {
       console.log(
         "prepareFrameLogin called but already logged in. Aborting new tab."
       );
-      // If this happens, it means "Login with Auth" was clicked while already logged in.
-      // We should ensure the monitor is running and the LOGIN_OPTION_SELECTED reflects the current state.
       this.startSessionMonitor();
       events.emit(events.events.LOGIN_OPTION_SELECTED, {
         option: "login",
@@ -295,24 +296,27 @@ class VisualLoginHandler {
       return;
     }
 
-    this.initialSessions.clear();
+    this.initialSessions.clear(); // Clear before fetching
     this.stopSessionPolling();
     this.stopSessionMonitor();
-    this.activeSessionId = null;
+    this.activeSessionId = null; // Ensure no active session ID from a previous state
 
     this.updateLoginStatus("checking", "Opening login tab...");
 
     try {
+      // Fetch sessions *before* opening the tab to establish a baseline
       const sessions = await this.fetchSessionListWithCacheBust();
       if (sessions === null) {
-        // Error already handled by fetchSessionListWithCacheBust, just ensure UI reset
         if (this.optionLoginRadio) this.optionLoginRadio.checked = false;
         this.selectedLoginOption = "";
         return;
       }
       sessions.forEach((s) => this.initialSessions.set(s.id, s.username));
+      console.log(
+        "Initial sessions recorded before opening login tab:",
+        this.initialSessions
+      );
     } catch (error) {
-      // Should be caught by fetchSessionList, but for safety
       this.updateLoginStatus(
         "logged-out",
         "Error checking authentication status."
@@ -338,15 +342,12 @@ class VisualLoginHandler {
       );
       if (this.optionLoginRadio) this.optionLoginRadio.checked = false;
       this.selectedLoginOption = "";
-      // No LOGIN_OPTION_SELECTED event here, as the attempt failed.
     } else {
       this.updateLoginStatus("checking", "Waiting for login in new tab...");
-      this.startSessionPolling();
-      // Emit LOGIN_OPTION_SELECTED to inform app.js that a login process is initiated
-      // but not yet complete. app.js uses this to hide capture form.
+      this.startSessionPolling(); // This will now use the corrected logic
       events.emit(events.events.LOGIN_OPTION_SELECTED, {
         option: "login",
-        isLoggedIn: false, // Not yet logged in through this attempt
+        isLoggedIn: false,
         username: null,
         sessionId: null,
         loginPendingInNewTab: true,
@@ -355,14 +356,19 @@ class VisualLoginHandler {
   }
 
   startSessionPolling() {
-    if (this._pollInterval) return; // Already polling
-    if (this.isLoggedIn) {
-      // If somehow already logged in, don't poll for new session
+    if (this._pollInterval) return;
+    if (
+      this.isLoggedIn &&
+      this.selectedLoginOption === "login" &&
+      this._sessionMonitorInterval
+    ) {
       this.stopSessionPolling();
       return;
     }
-    // Only poll if "login" option is selected and no session monitor is active (which means not fully logged in yet)
-    if (this.selectedLoginOption !== "login" || this._sessionMonitorInterval) {
+    if (
+      this.selectedLoginOption !== "login" ||
+      (this.isLoggedIn && this._sessionMonitorInterval)
+    ) {
       this.stopSessionPolling();
       return;
     }
@@ -371,12 +377,10 @@ class VisualLoginHandler {
     console.log("Starting session polling (for new tab login attempt)...");
 
     const pollCallback = async () => {
-      // Check conditions to stop polling inside the callback
       if (
-        !this._pollInterval || // Poller was stopped
-        this.isLoggedIn || // Logged in through some other means
-        this.selectedLoginOption !== "login" || // Option changed
-        this._sessionMonitorInterval // Session monitor took over (means login completed)
+        !this._pollInterval ||
+        (this.isLoggedIn && this._sessionMonitorInterval) ||
+        this.selectedLoginOption !== "login"
       ) {
         this.stopSessionPolling();
         return;
@@ -384,11 +388,10 @@ class VisualLoginHandler {
 
       const sessions = await this.fetchSessionListWithCacheBust();
       if (!this._pollInterval || sessions === null) {
-        // Poller stopped or error fetching
         return;
       }
 
-      let loggedInSession = null;
+      let identifiedAuthenticatedSession = null;
       for (const session of sessions) {
         const currentUsername = session.username;
         const isValidUsername =
@@ -397,31 +400,31 @@ class VisualLoginHandler {
           currentUsername.trim() !== "" &&
           currentUsername !== "null";
 
-        if (
-          isValidUsername &&
-          session.project === urlFetcher.projectName &&
-          !this.initialSessions.has(session.id) // Must be a new session
-        ) {
-          loggedInSession = session;
+        if (isValidUsername && session.project === urlFetcher.projectName) {
+          // This is a valid, authenticated session for the project.
+          // If we initiated a login, any such session found is the target.
+          identifiedAuthenticatedSession = session;
           break;
         }
       }
 
-      if (loggedInSession) {
+      if (identifiedAuthenticatedSession) {
+        // FIX: An authenticated session for the project was found after login was initiated.
+        // No need to strictly check against initialSessions if the intent was to log in.
         console.log(
-          `New session detected for user: ${loggedInSession.username} (ID: ${loggedInSession.id})`
+          `Authenticated session identified during polling: User: ${identifiedAuthenticatedSession.username} (ID: ${identifiedAuthenticatedSession.id})`
         );
-        this.stopSessionPolling(); // Stop polling once new session is found
-        this.completeLogin(loggedInSession.username, loggedInSession.id);
+        this.stopSessionPolling();
+        this.completeLogin(
+          identifiedAuthenticatedSession.username,
+          identifiedAuthenticatedSession.id
+        );
       } else {
-        // Still polling, update status if necessary
         if (this._pollInterval) {
-          // Check again, could have been stopped by another async op
           this.updateLoginStatus("checking", "Waiting for login in new tab...");
         }
       }
     };
-    // Initial call delayed slightly to allow tab to open.
     setTimeout(pollCallback, this.loginPollIntervalTime / 2);
     this._pollInterval = setInterval(pollCallback, this.loginPollIntervalTime);
   }
@@ -431,11 +434,10 @@ class VisualLoginHandler {
       console.log("Stopping session polling (for new tab login attempt).");
       clearInterval(this._pollInterval);
       this._pollInterval = null;
-      // Update status only if login wasn't completed and no session monitor is active
       if (
         !this.isLoggedIn &&
         !this._sessionMonitorInterval &&
-        this.selectedLoginOption === "login" // And the intent was to login
+        this.selectedLoginOption === "login"
       ) {
         this.updateLoginStatus(
           "logged-out",
@@ -446,15 +448,14 @@ class VisualLoginHandler {
   }
 
   startSessionMonitor() {
-    if (this._sessionMonitorInterval) return; // Already monitoring
-    // Only monitor if fully logged in and "login" option is active
+    if (this._sessionMonitorInterval) return;
     if (
       !this.isLoggedIn ||
       !this.loggedInUsername ||
       !this.activeSessionId ||
       this.selectedLoginOption !== "login"
     ) {
-      this.stopSessionMonitor(); // Ensure it's stopped if conditions aren't met
+      this.stopSessionMonitor();
       return;
     }
     console.log(
@@ -462,11 +463,10 @@ class VisualLoginHandler {
     );
 
     const monitorCallback = async () => {
-      // Check conditions to stop monitoring inside the callback
       if (
-        !this._sessionMonitorInterval || // Monitor was stopped
-        !this.isLoggedIn || // Logged out by other means
-        this.selectedLoginOption !== "login" // Option changed
+        !this._sessionMonitorInterval ||
+        !this.isLoggedIn ||
+        this.selectedLoginOption !== "login"
       ) {
         this.stopSessionMonitor();
         return;
@@ -476,7 +476,7 @@ class VisualLoginHandler {
         console.warn(
           "Session monitor: could not fetch session list. Will retry."
         );
-        return; // Keep monitor running, retry next interval
+        return;
       }
 
       const currentUserStillActive = sessions.some(
@@ -484,18 +484,17 @@ class VisualLoginHandler {
           s.id === this.activeSessionId &&
           s.username === this.loggedInUsername &&
           s.project === urlFetcher.projectName &&
-          s.username && // Ensure username is not empty/null
+          s.username &&
           s.username.toLowerCase() !== "unauthenticated" &&
           s.username.trim() !== "" &&
           s.username !== "null"
       );
 
       if (!currentUserStillActive) {
-        this.handleAutoLogout(); // This will also stop the monitor
+        this.handleAutoLogout();
       }
     };
-    // Initial check soon after starting.
-    setTimeout(monitorCallback, 100); // Short delay for initial check
+    setTimeout(monitorCallback, 100);
     this._sessionMonitorInterval = setInterval(
       monitorCallback,
       this.monitorPollIntervalTime
@@ -515,23 +514,22 @@ class VisualLoginHandler {
     const previousUsername = this.loggedInUsername;
     const previousSessionId = this.activeSessionId;
 
-    // Reset state
     this.isLoggedIn = false;
     this.loggedInUsername = null;
     this.activeSessionId = null;
-    this.stopSessionMonitor(); // Ensure monitor is stopped
-    this.stopSessionPolling(); // Ensure polling is stopped
+    this.stopSessionMonitor();
+    this.stopSessionPolling();
 
     this.updateLoginStatus(
       "logged-out",
       `Session for ${previousUsername || "user"} expired or ended.`
     );
-    // Update UI, ensuring no option is pre-checked
-    this.updateLoginOptionsUI(null, false); // Reset text, hide logout
+    this.updateLoginOptionsUI(null, false);
+
     if (this.optionLoginRadio) this.optionLoginRadio.checked = false;
     if (this.optionContinueGuestRadio)
       this.optionContinueGuestRadio.checked = false;
-    this.selectedLoginOption = ""; // Clear selected option
+    this.selectedLoginOption = "";
 
     events.emit(events.events.AUTO_LOGOUT_DETECTED, {
       username: previousUsername,
@@ -600,7 +598,6 @@ class VisualLoginHandler {
         console.error(
           `WorkspaceSessionList: Failed response ${res.status} from ${fetchUrl}. Message: ${responseText}`
         );
-        // Only update status if not already actively logged in or polling (to avoid overwriting specific messages)
         if (
           !this.isLoggedIn &&
           !this._pollInterval &&
@@ -613,13 +610,12 @@ class VisualLoginHandler {
       const data = await res.json();
       if (Array.isArray(data)) {
         return data.filter(
-          (
-            s // Ensure basic session structure
-          ) => typeof s.id !== "undefined" && typeof s.username !== "undefined"
+          (s) =>
+            typeof s.id !== "undefined" && typeof s.username !== "undefined"
         );
       }
       console.warn("fetchSessionList: Received data is not an array.", data);
-      return []; // Return empty array if not array
+      return [];
     } catch (e) {
       console.error(
         `WorkspaceSessionList: Network or JSON parse error from ${fetchUrl}:`,
@@ -637,28 +633,25 @@ class VisualLoginHandler {
   }
 
   completeLogin(username, sessionId) {
-    // Check if already in the desired state to prevent redundant updates/event emissions
     if (
       this.isLoggedIn &&
       this.loggedInUsername === username &&
       this.activeSessionId === sessionId
     ) {
-      if (!this._sessionMonitorInterval) this.startSessionMonitor(); // Ensure monitor is running
-      return; // Already completed for this session
+      if (!this._sessionMonitorInterval) this.startSessionMonitor();
+      return;
     }
-
-    // If previously logged in but with different details, stop old monitor
     if (
       this.isLoggedIn &&
       (this.loggedInUsername !== username || this.activeSessionId !== sessionId)
     ) {
-      this.stopSessionMonitor(); // Stop monitor for old session
+      this.stopSessionMonitor();
     }
 
     this.isLoggedIn = true;
-    this.loggedInUsername = username || "Authenticated User"; // Fallback name
+    this.loggedInUsername = username || "Authenticated User";
     this.activeSessionId = sessionId;
-    this.selectedLoginOption = "login"; // Explicitly set this as login is complete
+    this.selectedLoginOption = "login";
     console.log(
       `Login successful. User: '${this.loggedInUsername}', Session ID: ${this.activeSessionId}`
     );
@@ -667,7 +660,6 @@ class VisualLoginHandler {
       "logged-in",
       `Logged in as ${this.loggedInUsername}.`
     );
-    // Update UI, and pre-check the "login" radio to reflect the now active session state
     this.updateLoginOptionsUI(this.loggedInUsername, true);
 
     if (this.loginTab && !this.loginTab.closed) {
@@ -683,7 +675,7 @@ class VisualLoginHandler {
       this.loginTab = null;
     }
 
-    this.startSessionMonitor(); // Start monitoring the new active session
+    this.startSessionMonitor();
 
     events.emit(events.events.LOGIN_COMPLETE, {
       loggedIn: true,
@@ -697,35 +689,28 @@ class VisualLoginHandler {
     const previousUsername = this.loggedInUsername;
     const previousSessionId = this.activeSessionId;
 
-    // Immediately update UI to reflect logged-out state
     this.isLoggedIn = false;
     this.loggedInUsername = null;
     this.activeSessionId = null;
     this.stopSessionMonitor();
     this.stopSessionPolling();
     if (this.loginTab && !this.loginTab.closed) {
-      // If a login tab was open, it's no longer relevant
       this.loginTab = null;
     }
-
-    this.updateLoginOptionsUI(null, false); // Reset text, hide logout button
-    // Explicitly uncheck radio buttons
+    this.updateLoginOptionsUI(null, false);
     if (this.optionLoginRadio) this.optionLoginRadio.checked = false;
     if (this.optionContinueGuestRadio)
       this.optionContinueGuestRadio.checked = false;
-    this.selectedLoginOption = ""; // Clear selected option
-
+    this.selectedLoginOption = "";
     this.updateLoginStatus(
       "logged-out",
       `Logged out ${previousUsername || "user"}. Select an option.`
     );
-
     events.emit(events.events.USER_LOGGED_OUT, {
       username: previousUsername,
       sessionId: previousSessionId,
     });
 
-    // Construct the custom logout URL
     let gatewayOrigin, toolWebdevProject;
     try {
       const currentToolUrl = window.location.href;
@@ -737,26 +722,24 @@ class VisualLoginHandler {
         );
       }
       gatewayOrigin = toolUrlMatch[1];
-      toolWebdevProject = toolUrlMatch[2]; // This should be 'PerspectiveCapture' or your tool's project
+      toolWebdevProject = toolUrlMatch[2];
     } catch (e) {
       console.error(
         "Error constructing custom logout URL base:",
         e.message,
         "Falling back to generic logout."
       );
-      // Fallback to generic Perspective logout if custom URL construction fails
       window.open(
         `${
-          urlFetcher.baseClientUrl // Use the target project's base URL for generic logout
+          urlFetcher.baseClientUrl
             ? new URL(urlFetcher.baseClientUrl).origin
-            : window.location.origin // Fallback to current origin if baseClientUrl not set
+            : window.location.origin
         }/data/perspective/logout`,
         "_blank"
       );
       return;
     }
 
-    // Use the tool's own project context for the custom logout endpoint
     const customLogoutUrl = `${gatewayOrigin}/system/webdev/${toolWebdevProject}/${toolWebdevProject}/logout`;
 
     if (previousSessionId) {
@@ -790,16 +773,12 @@ class VisualLoginHandler {
       console.warn(
         "No active session ID found to perform specific logout. User state cleared locally. Opening generic logout."
       );
-      // If no sessionId, open the generic Perspective logout page as a fallback
-      // or your custom one if it can handle logout without a session ID (e.g. global logout)
       window.open(`${gatewayOrigin}/data/perspective/logout`, "_blank");
     }
   }
 
   hideLoginFrame() {
-    // This method was for an iframe-based login, which is no longer the primary approach.
-    // Kept for potential future use or if parts of the UI still reference it.
-    // console.log("hideLoginFrame called (no-op for new tab login).");
+    // No-op
   }
 
   updateLoginStatus(status, text) {
@@ -808,7 +787,7 @@ class VisualLoginHandler {
       console.warn("#loginStatus element not found for updating text:", text);
       return;
     }
-    statusElement.className = `login-status ${status}`; // Apply class for styling
+    statusElement.className = `login-status ${status}`;
     const icon = statusElement.querySelector(".login-status-icon");
     if (icon)
       icon.textContent =
@@ -816,7 +795,6 @@ class VisualLoginHandler {
     const lbl = statusElement.querySelector(".login-status-text");
     if (lbl) lbl.textContent = text;
 
-    // Manage visibility of the #loginSection (used for "Waiting for login tab..." messages)
     const loginMessageSection = document.getElementById("loginSection");
     if (loginMessageSection) {
       if (
@@ -825,19 +803,18 @@ class VisualLoginHandler {
           text.toLowerCase().includes("opening login tab"))
       ) {
         loginMessageSection.innerHTML = `<p class="login-process-message">${text.replace(
-          "... This page will update automatically when you return.", // Remove redundant part
+          "... This page will update automatically when you return.",
           "..."
         )}</p>`;
         loginMessageSection.style.display = "block";
       } else if (
-        status === "logged-in" || // Login complete
-        (status === "logged-out" && // Logged out AND
+        status === "logged-in" ||
+        (status === "logged-out" &&
           !(
             this.selectedLoginOption === "login" &&
             (this._pollInterval || this.loginTab)
-          )) // not actively in a new tab login process
+          ))
       ) {
-        // Hide message section if login is complete, or if logged out and not waiting for a tab.
         loginMessageSection.innerHTML = "";
         loginMessageSection.style.display = "none";
       }
