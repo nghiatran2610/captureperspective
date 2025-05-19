@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Enhanced URL Capture with dom-to-image-more</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image-more/3.1.6/dom-to-image-more.min.js"></script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      #controls {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+      }
+      .control-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      .control-row:last-child {
+        margin-bottom: 0;
+      }
+      .control-row label {
+        min-width: 100px;
+        font-weight: 500;
+      }
+      #controls input[type="url"],
+      #controls input[type="number"],
+      #controls select {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      #controls input[type="url"] {
+        flex-grow: 1;
+      }
+      #controls input[type="number"] {
+        width: 100px;
+      }
+      button {
+        padding: 8px 16px;
+        background-color: #0078d4;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 500;
+      }
+      button:hover {
+        background-color: #0063b1;
+      }
+      button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .secondary-btn {
+        background-color: #6c757d;
+      }
+      .secondary-btn:hover {
+        background-color: #5a6268;
+      }
+      #iframeContainer {
+        border: 2px solid #ccc;
+        margin-bottom: 20px;
+        overflow: hidden;
+        background-color: #ffffff;
+        border-radius: 6px;
+      }
+      #screenshotIframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        display: block;
+      }
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255,255,255,0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: #666;
+      }
+      #result {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 6px;
+        min-height: 100px;
+      }
+      #result img {
+        max-width: 100%;
+        border: 1px solid #ddd;
+        margin-top: 10px;
+        background-color: #f0f0f0;
+        border-radius: 4px;
+      }
+      .download-area {
+        margin-top: 15px;
+        padding: 15px;
+        background-color: #e7f3ff;
+        border-radius: 4px;
+        border: 1px solid #b3d7ff;
+      }
+      #log {
+        background-color: #1e1e1e;
+        color: #d4d4d4;
+        border: 1px solid #333;
+        padding: 15px;
+        height: 250px;
+        overflow-y: auto;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 13px;
+        margin-top: 20px;
+        border-radius: 6px;
+      }
+      .log-entry {
+        padding: 3px 0;
+        line-height: 1.4;
+      }
+      .log-entry.error {
+        color: #ff6b6b;
+      }
+      .log-entry.warn {
+        color: #feca57;
+      }
+      .log-entry.success {
+        color: #48db71;
+      }
+      .progress-bar {
+        width: 100%;
+        height: 4px;
+        background-color: #e9ecef;
+        border-radius: 2px;
+        overflow: hidden;
+        margin: 10px 0;
+      }
+      .progress-fill {
+        height: 100%;
+        background-color: #0078d4;
+        width: 0%;
+        transition: width 0.3s ease;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+      }
+      .stat-card {
+        background-color: white;
+        padding: 15px;
+        border-radius: 6px;
+        border: 1px solid #e0e0e0;
+        text-align: center;
+      }
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #0078d4;
+      }
+      .stat-label {
+        font-size: 14px;
+        color: #666;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📸 Enhanced Webpage Screenshot Tool</h1>
+      <p>Capture screenshots of web pages using dom-to-image-more with advanced options</p>
+
+      <div id="controls">
+        <div class="control-row">
+          <label>URL:</label>
+          <input
+            type="url"
+            id="urlInput"
+            placeholder="Enter URL (same-origin or CORS-friendly)"
+            value="https://example.com"
+          />
+        </div>
+        <div class="control-row">
+          <label>Dimensions:</label>
+          <input type="number" id="captureWidth" value="1280" title="Width (px)" />
+          <span>×</span>
+          <input type="number" id="captureHeight" value="720" title="Height (px)" />
+          <select id="presetSizes">
+            <option value="">Custom</option>
+            <option value="1920,1080">Full HD (1920×1080)</option>
+            <option value="1280,720">HD (1280×720)</option>
+            <option value="1024,768">XGA (1024×768)</option>
+            <option value="800,600">SVGA (800×600)</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <label>Format:</label>
+          <select id="formatSelect">
+            <option value="png">PNG</option>
+            <option value="jpeg">JPEG</option>
+            <option value="svg">SVG</option>
+          </select>
+          <label>Quality:</label>
+          <input type="number" id="qualityInput" value="95" min="1" max="100" title="JPEG Quality %" />
+          <span>%</span>
+          <label>Scale:</label>
+          <input type="number" id="scaleInput" value="1" min="0.1" max="5" step="0.1" title="Scale Factor" />
+        </div>
+        <div class="control-row">
+          <label>Wait Time:</label>
+          <input type="number" id="delayInput" value="3000" min="500" max="10000" step="500" title="Render Delay (ms)" />
+          <span>ms</span>
+          <label>Background:</label>
+          <input type="color" id="bgColorInput" value="#ffffff" title="Background Color" />
+          <input type="checkbox" id="transparentBg" title="Transparent Background" />
+          <label for="transparentBg">Transparent</label>
+        </div>
+        <div class="control-row">
+          <button id="loadAndCaptureBtn">🚀 Load & Capture</button>
+          <button id="captureOnlyBtn" class="secondary-btn">📷 Capture Current</button>
+          <button id="clearLogBtn" class="secondary-btn">🗑️ Clear Log</button>
+        </div>
+        <div class="progress-bar" id="progressContainer" style="display: none;">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+
+      <div id="iframeContainer" style="position: relative;">
+        <iframe
+          id="screenshotIframe"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+        ></iframe>
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+          Loading content...
+        </div>
+      </div>
+
+      <h2>📊 Results</h2>
+      <div id="result">
+        <p>No screenshot yet. Load a URL and capture!</p>
+      </div>
+
+      <div class="stats" id="statsContainer" style="display: none;">
+        <div class="stat-card">
+          <div class="stat-value" id="captureTime">--</div>
+          <div class="stat-label">Capture Time (ms)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="imageSize">--</div>
+          <div class="stat-label">Image Size (KB)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="svgCount">--</div>
+          <div class="stat-label">SVGs Processed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="loadTime">--</div>
+          <div class="stat-label">Load Time (ms)</div>
+        </div>
+      </div>
+
+      <h2>📋 Debug Log</h2>
+      <div id="log"></div>
+    </div>
+
+    <script>
+      let stats = {
+        captureStartTime: 0,
+        loadStartTime: 0,
+        svgCount: 0
+      };
+
+      function log(message, type = "info") {
+        const logElement = document.getElementById("log");
+        const entry = document.createElement("div");
+        entry.className = `log-entry ${type}`;
+        const timestamp = new Date().toLocaleTimeString();
+        entry.textContent = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+        logElement.appendChild(entry);
+        logElement.scrollTop = logElement.scrollHeight;
+        
+        const consoleMethod = type === "error" ? "error" : type === "warn" ? "warn" : "log";
+        console[consoleMethod](`[${timestamp}] ${message}`);
+      }
+
+      function updateProgress(percentage) {
+        const progressContainer = document.getElementById("progressContainer");
+        const progressFill = document.getElementById("progressFill");
+        
+        if (percentage === 0) {
+          progressContainer.style.display = "none";
+        } else {
+          progressContainer.style.display = "block";
+          progressFill.style.width = `${percentage}%`;
+          
+          if (percentage >= 100) {
+            setTimeout(() => {
+              progressContainer.style.display = "none";
+              progressFill.style.width = "0%";
+            }, 1000);
+          }
+        }
+      }
+
+      function updateStats() {
+        document.getElementById("statsContainer").style.display = "grid";
+      }
+
+      // Enhanced SVG utilities
+      const svgUtils = {
+        prepareSVGs: function (docContext, windowContext) {
+          if (!docContext || !windowContext) {
+            log("svgUtils.prepareSVGs: Document or window context is missing.", "warn");
+            return 0;
+          }
+          
+          try {
+            const svgs = docContext.querySelectorAll("svg");
+            if (!svgs || svgs.length === 0) {
+              log("svgUtils.prepareSVGs: No SVGs found.", "info");
+              return 0;
+            }
+            
+            log(`svgUtils.prepareSVGs: Found ${svgs.length} SVGs to prepare.`, "info");
+            stats.svgCount = svgs.length;
+
+            svgs.forEach((svg, index) => {
+              try {
+                const computedStyle = windowContext.getComputedStyle(svg);
+                const parentElement = svg.parentElement;
+                
+                if (!parentElement) {
+                  log(`svgUtils.prepareSVGs: SVG #${index + 1} has no parent. Skipping.`, "warn");
+                  return;
+                }
+
+                // Get parent dimensions
+                let pWidth = parentElement.clientWidth;
+                let pHeight = parentElement.clientHeight;
+                let tempParent = parentElement;
+                
+                while ((pWidth === 0 || pHeight === 0) && tempParent.parentElement && tempParent !== docContext.body) {
+                  tempParent = tempParent.parentElement;
+                  pWidth = tempParent.clientWidth;
+                  pHeight = tempParent.clientHeight;
+                }
+                
+                if (pWidth === 0) pWidth = parseInt(docContext.body.clientWidth) || parseInt(windowContext.innerWidth);
+                if (pHeight === 0) pHeight = parseInt(docContext.body.clientHeight) || parseInt(windowContext.innerHeight);
+
+                // Convert various CSS units to pixels
+                const toPx = (valStr, base) => {
+                  if (typeof valStr !== "string" || !valStr) return parseFloat(valStr) || 0;
+                  if (valStr.endsWith("%")) return (parseFloat(valStr) / 100) * base;
+                  if (valStr.endsWith("vw")) return (parseFloat(valStr) / 100) * windowContext.innerWidth;
+                  if (valStr.endsWith("vh")) return (parseFloat(valStr) / 100) * windowContext.innerHeight;
+                  return parseFloat(valStr);
+                };
+
+                let W_str = svg.getAttribute("width") || computedStyle.width;
+                let H_str = svg.getAttribute("height") || computedStyle.height;
+                let W = toPx(W_str, pWidth);
+                let H = toPx(H_str, pHeight);
+
+                // Handle viewBox for dimensions
+                const viewBox = svg.getAttribute("viewBox");
+                if (viewBox && (W === 0 || H === 0 || W_str === "auto" || H_str === "auto")) {
+                  const parts = viewBox.split(/\s+|,/).map(parseFloat);
+                  if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                    const vbWidth = parts[2];
+                    const vbHeight = parts[3];
+                    if (W > 0 && H === 0) H = W * (vbHeight / vbWidth);
+                    else if (H > 0 && W === 0) W = H * (vbWidth / vbHeight);
+                    else if (W === 0 && H === 0 && pWidth > 0 && pHeight > 0) {
+                      if ((pWidth / vbWidth) * vbHeight <= pHeight) {
+                        W = pWidth;
+                        H = pWidth * (vbHeight / vbWidth);
+                      } else {
+                        H = pHeight;
+                        W = pHeight * (vbWidth / vbHeight);
+                      }
+                    }
+                  }
+                }
+
+                // Fallback to baseVal if available
+                if (W <= 0 && typeof svg.width === "object" && svg.width.baseVal && svg.width.baseVal.value > 0) {
+                  W = svg.width.baseVal.value;
+                }
+                if (H <= 0 && typeof svg.height === "object" && svg.height.baseVal && svg.height.baseVal.value > 0) {
+                  H = svg.height.baseVal.value;
+                }
+
+                // Default fallback dimensions
+                if (W <= 0) W = 150;
+                if (H <= 0) H = 100;
+
+                // Apply the calculated dimensions
+                svg.setAttribute("width", String(W));
+                svg.setAttribute("height", String(H));
+                svg.style.width = `${W}px`;
+                svg.style.height = `${H}px`;
+                
+                // Ensure proper namespaces
+                if (!svg.getAttribute("xmlns")) svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                if (!svg.getAttribute("xmlns:xlink")) svg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+                
+                // Handle absolute positioning
+                if (computedStyle.position === "absolute") {
+                  svg.style.left = `${toPx(computedStyle.left, pWidth)}px`;
+                  svg.style.top = `${toPx(computedStyle.top, pHeight)}px`;
+                }
+                
+                svg.style.overflow = computedStyle.overflow || "visible";
+                
+                log(`SVG #${index + 1} processed: ${W}×${H}`, "info");
+              } catch (e) {
+                log(`svgUtils: Error processing SVG #${index + 1}: ${e.message}`, "error");
+              }
+            });
+            
+            return svgs.length;
+          } catch (e) {
+            log(`svgUtils: General error: ${e.message}`, "error");
+            return 0;
+          }
+        },
+      };
+
+      async function loadAndCaptureUrl() {
+        stats.loadStartTime = Date.now();
+        updateProgress(10);
+        
+        const urlInput = document.getElementById("urlInput");
+        const iframe = document.getElementById("screenshotIframe");
+        const resultElement = document.getElementById("result");
+        const loadingOverlay = document.getElementById("loadingOverlay");
+        const captureWidthInput = document.getElementById("captureWidth");
+        const captureHeightInput = document.getElementById("captureHeight");
+        const loadBtn = document.getElementById("loadAndCaptureBtn");
+
+        const targetUrl = urlInput.value.trim();
+        const captureWidth = parseInt(captureWidthInput.value) || 1280;
+        const captureHeight = parseInt(captureHeightInput.value) || 720;
+
+        if (!targetUrl) {
+          log("Please enter a URL.", "warn");
+          resultElement.innerHTML = "<p style='color:orange;'>Please enter a URL.</p>";
+          updateProgress(0);
+          return;
+        }
+
+        loadBtn.disabled = true;
+        loadingOverlay.style.display = "flex";
+        resultElement.innerHTML = "<p>Loading iframe...</p>";
+
+        log(`Loading URL: ${targetUrl} (${captureWidth}×${captureHeight})`, "info");
+        updateProgress(20);
+
+        const iframeContainer = document.getElementById("iframeContainer");
+        iframeContainer.style.width = `${captureWidth}px`;
+        iframeContainer.style.height = `${captureHeight}px`;
+
+        iframe.removeAttribute("srcdoc");
+        iframe.src = "about:blank";
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        iframe.src = targetUrl;
+        updateProgress(40);
+
+        iframe.onload = async () => {
+          const loadTime = Date.now() - stats.loadStartTime;
+          document.getElementById("loadTime").textContent = loadTime;
+          
+          log(`Iframe loaded in ${loadTime}ms. Waiting for content...`, "success");
+          updateProgress(60);
+          
+          try {
+            // Debug: Log actual dimensions
+            const iframeDoc = iframe.contentWindow.document;
+            const htmlElement = iframeDoc.documentElement;
+            const bodyElement = iframeDoc.body;
+            
+            log(`Debug - HTML element: ${htmlElement.scrollWidth}×${htmlElement.scrollHeight}`, "info");
+            log(`Debug - Body element: ${bodyElement.scrollWidth}×${bodyElement.scrollHeight}`, "info");
+            log(`Debug - Viewport: ${iframe.contentWindow.innerWidth}×${iframe.contentWindow.innerHeight}`, "info");
+            
+            // Force consistent dimensions
+            htmlElement.style.minWidth = `${captureWidth}px`;
+            htmlElement.style.width = `${captureWidth}px`;
+            bodyElement.style.minWidth = `${captureWidth}px`;
+            bodyElement.style.width = `${captureWidth}px`;
+            
+            // Fix for specific button text wrapping issue
+            // Inject CSS to prevent button text from wrapping
+            const style = iframeDoc.createElement('style');
+            style.textContent = `
+              /* Prevent button text wrapping */
+              .ia_button--primary .text,
+              .button-primary .text,
+              .ia-button .text {
+                white-space: nowrap !important;
+                flex-shrink: 0 !important;
+              }
+              
+              /* Ensure buttons have enough width */
+              .ia_button--primary,
+              .button-primary,
+              .ia-button {
+                min-width: fit-content !important;
+                flex-shrink: 0 !important;
+              }
+              
+              /* Fix flex containers inside buttons */
+              .ia_button--primary > div,
+              .button-primary > div,
+              .ia-button > div {
+                white-space: nowrap !important;
+                flex-wrap: nowrap !important;
+              }
+              
+              /* General button text fix */
+              button .text,
+              .button .text {
+                white-space: nowrap !important;
+              }
+            `;
+            iframeDoc.head.appendChild(style);
+            
+            log(`Applied fixed width of ${captureWidth}px to iframe content`, "info");
+            log(`Injected CSS to prevent button text wrapping`, "info");
+          } catch (e) {
+            log(`Error setting iframe dimensions: ${e.message}`, "warn");
+          }
+          
+          const delayMs = parseInt(document.getElementById("delayInput").value) || 3000;
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          loadingOverlay.style.display = "none";
+          updateProgress(80);
+          
+          log(`Waited ${delayMs}ms. Starting capture...`, "info");
+          await captureIframe();
+          
+          loadBtn.disabled = false;
+          updateProgress(100);
+        };
+
+        iframe.onerror = (event) => {
+          log(`Iframe loading error for URL: ${targetUrl}. Check X-Frame-Options/CSP.`, "error");
+          resultElement.innerHTML = `<p style="color:red;">Failed to load URL in iframe.</p>`;
+          loadingOverlay.style.display = "none";
+          loadBtn.disabled = false;
+          updateProgress(0);
+        };
+      }
+
+      async function captureIframe() {
+        stats.captureStartTime = Date.now();
+        const iframe = document.getElementById("screenshotIframe");
+        const resultElement = document.getElementById("result");
+        const format = document.getElementById("formatSelect").value;
+        const quality = parseInt(document.getElementById("qualityInput").value) / 100;
+        const scale = parseFloat(document.getElementById("scaleInput").value) || 1;
+        const captureWidth = parseInt(document.getElementById("captureWidth").value) || 1280;
+        const captureHeight = parseInt(document.getElementById("captureHeight").value) || 720;
+        const transparent = document.getElementById("transparentBg").checked;
+        const bgColor = document.getElementById("bgColorInput").value;
+
+        let iframeWin, iframeDoc;
+        try {
+          if (!iframe.contentWindow || !iframe.contentWindow.document || !iframe.contentWindow.document.body) {
+            log("Iframe contentWindow/document/body not accessible.", "error");
+            resultElement.innerHTML = `<p style="color:red;">Failed to access iframe content.</p>`;
+            return;
+          }
+          
+          iframeWin = iframe.contentWindow;
+          iframeDoc = iframeWin.document;
+          log("Accessed iframe document.", "info");
+
+          // Scroll to top-left
+          iframeWin.scrollTo(0, 0);
+          log("Scrolled iframe to top-left.", "info");
+        } catch (e) {
+          log(`Error accessing iframe doc: ${e.message}`, "error");
+          resultElement.innerHTML = `<p style="color:red;">Could not access iframe content.</p>`;
+          return;
+        }
+
+        try {
+          log("Preparing SVGs in iframe...", "info");
+          const svgCount = svgUtils.prepareSVGs(iframeDoc, iframeWin);
+          document.getElementById("svgCount").textContent = svgCount;
+        } catch (e) {
+          log(`Error in SVG utils: ${e.message}`, "error");
+        }
+
+        log(`Starting ${format.toUpperCase()} capture...`, "info");
+        try {
+          const nodeToCapture = iframeDoc.documentElement;
+
+          const options = {
+            width: captureWidth,
+            height: captureHeight,
+            bgcolor: transparent ? 'transparent' : bgColor,
+            scale: scale,
+            cacheBust: true,
+            filter: (element) => {
+              if (!element || !element.tagName) return true;
+
+              // Filter problematic elements
+              let elSrc = "";
+              if (element.tagName === "IMG") {
+                elSrc = element.src || "";
+              } else if (element.tagName === "image") {
+                elSrc = element.getAttribute("href") || element.getAttributeNS("http://www.w3.org/1999/xlink", "href") || "";
+              }
+
+              if (elSrc.startsWith("data:image/svg+xml")) {
+                log(`Filter: Excluding ${element.tagName} with SVG data URI.`, "warn");
+                return false;
+              }
+              
+              if (element.tagName === "SCRIPT") {
+                log(`Filter: Excluding SCRIPT tag.`, "info");
+                return false;
+              }
+              
+              return true;
+            },
+          };
+
+          // Add format-specific options
+          if (format === "jpeg") {
+            options.quality = quality;
+          }
+
+          log(`Capture options: ${captureWidth}×${captureHeight}, format=${format}, scale=${scale}`, "info");
+
+          let dataUrl;
+          switch (format) {
+            case "png":
+              dataUrl = await domtoimage.toPng(nodeToCapture, options);
+              break;
+            case "jpeg":
+              dataUrl = await domtoimage.toJpeg(nodeToCapture, options);
+              break;
+            case "svg":
+              dataUrl = await domtoimage.toSvg(nodeToCapture, options);
+              break;
+            default:
+              throw new Error(`Unsupported format: ${format}`);
+          }
+
+          const captureTime = Date.now() - stats.captureStartTime;
+          document.getElementById("captureTime").textContent = captureTime;
+
+          // Calculate image size
+          const base64Data = dataUrl.split(',')[1];
+          const imageSize = Math.round((base64Data.length * 3/4) / 1024);
+          document.getElementById("imageSize").textContent = imageSize;
+
+          resultElement.innerHTML = "";
+          log(`${format.toUpperCase()} capture successful in ${captureTime}ms (${imageSize}KB)`, "success");
+
+          const img = document.createElement("img");
+          img.src = dataUrl;
+          img.style.maxWidth = "100%";
+          resultElement.appendChild(img);
+
+          // Create download area
+          const downloadArea = document.createElement("div");
+          downloadArea.className = "download-area";
+          
+          const link = document.createElement("a");
+          link.href = dataUrl;
+          const urlObj = new URL(iframe.src);
+          const hostname = urlObj.hostname || "capture";
+          link.download = `screenshot-${hostname}-${Date.now()}.${format}`;
+          link.textContent = `📥 Download ${format.toUpperCase()} (${imageSize}KB)`;
+          link.style.textDecoration = "none";
+          link.style.color = "#0078d4";
+          link.style.fontWeight = "bold";
+          
+          downloadArea.appendChild(link);
+          resultElement.appendChild(downloadArea);
+          
+          updateStats();
+          log("Capture completed and ready for download.", "success");
+        } catch (error) {
+          const captureTime = Date.now() - stats.captureStartTime;
+          log(`${format.toUpperCase()} capture failed after ${captureTime}ms: ${error ? error.message || error.toString() : "Unknown error"}`, "error");
+          console.error("Raw dom-to-image error:", error);
+          resultElement.innerHTML = `<p style="color:red;">Screenshot failed. Check the debug log for details.</p>`;
+        }
+      }
+
+      // Event listeners
+      document.getElementById("loadAndCaptureBtn").addEventListener("click", loadAndCaptureUrl);
+      document.getElementById("captureOnlyBtn").addEventListener("click", captureIframe);
+      document.getElementById("clearLogBtn").addEventListener("click", () => {
+        document.getElementById("log").innerHTML = "";
+        log("Log cleared.", "info");
+      });
+
+      // Preset size dropdown
+      document.getElementById("presetSizes").addEventListener("change", (e) => {
+        if (e.target.value) {
+          const [width, height] = e.target.value.split(",");
+          document.getElementById("captureWidth").value = width;
+          document.getElementById("captureHeight").value = height;
+        }
+      });
+
+      // Format change handler
+      document.getElementById("formatSelect").addEventListener("change", (e) => {
+        const qualityGroup = document.getElementById("qualityInput");
+        qualityGroup.style.display = e.target.value === "jpeg" ? "inline" : "none";
+      });
+
+      // Initialize
+      log("Enhanced screenshot tool initialized.", "success");
+      log("Features: Multiple formats, quality control, scaling, transparency, preset sizes", "info");
+    </script>
+  </body>
+</html>
