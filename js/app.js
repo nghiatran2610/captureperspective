@@ -17,7 +17,7 @@ import urlFetcher from "./url-fetcher.js";
 
 class App {
   constructor() {
-    this.currentMode = "simple"; // 'simple' or 'advanced'
+    this.currentMode = "simple";
     this.captureScreenshots = this.captureScreenshots.bind(this);
     this._handleActionsInput = this._handleActionsInput.bind(this);
     this.baseUrl = "";
@@ -172,7 +172,6 @@ class App {
     this._hideCaptureFormAndPageSource();
     if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
 
-    // MODIFICATION: Call comprehensive reset when project changes
     this._performFullReset();
 
     this.loginHandler.updateLoginOptionsUI(null, false);
@@ -289,11 +288,9 @@ class App {
   }
 
   _performFullReset() {
-    console.log(
-      "Performing full UI and data reset due to auth/project change."
-    );
-    UI.utils.resetUI(); // Clears thumbnails, output, stats
-    AppState.reset(); // Clears screenshot data, failed URLs
+    console.log("[App._performFullReset] Performing full UI and data reset.");
+    UI.utils.resetUI();
+    AppState.reset();
     if (urlSelector.clearRenderedUrls) {
       urlSelector.clearRenderedUrls();
     }
@@ -821,16 +818,16 @@ class App {
 
     events.on("URL_SELECTION_CHANGED", () => this._checkCaptureButtonState());
 
-    // MODIFIED: Centralized reset logic here
     events.on(events.events.LOGIN_OPTION_SELECTED, (data) => {
       console.log(
-        `App received LOGIN_OPTION_SELECTED: ${data.option}, isLoggedIn: ${data.isLoggedIn}, pending: ${data.loginPendingInNewTab}`
+        `[App Event] LOGIN_OPTION_SELECTED: Option: ${data.option}, LoggedIn: ${data.isLoggedIn}, Pending: ${data.loginPendingInNewTab}`
       );
 
-      // Perform reset when authentication option effectively changes
-      // Don't reset if it's just a pending login state for the same "login" option.
       if (!data.loginPendingInNewTab) {
         this._performFullReset();
+      } else {
+        UI.utils.resetUI();
+        AppState.reset();
       }
 
       if (
@@ -860,7 +857,6 @@ class App {
       } else if (data.option === "login" && data.loginPendingInNewTab) {
         this._hideCaptureFormAndPageSource();
       } else if (data.option === "") {
-        // No option selected (e.g., after cancelling guest mode)
         this._hideCaptureFormAndPageSource();
       }
       this._checkCaptureButtonState();
@@ -868,9 +864,8 @@ class App {
 
     events.on(events.events.LOGIN_COMPLETE, (data) => {
       console.log(
-        `App received LOGIN_COMPLETE: User ${data.username}, LoggedIn: ${data.loggedIn}`
+        `[App Event] LOGIN_COMPLETE: User ${data.username}, LoggedIn: ${data.loggedIn}`
       );
-      // Resetting here ensures clean state after login process finishes.
       this._performFullReset();
 
       if (data.loggedIn) {
@@ -887,11 +882,11 @@ class App {
 
     events.on(events.events.AUTO_LOGOUT_DETECTED, (data) => {
       console.log(
-        `App received AUTO_LOGOUT_DETECTED for user: ${
+        `[App Event] AUTO_LOGOUT_DETECTED for user: ${
           data?.username || "unknown"
         }`
       );
-      this._performFullReset(); // Reset UI and state on auto-logout
+      this._performFullReset();
       UI.utils.showStatus(
         `Your session has expired. Please log in again or continue as guest.`,
         true,
@@ -913,9 +908,9 @@ class App {
 
     events.on(events.events.USER_LOGGED_OUT, (data) => {
       console.log(
-        `App received USER_LOGGED_OUT for user: ${data?.username || "unknown"}`
+        `[App Event] USER_LOGGED_OUT for user: ${data?.username || "unknown"}`
       );
-      this._performFullReset(); // Reset UI and state on user-initiated logout
+      this._performFullReset();
       UI.utils.showStatus(
         `Successfully logged out ${
           data?.username || "user"
@@ -1008,6 +1003,7 @@ class App {
   }
 
   async captureScreenshots() {
+    console.log("[App.captureScreenshots] Method invoked.");
     const progressOutput = UI.elements.progressOutput;
     const captureWarningMessage = document.getElementById(
       "captureWarningMessage"
@@ -1015,12 +1011,21 @@ class App {
 
     if (!progressOutput) {
       UI.utils.showStatus("UI Error: Progress area missing.", true);
+      console.error(
+        "[App.captureScreenshots] Exiting: Progress output element missing."
+      );
       return;
     }
     progressOutput.style.display = "";
 
+    console.log(
+      `[App.captureScreenshots] Current _processingQueue state at start: ${this._processingQueue}`
+    );
     if (this._processingQueue) {
       UI.utils.showStatus("Capture is already running...", false, 3000);
+      console.warn(
+        "[App.captureScreenshots] Exiting: Capture already in progress because _processingQueue is true."
+      );
       return;
     }
 
@@ -1030,11 +1035,13 @@ class App {
     if (!authOk) {
       UI.utils.showStatus("Please authenticate or continue as guest.", true);
       if (progressOutput) progressOutput.style.display = "none";
+      console.warn("[App.captureScreenshots] Exiting: Auth not OK.");
       return;
     }
     if (!this.baseUrlValid) {
       UI.utils.showStatus("Please select a valid Project first.", true);
       if (progressOutput) progressOutput.style.display = "none";
+      console.warn("[App.captureScreenshots] Exiting: Base URL not valid.");
       return;
     }
 
@@ -1047,8 +1054,26 @@ class App {
     let errorInCaptureSetup = false;
 
     try {
-      // AppState.reset() and UI.utils.resetUI() are now called by LOGIN_OPTION_SELECTED or project change handlers
-      // this._performFullReset(); // Call this to ensure clean state before new capture batch
+      console.log(
+        "[App.captureScreenshots] Passed initial checks, entering TRY block."
+      );
+      console.log(
+        `[App.captureScreenshots] AppState.screenshots size BEFORE AppState.reset(): ${AppState.screenshots.size}`
+      );
+      console.log(
+        `[App.captureScreenshots] AppState.failedUrls.length BEFORE AppState.reset(): ${AppState.failedUrls.length}`
+      );
+
+      // Ensure AppState and UI are reset for a new capture batch
+      AppState.reset();
+      UI.utils.resetUI();
+
+      console.log(
+        `[App.captureScreenshots] AppState.screenshots size AFTER AppState.reset(): ${AppState.screenshots.size}`
+      );
+      console.log(
+        "[App.captureScreenshots] AppState and UI.utils.resetUI() calls completed."
+      );
 
       this._setCaptureSettingsCollapsed(true);
 
@@ -1071,6 +1096,9 @@ class App {
           "No URLs selected"
         );
       }
+      console.log(
+        `[App.captureScreenshots] Prepared to capture ${urlList.length} URLs.`
+      );
 
       UI.progress.updateStats(urlList.length, 0, 0, 0);
       if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
@@ -1092,12 +1120,20 @@ class App {
       this.currentCaptureIndex = 0;
       this.isPaused = false;
       this._processingQueue = true;
+      console.log(
+        `[App.captureScreenshots] _processingQueue set to true. Starting queue processing.`
+      );
       this.updatePauseResumeButton();
       await this.processCaptureQueue();
+      console.log("[App.captureScreenshots] processCaptureQueue awaited.");
     } catch (error) {
       errorInCaptureSetup = true;
       handleError(error, { logToConsole: true, showToUser: true });
       this._processingQueue = false;
+      console.error(
+        "[App.captureScreenshots] Error during capture setup or processing:",
+        error
+      );
       this._setCaptureSettingsCollapsed(false);
       if (
         errorInCaptureSetup &&
@@ -1107,6 +1143,9 @@ class App {
         if (progressOutput) progressOutput.style.display = "none";
       }
     } finally {
+      console.log(
+        `[App.captureScreenshots] Entering FINALLY block. isPaused: ${this.isPaused}`
+      );
       const endTime = performance.now();
       const totalTimeTakenMs = this.startTotalTime
         ? endTime - this.startTotalTime
@@ -1118,12 +1157,22 @@ class App {
       const isQueueFullyProcessed =
         this.currentCaptureIndex >= this.captureQueue.length;
 
+      console.log(
+        `[App.captureScreenshots FINALLY] isQueueFullyProcessed: ${isQueueFullyProcessed}, currentCaptureIndex: ${this.currentCaptureIndex}, captureQueue.length: ${this.captureQueue.length}`
+      );
+
       if (!this.isPaused) {
+        console.log(
+          "[App.captureScreenshots FINALLY] Not paused. Setting _processingQueue to false."
+        );
         this._processingQueue = false;
         this._setCaptureSettingsUIsDisabled(false);
         if (projectDropdown) projectDropdown.disabled = false;
 
         if (isQueueFullyProcessed && this.startTotalTime > 0) {
+          console.log(
+            `[App.captureScreenshots FINALLY] Queue fully processed. Updating stats. AppState.screenshots.size: ${AppState.screenshots.size}, AppState.failedUrls.length: ${AppState.failedUrls.length}`
+          );
           UI.progress.updateStats(
             this.captureQueue.length,
             AppState.screenshots.size,
@@ -1175,6 +1224,9 @@ class App {
           }
         }
       } else {
+        console.log(
+          "[App.captureScreenshots FINALLY] Is paused. _processingQueue should have been set to false by processCaptureQueue."
+        );
         if (this.startTotalTime > 0)
           UI.progress.updateStats(
             this.captureQueue.length,
@@ -1202,6 +1254,9 @@ class App {
       ) {
         progressOutput.style.display = "none";
       }
+      console.log(
+        `[App.captureScreenshots FINALLY] Final _processingQueue state: ${this._processingQueue}`
+      );
     }
   }
 
@@ -1210,36 +1265,54 @@ class App {
       "captureWarningMessage"
     );
     const projectDropdown = document.getElementById("projectSelectorDropdown");
+    console.log(
+      `[App.processCaptureQueue] Starting. isPaused: ${this.isPaused}, currentCaptureIndex: ${this.currentCaptureIndex}, queueLength: ${this.captureQueue.length}`
+    );
 
     if (this.isPaused || this.currentCaptureIndex >= this.captureQueue.length) {
       if (this.isPaused) {
+        console.log(
+          "[App.processCaptureQueue] Paused. Setting _processingQueue to false."
+        );
         this._processingQueue = false;
       }
       if (
         !this.isPaused &&
         this.currentCaptureIndex >= this.captureQueue.length
       ) {
+        console.log(
+          "[App.processCaptureQueue] Queue finished. Setting _processingQueue to false."
+        );
+        this._processingQueue = false;
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
         this._setCaptureSettingsUIsDisabled(false);
         if (projectDropdown) projectDropdown.disabled = false;
       }
+      this.updatePauseResumeButton();
+      console.log(
+        `[App.processCaptureQueue] Exiting early. _processingQueue: ${this._processingQueue}`
+      );
       return;
     }
 
     if (!this._processingQueue) {
+      console.log(
+        "[App.processCaptureQueue] _processingQueue was false, setting to true."
+      );
       this._processingQueue = true;
-      this._setCaptureSettingsUIsDisabled(true);
-      if (projectDropdown) projectDropdown.disabled = true;
-      this.updatePauseResumeButton();
-      if (
-        captureWarningMessage &&
-        captureWarningMessage.style.display === "none" &&
-        !this.isPaused
-      ) {
-        captureWarningMessage.textContent =
-          "Browser needs to be active for screenshots.";
-        captureWarningMessage.style.display = "block";
-      }
+    }
+    this._setCaptureSettingsUIsDisabled(true);
+    if (projectDropdown) projectDropdown.disabled = true;
+    this.updatePauseResumeButton();
+
+    if (
+      captureWarningMessage &&
+      captureWarningMessage.style.display === "none" &&
+      !this.isPaused
+    ) {
+      captureWarningMessage.textContent =
+        "The browser needs to be active for screenshots.";
+      captureWarningMessage.style.display = "block";
     }
 
     const totalUrls = this.captureQueue.length;
@@ -1250,7 +1323,10 @@ class App {
       const item = this.captureQueue[itemIndex];
 
       if (!item || !item.url) {
-        console.error(`Invalid item at queue index ${itemIndex}:`, item);
+        console.error(
+          `[App.processCaptureQueue] Invalid item at queue index ${itemIndex}:`,
+          item
+        );
         AppState.addFailedUrl(`Invalid Item @ Queue Index ${itemIndex}`);
         this.currentCaptureIndex++;
         if (UI.elements.progressBar)
@@ -1261,6 +1337,11 @@ class App {
       const { url, index, capturePreset, captureFullPage, actionSequences } =
         item;
 
+      console.log(
+        `[App.processCaptureQueue] Processing item ${
+          itemIndex + 1
+        }/${totalUrls}: ${url}`
+      );
       if (UI.elements.progress)
         UI.progress.updateProgressMessage(
           `⏳ Processing ${
@@ -1280,6 +1361,9 @@ class App {
         );
 
         if (this.isPaused) {
+          console.log(
+            "[App.processCaptureQueue] Paused during takeScreenshot. Breaking loop."
+          );
           this._processingQueue = false;
           break;
         }
@@ -1298,7 +1382,7 @@ class App {
 
         if (result.detectedMountIssue)
           console.warn(
-            `Screenshot for ${url} captured with mount issue: ${result.mountIssueMessage}`
+            `[App.processCaptureQueue] Screenshot for ${url} captured with mount issue: ${result.mountIssueMessage}`
           );
 
         UI.thumbnails.addLiveThumbnail(result, result.fileName, url);
@@ -1306,9 +1390,16 @@ class App {
         AppState.removeFailedUrl(url);
       } catch (error) {
         if (this.isPaused) {
+          console.log(
+            "[App.processCaptureQueue] Paused during error handling. Breaking loop."
+          );
           this._processingQueue = false;
           break;
         }
+        console.error(
+          `[App.processCaptureQueue] Error processing ${url}:`,
+          error
+        );
         handleError(error, { logToConsole: true, showToUser: false });
         const timestamp = URLProcessor.getTimestamp();
         const baseFileName = URLProcessor.generateFilename(url, index, "");
@@ -1354,18 +1445,28 @@ class App {
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
       if (this.isPaused) {
+        console.log(
+          "[App.processCaptureQueue] Paused at end of loop iteration."
+        );
         this._processingQueue = false;
         break;
       }
     }
 
     const isFinished = this.currentCaptureIndex >= totalUrls;
-    if (isFinished && !this.isPaused) {
+    console.log(
+      `[App.processCaptureQueue] Loop finished. isFinished: ${isFinished}, isPaused: ${this.isPaused}`
+    );
+
+    if (!this.isPaused) {
       this._processingQueue = false;
-      this._setCaptureSettingsUIsDisabled(false);
-      if (projectDropdown) projectDropdown.disabled = false;
-      if (captureWarningMessage) captureWarningMessage.style.display = "none";
-    } else if (this.isPaused) {
+      if (isFinished) {
+        this._setCaptureSettingsUIsDisabled(false);
+        if (projectDropdown) projectDropdown.disabled = false;
+        if (captureWarningMessage) captureWarningMessage.style.display = "none";
+      }
+    } else {
+      this._processingQueue = false;
       if (UI.elements.progress)
         UI.utils.showStatus(
           `⏳ Paused at ${
@@ -1375,12 +1476,11 @@ class App {
           0
         );
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
-    } else {
-      this._processingQueue = false;
-      this._setCaptureSettingsUIsDisabled(false);
-      if (projectDropdown) projectDropdown.disabled = false;
-      if (captureWarningMessage) captureWarningMessage.style.display = "none";
     }
+    this.updatePauseResumeButton();
+    console.log(
+      `[App.processCaptureQueue] Exiting. Final _processingQueue: ${this._processingQueue}`
+    );
   }
 
   createPauseResumeButton() {
@@ -1428,7 +1528,7 @@ class App {
         this.captureQueue.length > this.currentCaptureIndex
       ) {
         captureWarningMessage.textContent =
-          "Browser needs to be active for screenshots.";
+          "The browser needs to be active for screenshots.";
         captureWarningMessage.style.display = "block";
       }
 
