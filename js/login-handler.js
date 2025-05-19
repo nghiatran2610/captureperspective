@@ -43,6 +43,7 @@ class VisualLoginHandler {
         this.optionContinueGuestRadio,
         "change",
         async () => {
+          // Check .checked inside handleLoginOptionChange after confirmation for this path
           if (this.optionContinueGuestRadio.checked) {
             await this.handleLoginOptionChange("continueWithoutLogin");
           }
@@ -199,10 +200,10 @@ class VisualLoginHandler {
   }
 
   async handleLoginOptionChange(option) {
-    this.stopSessionMonitor();
-    this.selectedLoginOption = option;
-
     if (option === "login") {
+      this.stopSessionMonitor();
+      this.selectedLoginOption = option;
+
       if (this.isLoggedIn && this.loggedInUsername) {
         console.log(
           `Login option selected, continuing as authenticated user ${this.loggedInUsername} (Session ID: ${this.activeSessionId}).`
@@ -227,22 +228,60 @@ class VisualLoginHandler {
       }
     } else if (option === "continueWithoutLogin") {
       console.log("Continue without login selected.");
+
       if (this.isLoggedIn && this.activeSessionId) {
-        console.log(
-          `User was logged in as ${this.loggedInUsername}. Performing logout before continuing as guest.`
+        const confirmGuest = window.confirm(
+          `You are currently logged in as ${this.loggedInUsername}. Continuing as a guest will log you out. Do you want to proceed?`
         );
+
+        if (!confirmGuest) {
+          console.log(
+            "User cancelled continuing as guest. Reverting to logged-in selection."
+          );
+          if (this.optionLoginRadio) {
+            this.optionLoginRadio.checked = true;
+          }
+          if (this.optionContinueGuestRadio) {
+            this.optionContinueGuestRadio.checked = false;
+          }
+          this.selectedLoginOption = "login";
+          this.updateLoginStatus(
+            "logged-in",
+            `Guest login cancelled. Session for ${this.loggedInUsername} remains active.`
+          );
+          // MODIFICATION: Manually emit LOGIN_OPTION_SELECTED for the reverted "login" state
+          events.emit(events.events.LOGIN_OPTION_SELECTED, {
+            option: "login",
+            isLoggedIn: this.isLoggedIn, // Should be true
+            username: this.loggedInUsername,
+            sessionId: this.activeSessionId,
+          });
+          return;
+        }
+        // User confirmed "Yes"
+        console.log(`User confirmed logout to continue as guest.`);
+        this.stopSessionMonitor();
         await this.performLogout();
       }
 
+      // Proceed as guest
       this.isLoggedIn = false;
       this.loggedInUsername = null;
       this.activeSessionId = null;
+      this.selectedLoginOption = "continueWithoutLogin";
       this.stopSessionPolling();
       this.stopSessionMonitor();
 
       this.updateLoginStatus("logged-out", "Continuing as Guest");
-      this.updateLoginOptionsUI(null, false);
-      if (this.optionLoginRadio) this.optionLoginRadio.checked = false;
+
+      if (this.optionLoginRadio) {
+        this.optionLoginRadio.checked = false;
+      }
+      // Ensure the guest radio (which triggered this flow initially) remains checked
+      // if performLogout or other UI updates didn't already ensure this.
+      if (this.optionContinueGuestRadio) {
+        this.optionContinueGuestRadio.checked = true;
+      }
 
       try {
         const screenshotIframe = document.getElementById("screenshotIframe");
@@ -296,15 +335,14 @@ class VisualLoginHandler {
       return;
     }
 
-    this.initialSessions.clear(); // Clear before fetching
+    this.initialSessions.clear();
     this.stopSessionPolling();
     this.stopSessionMonitor();
-    this.activeSessionId = null; // Ensure no active session ID from a previous state
+    this.activeSessionId = null;
 
     this.updateLoginStatus("checking", "Opening login tab...");
 
     try {
-      // Fetch sessions *before* opening the tab to establish a baseline
       const sessions = await this.fetchSessionListWithCacheBust();
       if (sessions === null) {
         if (this.optionLoginRadio) this.optionLoginRadio.checked = false;
@@ -344,7 +382,7 @@ class VisualLoginHandler {
       this.selectedLoginOption = "";
     } else {
       this.updateLoginStatus("checking", "Waiting for login in new tab...");
-      this.startSessionPolling(); // This will now use the corrected logic
+      this.startSessionPolling();
       events.emit(events.events.LOGIN_OPTION_SELECTED, {
         option: "login",
         isLoggedIn: false,
@@ -401,16 +439,12 @@ class VisualLoginHandler {
           currentUsername !== "null";
 
         if (isValidUsername && session.project === urlFetcher.projectName) {
-          // This is a valid, authenticated session for the project.
-          // If we initiated a login, any such session found is the target.
           identifiedAuthenticatedSession = session;
           break;
         }
       }
 
       if (identifiedAuthenticatedSession) {
-        // FIX: An authenticated session for the project was found after login was initiated.
-        // No need to strictly check against initialSessions if the intent was to log in.
         console.log(
           `Authenticated session identified during polling: User: ${identifiedAuthenticatedSession.username} (ID: ${identifiedAuthenticatedSession.id})`
         );
@@ -692,16 +726,19 @@ class VisualLoginHandler {
     this.isLoggedIn = false;
     this.loggedInUsername = null;
     this.activeSessionId = null;
+    this.selectedLoginOption = "";
     this.stopSessionMonitor();
     this.stopSessionPolling();
     if (this.loginTab && !this.loginTab.closed) {
       this.loginTab = null;
     }
+
     this.updateLoginOptionsUI(null, false);
+    // Explicitly uncheck both radio buttons after a full logout action
     if (this.optionLoginRadio) this.optionLoginRadio.checked = false;
     if (this.optionContinueGuestRadio)
       this.optionContinueGuestRadio.checked = false;
-    this.selectedLoginOption = "";
+
     this.updateLoginStatus(
       "logged-out",
       `Logged out ${previousUsername || "user"}. Select an option.`
