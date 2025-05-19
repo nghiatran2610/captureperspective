@@ -9,6 +9,43 @@ import { prepareSVGsForCapture } from "./svgUtils.js";
 
 let _waitTimeout = null;
 
+/**
+ * Injects CSS rules into the head of the specified iframe.
+ * This function assumes it's called when the iframe's document is accessible.
+ *
+ * @param {HTMLIFrameElement} iframeElement The iframe element.
+ * @param {string} cssRules The CSS rules to inject.
+ * @param {function} logFunction A function to log messages (optional).
+ */
+function applyCssToIframe(iframeElement, cssRules, logFunction) {
+  if (
+    !iframeElement ||
+    !iframeElement.contentWindow ||
+    !iframeElement.contentWindow.document
+  ) {
+    if (logFunction)
+      logFunction(
+        "Cannot apply CSS: Iframe or its document is not accessible.",
+        "error"
+      );
+    return false;
+  }
+
+  try {
+    const iframeDoc = iframeElement.contentWindow.document;
+    const style = iframeDoc.createElement("style");
+    style.textContent = cssRules;
+    iframeDoc.head.appendChild(style);
+    if (logFunction)
+      logFunction("Custom CSS successfully injected into iframe.", "info");
+    return true;
+  } catch (e) {
+    if (logFunction)
+      logFunction(`Error injecting CSS into iframe: ${e.message}`, "error");
+    return false;
+  }
+}
+
 export async function takeScreenshot(
   url,
   preset = "fullHD",
@@ -67,15 +104,20 @@ export async function takeScreenshot(
     config.screenshot.presets[preset] || config.screenshot.presets.fullHD;
   let width = basePreset.width;
   let initialHeight = basePreset.height;
-  let actualHeight = initialHeight;
+  let actualHeight = initialHeight; // Will be updated for full page
 
   iframe.style.width = `${width}px`;
   iframe.style.height = `${initialHeight}px`;
 
+  // ADD LOG: Initial iframe style dimensions
+  console.log(
+    `[Capture Setup] Initial iframe style set to: width=${iframe.style.width}, height=${iframe.style.height} (based on preset: ${preset})`
+  );
+
   let wasMountIssueDetectedInRendering = false;
   let finalDetectedMountIssueMessage = null;
 
-  let doc, win; // Declare here to be accessible in finally if needed for resets
+  let doc, win;
 
   try {
     events.emit(events.events.CAPTURE_STARTED, {
@@ -84,12 +126,10 @@ export async function takeScreenshot(
       captureFullPage,
     });
 
-    // Initial check for contentWindow and contentDocument
     win = iframe.contentWindow;
     doc = iframe.contentDocument || win?.document;
 
     if (doc) {
-      // Only observe if doc is available
       observer.observe(doc, {
         childList: true,
         subtree: true,
@@ -99,30 +139,21 @@ export async function takeScreenshot(
         "takeScreenshot: iframe.contentDocument not available at observer setup for URL:",
         url
       );
-      // Depending on how critical this is, you might choose to proceed or throw earlier.
-      // For now, loadUrlInIframe will also check and might throw.
     }
 
-    await loadUrlInIframe(iframe, url); // This can throw if iframe fails to load
+    await loadUrlInIframe(iframe, url);
 
-    // Re-assign doc and win after load, as they might have changed (especially if src was about:blank)
-    win = iframe.contentWindow;
+    win = iframe.contentWindow; // Ensure win and doc are updated after load
     doc = iframe.contentDocument || win?.document;
 
     if (!doc || !win) {
-      observer.disconnect(); // Ensure observer is disconnected if it was started
+      if (observer && typeof observer.disconnect === "function")
+        observer.disconnect();
       throw new errorHandling.ScreenshotError(
         "Iframe content (document or window) became unavailable after load.",
         url
       );
     }
-
-    // If the observer wasn't started due to initial null doc, try starting it now if doc is available
-    // This is a bit defensive, ideally observer is set on a valid doc from the start.
-    // However, the initial check for doc before loadUrlInIframe might mean observer was never started.
-    // It's better to ensure the observer is attached to the final loaded document if possible.
-    // For simplicity and to avoid re-observing, we'll assume the initial observe was on the correct (eventual) document
-    // or that changes relevant to mount issues happen early.
 
     await new Promise((resolve) => setTimeout(resolve, 300));
 
@@ -142,7 +173,8 @@ export async function takeScreenshot(
     }
 
     if (!renderResult.success && !renderResult.detectedMountIssue) {
-      observer.disconnect();
+      if (observer && typeof observer.disconnect === "function")
+        observer.disconnect();
       throw new errorHandling.ScreenshotError(
         `Failed to capture screenshot: ${renderResult.error}`,
         url,
@@ -164,8 +196,46 @@ export async function takeScreenshot(
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    observer.disconnect();
+    if (observer && typeof observer.disconnect === "function")
+      observer.disconnect();
     const currentUrl = win.location.href;
+
+    // *********************************************************************
+    // ** CSS INJECTION POINT **
+    // *********************************************************************
+    const buttonFixCss = `
+      /* Prevent button text wrapping - Core fix from user */
+      .button .text,
+      .ia_button--primary .text,
+      .button-primary .text,
+      .ia-button .text {
+        white-space: nowrap !important;
+      }
+
+      /* Ensure buttons have enough width - Core fix from user */
+      .button,
+      .ia_button--primary,
+      .button-primary,
+      .ia-button {
+        min-width: fit-content !important;
+        flex-shrink: 0 !important;
+      }
+
+      /* Optional: Address flex container issues if buttons themselves are flex containers for their text/icon */
+      .ia_button--primary > div, /* Assuming direct child div holds text/icon */
+      .button-primary > div,
+      .ia-button > div {
+        white-space: nowrap !important; /* Might be redundant if above .text selector works */
+        flex-wrap: nowrap !important; /* Prevents wrapping of items inside the button's flex div */
+      }
+    `;
+
+    applyCssToIframe(iframe, buttonFixCss, (message, type) =>
+      console[type || "log"](`[CSS Injection] ${message}`)
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    // *********************************************************************
 
     if (doc) {
       prepareSVGsForCapture(doc);
@@ -220,7 +290,7 @@ export async function takeScreenshot(
         actualHeight = initialHeight > 0 ? initialHeight : 720;
       actualHeight = Math.max(actualHeight, initialHeight);
       console.log(
-        `[Full Page] Calculated actualHeight: ${actualHeight} for ${url}`
+        `[Capture Setup] Full Page mode: Calculated actualHeight: ${actualHeight} for ${url}`
       );
 
       originalRootStyles = {
@@ -242,15 +312,21 @@ export async function takeScreenshot(
       doc.body.style.margin = "0";
 
       iframe.style.height = `${actualHeight}px`;
+      console.log(
+        `[Capture Setup] Full Page mode: iframe style height updated to: ${iframe.style.height}`
+      );
       if (doc.documentElement.offsetHeight === undefined) {
         /* no-op to trigger reflow */
-      } // Check on doc.documentElement
+      }
       await new Promise((resolve) =>
         requestAnimationFrame(() => setTimeout(resolve, 250))
-      ); // Increased delay
+      );
     } else {
       actualHeight = initialHeight;
       iframe.style.height = `${actualHeight}px`;
+      console.log(
+        `[Capture Setup] Non-Full Page mode: iframe style height: ${iframe.style.height}`
+      );
       if (doc && doc.documentElement) {
         originalRootStyles = {
           height: doc.documentElement.style.height,
@@ -272,9 +348,13 @@ export async function takeScreenshot(
       );
     }
 
+    console.log(
+      `[Capture Setup] Dimensions for domtoimage: width=${width}, height=${actualHeight}`
+    );
+
     let tempFixedStyles = [];
+
     if (doc && win) {
-      // Ensure doc and win are valid
       try {
         const fixedElements = Array.from(doc.querySelectorAll("*")).filter(
           (el) => {
@@ -312,7 +392,6 @@ export async function takeScreenshot(
       actualHeight
     );
 
-    // Restore original styles for fixed elements
     if (tempFixedStyles.length > 0) {
       try {
         tempFixedStyles.forEach((item) => {
@@ -324,7 +403,6 @@ export async function takeScreenshot(
       }
     }
 
-    // Restore original root/body styles
     if (doc && doc.documentElement && originalRootStyles.height !== undefined) {
       doc.documentElement.style.height = originalRootStyles.height;
       doc.documentElement.style.overflow = originalRootStyles.overflow;
@@ -366,7 +444,8 @@ export async function takeScreenshot(
     events.emit(events.events.SCREENSHOT_TAKEN, { url: currentUrl, result });
     return result;
   } catch (error) {
-    observer.disconnect();
+    if (observer && typeof observer.disconnect === "function")
+      observer.disconnect();
     iframe.style.height = `${initialHeight}px`;
     iframe.src = "about:blank";
     const errorMessage =
@@ -377,7 +456,7 @@ export async function takeScreenshot(
     const captureError = new errorHandling.ScreenshotError(
       errorMessage,
       url,
-      error.reason || error.name // Use error.name if reason is not available
+      error.reason || error.name
     );
 
     events.emit(events.events.CAPTURE_FAILED, { url, error: captureError });
@@ -402,15 +481,10 @@ function loadUrlInIframe(iframe, url) {
       if (loadFired) return;
       loadFired = true;
       console.log(`Iframe load event fired for ${url}`);
-      // Check if contentDocument is accessible after load
       if (!iframe.contentDocument && !iframe.contentWindow?.document) {
         console.error(
           `Iframe contentDocument not accessible after load for ${url}. This might be a cross-origin issue or load failure.`
         );
-        cleanup();
-        // This specific error could be caught by takeScreenshot or we can reject here.
-        // For now, let loadUrlInIframe resolve, and takeScreenshot will fail if doc/win are null.
-        // Or, reject directly: reject(new Error(`Iframe contentDocument not accessible after load for ${url}`));
       }
       cleanup();
       setTimeout(resolve, 500);
@@ -446,12 +520,11 @@ function loadUrlInIframe(iframe, url) {
         "Cross-origin check during iframe load failed. Proceeding for " + url
       );
     }
-    iframe.src = url; // This can also throw sync errors if URL is invalid like "chrome-error://..."
+    iframe.src = url;
   });
 }
 
 function waitForRendering(url, iframe) {
-  // ... (waitForRendering function remains largely unchanged but ensure robustness for null contentDocument)
   return new Promise((resolve) => {
     let waitTimeInSeconds = 10;
     try {
@@ -630,8 +703,10 @@ function waitForRendering(url, iframe) {
       }
     };
 
+    let resolveFn = resolve;
+
     const countdown = () => {
-      if (!resolve) return; // Already resolved
+      if (!resolveFn) return;
 
       const domLoadErrorCheck = checkForDOMLoadErrors();
       if (domLoadErrorCheck.found && !domLoadErrorCheck.isMountIssue) {
@@ -639,12 +714,12 @@ function waitForRendering(url, iframe) {
         generalErrorMsg = domLoadErrorCheck.message;
         if (_waitTimeout) clearTimeout(_waitTimeout);
         _waitTimeout = null;
-        resolve({
+        resolveFn({
           success: false,
           error: generalErrorMsg,
           detectedMountIssue: false,
         });
-        resolve = null;
+        resolveFn = null;
         return;
       }
 
@@ -660,10 +735,10 @@ function waitForRendering(url, iframe) {
       ) {
         checkAndRestoreConsole();
         setTimeout(() => {
-          if (resolve) {
+          if (resolveFn) {
             const anyMountIssueFound =
               domMountErrorFound || consoleMountErrorFound;
-            resolve({
+            resolveFn({
               success: true,
               error: null,
               detectedMountIssue: anyMountIssueFound,
@@ -671,7 +746,7 @@ function waitForRendering(url, iframe) {
                 ? detectedMountIssueMsgInternal
                 : null,
             });
-            resolve = null;
+            resolveFn = null;
           }
         }, 500);
         _waitTimeout = null;
@@ -683,10 +758,10 @@ function waitForRendering(url, iframe) {
         console.warn(
           `Wait time expired for ${url}. Images loaded: ${imagesLoaded}, readyState: ${readyState}. Proceeding with capture.`
         );
-        if (resolve) {
+        if (resolveFn) {
           const anyMountIssueFound =
             domMountErrorFound || consoleMountErrorFound;
-          resolve({
+          resolveFn({
             success: true,
             error: null,
             detectedMountIssue: anyMountIssueFound,
@@ -694,7 +769,7 @@ function waitForRendering(url, iframe) {
               ? detectedMountIssueMsgInternal
               : null,
           });
-          resolve = null;
+          resolveFn = null;
         }
         _waitTimeout = null;
         return;
@@ -704,7 +779,7 @@ function waitForRendering(url, iframe) {
         message: `<span class="status-spinner">⏳</span> Waiting for ${url} (${readyState})... (${secondsLeft}s remaining)`,
       });
       secondsLeft--;
-      if (resolve) {
+      if (resolveFn) {
         _waitTimeout = setTimeout(countdown, 1000);
       } else {
         _waitTimeout = null;
@@ -715,19 +790,17 @@ function waitForRendering(url, iframe) {
 }
 
 async function captureScreenshotInternal(iframe, pageUrl, width, height) {
-  // Re-fetch doc and win here as they are scoped to this function
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument || win?.document;
 
   if (!doc || !doc.documentElement) {
-    // Check doc first
     throw new errorHandling.ScreenshotError(
       "Iframe document or documentElement is not available for capture.",
       pageUrl
     );
   }
 
-  const targetNode = doc.documentElement; // Define targetNode here
+  const targetNode = doc.documentElement;
 
   events.emit(events.events.CAPTURE_PROGRESS, {
     message: `Capturing with dom-to-image (${width}x${height})...`,
@@ -753,18 +826,20 @@ async function captureScreenshotInternal(iframe, pageUrl, width, height) {
     style: { margin: "0" },
   };
 
-  // Styles should have been applied in takeScreenshot before calling this.
-  // A final reflow trigger and small delay.
+  console.log(
+    `[Capture Internal] domToImageOptions being used:`,
+    JSON.stringify(domToImageOptions)
+  );
+
   if (targetNode.offsetHeight === undefined) {
     /* no-op */
-  } // Trigger reflow on the actual targetNode
+  }
   await new Promise((resolve) =>
     requestAnimationFrame(() => setTimeout(resolve, 100))
   );
 
   let dataUrl;
   try {
-    // targetNode is doc.documentElement, which should be valid if we reached here
     dataUrl = await domtoimage.toPng(targetNode, domToImageOptions);
   } catch (captureError) {
     console.error("dom-to-image.toPng failed:", captureError);
@@ -813,7 +888,6 @@ async function captureScreenshotInternal(iframe, pageUrl, width, height) {
 }
 
 export function downloadScreenshot(screenshotData, filename) {
-  // ... (downloadScreenshot function remains unchanged)
   try {
     if (!screenshotData || !filename) {
       console.error("Missing data or filename for download.");
@@ -832,7 +906,6 @@ export function downloadScreenshot(screenshotData, filename) {
 }
 
 export async function takeSequentialScreenshots(
-  // ... (takeSequentialScreenshots function remains unchanged)
   url,
   preset = "fullHD",
   captureFullPage = false,
