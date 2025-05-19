@@ -983,11 +983,12 @@ body.simple-mode .context-actions-header {
 .setting-container {
   display: flex;
   align-items: center;
+  margin-top: 15px; /* Space between setting rows */
 }
 .setting-container label {
   font-weight: 500;
   font-size: 14px;
-  margin-right: 8px;
+  margin-right: var(--spacing-md); /* Space between label and its input */
   color: #3f4a5a;
 }
 .wait-time-input {
@@ -1209,7 +1210,6 @@ body.simple-mode .context-actions-header {
   padding: 10px 15px;
   background-color: #f0f7ff;
   border: 1px solid #cce4ff;
-  margin-bottom: 0;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -1567,4 +1567,7 @@ body.simple-mode .context-actions-header {
     margin-top: 10px; /* Add top margin when stacked */
     width: 100%; /* Make logout button full width on very small screens */
   }
+}
+#screenSizeLabel select#capturePreset {
+  margin-left: var(--spacing-md); /* Adds 10px space */
 }
