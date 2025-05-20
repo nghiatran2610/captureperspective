@@ -33,7 +33,16 @@ function applyCssToIframe(iframeElement, cssRules, logFunction) {
 
   try {
     const iframeDoc = iframeElement.contentWindow.document;
+    // Remove existing injected styles to prevent duplication if this function is called multiple times
+    const existingStyleElement = iframeDoc.getElementById(
+      "screenshot-injected-styles"
+    );
+    if (existingStyleElement) {
+      existingStyleElement.remove();
+    }
+
     const style = iframeDoc.createElement("style");
+    style.id = "screenshot-injected-styles"; // Add an ID for easy removal/update
     style.textContent = cssRules;
     iframeDoc.head.appendChild(style);
     if (logFunction)
@@ -109,7 +118,6 @@ export async function takeScreenshot(
   iframe.style.width = `${width}px`;
   iframe.style.height = `${initialHeight}px`;
 
-  // ADD LOG: Initial iframe style dimensions
   console.log(
     `[Capture Setup] Initial iframe style set to: width=${iframe.style.width}, height=${iframe.style.height} (based on preset: ${preset})`
   );
@@ -143,7 +151,7 @@ export async function takeScreenshot(
 
     await loadUrlInIframe(iframe, url);
 
-    win = iframe.contentWindow; // Ensure win and doc are updated after load
+    win = iframe.contentWindow;
     doc = iframe.contentDocument || win?.document;
 
     if (!doc || !win) {
@@ -230,12 +238,53 @@ export async function takeScreenshot(
       }
     `;
 
-    applyCssToIframe(iframe, buttonFixCss, (message, type) =>
+    const scrollbarAndOverflowFixCss = `
+      /* General scrollbar hiding for all elements in the iframe */
+      html::-webkit-scrollbar,
+      body::-webkit-scrollbar,
+      *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        background: transparent !important; /* Ensure no scrollbar track background */
+      }
+
+      html,
+      body,
+      * {
+        -ms-overflow-style: none !important;  /* IE and Edge */
+        scrollbar-width: none !important;     /* Firefox */
+      }
+
+      /* Specific fix for the container identified by the user (psc-Card_Off) 
+         and common Perspective flex containers that might cause internal scrolling.
+         The !important is crucial here to override inline styles or other specific styles.
+      */
+      .psc-Card_Off, /* The main card element that showed the scrollbar */
+      .ia_container--primary.flex-container, /* Common flex container class */
+      .responsive-container.flex-container, /* Another common flex container pattern */
+      div[data-component="ia.container.flex"][style*="overflow: auto"], /* Target specific inline styles for overflow: auto */
+      div[data-component="ia.container.flex"][style*="overflow: scroll"], /* Target specific inline styles for overflow: scroll */
+      div[data-component-path="C$0:0$0:0[0]$0:1[0].0:0"] /* Targeting the specific problematic component by its path */
+      {
+        overflow: hidden !important;
+      }
+
+      /* Address potential inner elements that might still cause overflow issues */
+      .psc-High_Performance_Text.flex-container.view[style*="overflow: auto"],
+      .psc-High_Performance_Text.flex-container.view[style*="overflow: scroll"] {
+         overflow: hidden !important;
+      }
+    `;
+
+    const combinedCss = buttonFixCss + "\n" + scrollbarAndOverflowFixCss;
+
+    applyCssToIframe(iframe, combinedCss, (message, type) =>
       console[type || "log"](`[CSS Injection] ${message}`)
     );
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
     // *********************************************************************
+
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Allow styles to apply
 
     if (doc) {
       prepareSVGsForCapture(doc);
@@ -299,7 +348,7 @@ export async function takeScreenshot(
         margin: doc.documentElement.style.margin,
       };
       doc.documentElement.style.height = `${actualHeight}px`;
-      doc.documentElement.style.overflow = "visible";
+      doc.documentElement.style.overflow = "visible"; // For full page, allow it to be visible but ensure scrollbars are hidden by injected CSS
       doc.documentElement.style.margin = "0";
 
       originalBodyStyles = {
@@ -308,7 +357,7 @@ export async function takeScreenshot(
         margin: doc.body.style.margin,
       };
       doc.body.style.height = `${actualHeight}px`;
-      doc.body.style.overflow = "visible";
+      doc.body.style.overflow = "visible"; // For full page, allow it to be visible but ensure scrollbars are hidden by injected CSS
       doc.body.style.margin = "0";
 
       iframe.style.height = `${actualHeight}px`;
@@ -322,6 +371,7 @@ export async function takeScreenshot(
         requestAnimationFrame(() => setTimeout(resolve, 250))
       );
     } else {
+      // Not full page
       actualHeight = initialHeight;
       iframe.style.height = `${actualHeight}px`;
       console.log(
@@ -333,7 +383,7 @@ export async function takeScreenshot(
           overflow: doc.documentElement.style.overflow,
         };
         doc.documentElement.style.height = `${actualHeight}px`;
-        doc.documentElement.style.overflow = "hidden";
+        doc.documentElement.style.overflow = "hidden"; // Explicitly hide overflow for fixed-size capture
       }
       if (doc && doc.body) {
         originalBodyStyles = {
@@ -341,7 +391,7 @@ export async function takeScreenshot(
           overflow: doc.body.style.overflow,
         };
         doc.body.style.height = `${actualHeight}px`;
-        doc.body.style.overflow = "hidden";
+        doc.body.style.overflow = "hidden"; // Explicitly hide overflow for fixed-size capture
       }
       await new Promise((resolve) =>
         requestAnimationFrame(() => setTimeout(resolve, 50))
@@ -403,6 +453,7 @@ export async function takeScreenshot(
       }
     }
 
+    // Restore original styles to iframe's documentElement and body
     if (doc && doc.documentElement && originalRootStyles.height !== undefined) {
       doc.documentElement.style.height = originalRootStyles.height;
       doc.documentElement.style.overflow = originalRootStyles.overflow;
@@ -412,6 +463,13 @@ export async function takeScreenshot(
       doc.body.style.height = originalBodyStyles.height;
       doc.body.style.overflow = originalBodyStyles.overflow;
       doc.body.style.margin = originalBodyStyles.margin;
+    }
+    // Remove injected styles after capture
+    const injectedStyleElement = doc?.getElementById(
+      "screenshot-injected-styles"
+    );
+    if (injectedStyleElement) {
+      injectedStyleElement.remove();
     }
 
     const thumbnailData = await screenshotUtils.createThumbnail(
@@ -439,15 +497,35 @@ export async function takeScreenshot(
       error: false,
     };
 
-    iframe.style.height = `${initialHeight}px`;
-    iframe.src = "about:blank";
+    iframe.style.height = `${initialHeight}px`; // Restore iframe's initial height
+    iframe.src = "about:blank"; // Clear iframe content
     events.emit(events.events.SCREENSHOT_TAKEN, { url: currentUrl, result });
     return result;
   } catch (error) {
     if (observer && typeof observer.disconnect === "function")
       observer.disconnect();
-    iframe.style.height = `${initialHeight}px`;
-    iframe.src = "about:blank";
+    iframe.style.height = `${initialHeight}px`; // Restore iframe's initial height on error
+    iframe.src = "about:blank"; // Clear iframe content on error
+
+    // Attempt to remove injected styles even on error
+    try {
+      const docOnError =
+        iframe.contentDocument || iframe.contentWindow?.document;
+      if (docOnError) {
+        const injectedStyleElementOnError = docOnError.getElementById(
+          "screenshot-injected-styles"
+        );
+        if (injectedStyleElementOnError) {
+          injectedStyleElementOnError.remove();
+        }
+      }
+    } catch (cleanupError) {
+      console.warn(
+        "Error cleaning up injected styles after main error:",
+        cleanupError
+      );
+    }
+
     const errorMessage =
       error instanceof errorHandling.ScreenshotError
         ? error.message
@@ -467,7 +545,7 @@ export async function takeScreenshot(
 function loadUrlInIframe(iframe, url) {
   return new Promise((resolve, reject) => {
     let loadFired = false;
-    const timeoutDuration = 30000;
+    const timeoutDuration = 30000; // 30 seconds
 
     const loadTimeout = setTimeout(() => {
       if (!loadFired) {
@@ -570,7 +648,7 @@ function waitForRendering(url, iframe) {
         originalError = iframeWin.console.error;
         restoreConsoleNeeded = true;
       } catch (e) {
-        console.warn("Could not access iframe console for:", url, e);
+        console.warn("Could not access iframe console for:", url, e.message);
       }
     }
 
@@ -580,7 +658,7 @@ function waitForRendering(url, iframe) {
           iframeWin.console.warn = originalWarn;
           iframeWin.console.error = originalError;
         } catch (e) {
-          console.warn("Error restoring iframe console for:", url, e);
+          console.warn("Error restoring iframe console for:", url, e.message);
         }
         restoreConsoleNeeded = false;
       }
@@ -825,14 +903,13 @@ async function captureScreenshotInternal(iframe, pageUrl, width, height) {
     },
     style: { margin: "0" },
   };
-
   console.log(
     `[Capture Internal] domToImageOptions being used:`,
     JSON.stringify(domToImageOptions)
   );
 
   if (targetNode.offsetHeight === undefined) {
-    /* no-op */
+    /* no-op to trigger reflow */
   }
   await new Promise((resolve) =>
     requestAnimationFrame(() => setTimeout(resolve, 100))
@@ -1033,6 +1110,7 @@ export async function takeSequentialScreenshots(
           sequenceIndex: i,
           totalSequences: actionSequences.length,
         });
+
         throw sequenceError;
       }
       await new Promise((r) => setTimeout(r, 200));
