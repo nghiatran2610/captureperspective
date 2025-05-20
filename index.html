@@ -121,6 +121,15 @@
                 />
                 From JSON (Perspective Page Configuration)
               </label>
+              <label>
+                <input
+                  type="radio"
+                  name="pageSourceOption"
+                  value="relativeList"
+                  id="sourceRelativeList"
+                />
+                From Relative Path List
+              </label>
             </div>
           </div>
 
@@ -163,6 +172,56 @@
             </button>
             <div
               id="manualJsonStatus"
+              class="input-status-message"
+              style="margin-top: 5px"
+            ></div>
+          </div>
+
+          <div
+            id="relativeListInputArea"
+            class="setting-container manual-input-options"
+            style="display: none"
+          >
+            <div class="manual-paste-group" style="width: 100%">
+              <label for="relativePathsText" class="manual-input-label"
+                >Enter Relative Paths (one per line):</label
+              >
+              <textarea
+                id="relativePathsText"
+                rows="5"
+                placeholder="/path/to/page1&#10;/another/page&#10;/example"
+              ></textarea>
+              <div
+                id="relativePathInfo"
+                class="help-text"
+                style="
+                  margin-top: 8px;
+                  padding: 8px;
+                  background-color: #f0f8ff;
+                  border: 1px solid #cce4ff;
+                  border-radius: 4px;
+                  display: none;
+                "
+              >
+                Relative paths are combined with the Project URL.
+                <br />Current Project URL:
+                <strong id="currentProjectUrlDisplay">N/A</strong>
+                <br />Example:
+                <code
+                  ><span id="finalUrlExamplePrefix"></span>/example/page</code
+                >
+              </div>
+            </div>
+            <button
+              id="loadRelativeListBtn"
+              class="btn btn-small load-manual-btn"
+              style="margin-top: 10px"
+              disabled
+            >
+              Load Paths
+            </button>
+            <div
+              id="relativeListStatus"
               class="input-status-message"
               style="margin-top: 5px"
             ></div>

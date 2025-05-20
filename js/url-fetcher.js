@@ -3,9 +3,6 @@ import config from "./config.js";
 import { URLProcessingError } from "./errors.js";
 import * as events from "./events.js";
 
-/**
- * A utility class to fetch URLs from an endpoint or use provided data
- */
 class URLFetcher {
   constructor() {
     this.urlsData = null;
@@ -19,33 +16,22 @@ class URLFetcher {
     this.apiEndpointBase = ""; // Base URL up to the webdev project root (e.g., http://.../system/webdev/PerspectiveCapture/)
     this.projectListEndpoint = ""; // Endpoint for fetching project names
     this.pageListEndpoint = ""; // The final constructed API endpoint for fetching pages of a project
-    this.dataLoadedDirectly = false;
+    this.dataLoadedDirectly = false; // This flag will be used by the new mode too
 
-    this._determineApiEndpoints(); // Renamed for clarity
+    this._determineApiEndpoints();
   }
 
-  // Corrected method to determine the FULL endpoint paths
   _determineApiEndpoints() {
     try {
       const currentHref = window.location.href;
-      // Regex to capture:
-      // 1. The full base URL up to and including the webdev project name and trailing slash (e.g., http://host/system/webdev/PerspectiveCapture/)
-      // 2. The webdev project name itself (e.g., PerspectiveCapture)
       const match = currentHref.match(/^(.*\/system\/webdev\/([^\/]+)\/)/);
 
       if (match && match[1] && match[2]) {
-        this.apiEndpointBase = match[1]; // e.g., http://host/system/webdev/PerspectiveCapture/
-        const toolProjectName = match[2]; // e.g., PerspectiveCapture (The project this tool runs under)
+        this.apiEndpointBase = match[1];
+        const toolProjectName = match[2];
+        const backendRouteBase = toolProjectName;
 
-        // --- Construct Endpoints ---
-        // Assuming your Python backend script routes are mounted directly under the tool's project name
-        const backendRouteBase = toolProjectName; // Often the same as the tool's project name
-
-        // Project List Endpoint
         this.projectListEndpoint = `${this.apiEndpointBase}${backendRouteBase}/listProjects`;
-
-        // Page List Endpoint (Base part, query param added later in setBaseClientUrl)
-        // Storing the base path here, the full endpoint is constructed when a target project is known
         this.pageListEndpointBase = `${this.apiEndpointBase}${backendRouteBase}/getUrls`;
 
         console.log(`API Endpoint Base determined: ${this.apiEndpointBase}`);
@@ -62,29 +48,23 @@ class URLFetcher {
         );
         this.apiEndpointBase = "";
         this.projectListEndpoint = "";
-        this.pageListEndpointBase = ""; // Ensure this is also cleared
-        // Consider throwing an error or displaying a UI message here as this is critical
-        UI.utils.showStatus(
-          "Error: Could not determine API paths. Tool may not function.",
-          true,
-          0
-        );
+        this.pageListEndpointBase = "";
+        // Consider UI.utils.showStatus for critical errors if UI is available
       }
     } catch (e) {
       console.error("Error determining API endpoints:", e);
       this.apiEndpointBase = "";
       this.projectListEndpoint = "";
       this.pageListEndpointBase = "";
-      UI.utils.showStatus("Error: Failed to configure API paths.", true, 0);
+      // Consider UI.utils.showStatus for critical errors
     }
   }
 
   setBaseClientUrl(url) {
-    // This method remains largely the same, but uses this.pageListEndpointBase
     if (!url || typeof url !== "string") {
       console.error("Invalid base client URL provided");
       this.projectName = "";
-      this.pageListEndpoint = ""; // Clear the final page list endpoint
+      this.pageListEndpoint = "";
       return false;
     }
 
@@ -94,12 +74,11 @@ class URLFetcher {
 
       const match = this.baseClientUrl.match(/\/client\/([^\/]+)/);
       if (match && match[1]) {
-        this.projectName = match[1]; // This is the TARGET project name
+        this.projectName = match[1];
         console.log(
           `Target Project name extracted (for page query param): ${this.projectName}`
         );
 
-        // Construct the final page list endpoint using the base path and the target project name
         if (this.pageListEndpointBase && this.projectName) {
           this.pageListEndpoint = `${
             this.pageListEndpointBase
@@ -137,7 +116,6 @@ class URLFetcher {
       message: "Fetching project list...",
     });
 
-    // Use the already constructed projectListEndpoint
     if (!this.projectListEndpoint) {
       const errorMsg = "Project list API endpoint is not configured.";
       console.error(errorMsg);
@@ -189,12 +167,11 @@ class URLFetcher {
   }
 
   _processData(data) {
-    // No changes needed here
     this.urlsData = data;
     if (data && data.pages && typeof data.pages === "object") {
       this.urlsList = Object.entries(data.pages).map(([path, details]) => ({
         path,
-        title: details.title || path,
+        title: details.title || path, // Ensure title defaults to path if not provided
         viewPath: details.viewPath,
       }));
       this.categorizeUrls();
@@ -227,10 +204,9 @@ class URLFetcher {
   }
 
   async setDataDirectly(jsonData) {
-    // No changes needed here
     this.isLoading = true;
     this.error = null;
-    this.dataLoadedDirectly = false;
+    this.dataLoadedDirectly = false; // Reset before processing
 
     return new Promise((resolve, reject) => {
       try {
@@ -241,18 +217,18 @@ class URLFetcher {
           } catch (parseError) {
             throw new URLProcessingError(
               "Failed to parse provided JSON string",
-              "Direct Data",
+              "Direct Data (JSON)",
               parseError
             );
           }
         }
         if (typeof dataObject !== "object" || dataObject === null) {
           throw new URLProcessingError(
-            "Provided data is not a valid object",
-            "Direct Data"
+            "Provided JSON data is not a valid object",
+            "Direct Data (JSON)"
           );
         }
-        console.log("Setting page data directly:", dataObject);
+        console.log("Setting page data directly from JSON:", dataObject);
         events.emit(events.events.URL_PROCESSING_STARTED, {
           message: "Processing provided page JSON...",
         });
@@ -263,16 +239,81 @@ class URLFetcher {
           resolve(this.urlsList);
         } else {
           this.isLoading = false;
-          resolve([]);
+          // _processData would have set this.error and emitted events
+          resolve([]); // Resolve with empty on processing failure
         }
       } catch (error) {
-        console.error("Error setting data directly:", error);
+        console.error("Error setting data directly (JSON):", error);
         this.error =
           error instanceof URLProcessingError
             ? error
-            : new URLProcessingError(error.message, "Direct Data");
+            : new URLProcessingError(error.message, "Direct Data (JSON)");
         events.emit(events.events.CAPTURE_FAILED, {
-          url: "Direct Data",
+          url: "Direct Data (JSON)",
+          error: this.error,
+        });
+        this.isLoading = false;
+        reject(this.error);
+      }
+    });
+  }
+
+  /**
+   * NEW METHOD: Process a list of relative paths.
+   * @param {string[]} pathsArray - An array of relative path strings.
+   * @returns {Promise<Array>} - Promise resolving to the list of processed URLs.
+   */
+  async setPathsDirectly(pathsArray) {
+    this.isLoading = true;
+    this.error = null;
+    this.dataLoadedDirectly = false; // Reset before processing
+
+    return new Promise((resolve, reject) => {
+      try {
+        if (!Array.isArray(pathsArray)) {
+          throw new URLProcessingError(
+            "Provided paths data is not a valid array.",
+            "Direct Data (Path List)"
+          );
+        }
+
+        console.log("Setting page data directly from path list:", pathsArray);
+        events.emit(events.events.URL_PROCESSING_STARTED, {
+          message: "Processing provided relative path list...",
+        });
+
+        // Transform the array of paths into the structure _processData expects
+        const pagesObject = {};
+        pathsArray.forEach((path) => {
+          const cleanedPath = path.trim();
+          if (cleanedPath) {
+            // Use the path itself as the title and viewPath for simplicity
+            pagesObject[cleanedPath] = {
+              title: cleanedPath,
+              viewPath: cleanedPath,
+            };
+          }
+        });
+
+        const dataObject = { pages: pagesObject };
+
+        if (this._processData(dataObject)) {
+          this.dataLoadedDirectly = true; // Mark that data was loaded directly
+          this.isLoading = false;
+          resolve(this.urlsList);
+        } else {
+          this.isLoading = false;
+          // _processData would have set this.error and emitted events
+          resolve([]); // Resolve with empty on processing failure
+        }
+      } catch (error) {
+        console.error("Error setting data directly (Path List):", error);
+        this.error =
+          error instanceof URLProcessingError
+            ? error
+            : new URLProcessingError(error.message, "Direct Data (Path List)");
+        events.emit(events.events.CAPTURE_FAILED, {
+          url: "Direct Data (Path List)",
           error: this.error,
         });
         this.isLoading = false;
@@ -283,15 +324,16 @@ class URLFetcher {
 
   async loadUrls() {
     // This loads PAGES for the selected project
-    // No changes needed here, uses this.pageListEndpoint constructed by setBaseClientUrl
     if (this.dataLoadedDirectly) {
-      console.log("Using directly loaded page data (loadUrls).");
+      console.log(
+        "Using directly loaded page data (loadUrls called, but data was direct)."
+      );
       return Promise.resolve(this.urlsList);
     }
 
     this.isLoading = true;
     this.error = null;
-    this.dataLoadedDirectly = false;
+    // this.dataLoadedDirectly = false; // Ensure this is false if we are actually fetching
 
     return new Promise(async (resolve, reject) => {
       try {
@@ -323,6 +365,7 @@ class URLFetcher {
           resolve(this.urlsList);
         } else {
           this.isLoading = false;
+          // _processData would have set this.error and emitted events
           resolve([]);
         }
       } catch (error) {
@@ -345,10 +388,12 @@ class URLFetcher {
   }
 
   categorizeUrls() {
-    // No changes needed here
     this.categorizedUrls = {};
     this.urlsList.forEach((urlInfo) => {
-      const firstSegment = urlInfo.path.split("/").filter(Boolean)[0] || "Home";
+      // Ensure urlInfo.path is a string before splitting
+      const pathString =
+        typeof urlInfo.path === "string" ? urlInfo.path : String(urlInfo.path);
+      const firstSegment = pathString.split("/").filter(Boolean)[0] || "Home";
       if (!this.categorizedUrls[firstSegment]) {
         this.categorizedUrls[firstSegment] = [];
       }
@@ -358,7 +403,6 @@ class URLFetcher {
   }
 
   generateFullUrls(selectedPaths) {
-    // No changes needed here
     if (
       !Array.isArray(selectedPaths) ||
       selectedPaths.length === 0 ||
@@ -379,7 +423,6 @@ class URLFetcher {
   }
 
   extractProjectNameFromBaseUrl() {
-    // No changes needed here
     return this.projectName || null;
   }
 }

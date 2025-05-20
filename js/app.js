@@ -39,6 +39,10 @@ class App {
     this._handleSourceChange = this._handleSourceChange.bind(this);
     this._handleLoadManualSource = this._handleLoadManualSource.bind(this);
     this._handleFileUpload = this._handleFileUpload.bind(this);
+    this._handleLoadRelativeListSource =
+      this._handleLoadRelativeListSource.bind(this);
+    this._updateRelativePathInfoDisplay =
+      this._updateRelativePathInfoDisplay.bind(this); // Renamed
   }
 
   initialize() {
@@ -214,6 +218,7 @@ class App {
       this._setCaptureSettingsUIsDisabled(false);
     }
     this._checkCaptureButtonState();
+    this._updateRelativePathInfoDisplay(); // Update info on project change
   }
 
   async _handleBaseUrlInput(event) {
@@ -224,8 +229,11 @@ class App {
 
     if (!url || !url.includes("/client/")) {
       this.baseUrlValid = false;
-      this.baseUrl = url;
-      if (urlFetcher) urlFetcher.projectName = "";
+      this.baseUrl = url; // Store it even if invalid for now
+      if (urlFetcher) {
+        urlFetcher.setBaseClientUrl(url); // Allow urlFetcher to also know, it might invalidate its state
+        urlFetcher.projectName = ""; // Explicitly clear project name if URL is invalid
+      }
       UI.utils.showStatus(
         url ? "Invalid Project URL format." : "Project URL is required.",
         true,
@@ -242,7 +250,7 @@ class App {
     } else {
       const success = urlFetcher.setBaseClientUrl(url);
       if (success) {
-        this.baseUrl = urlFetcher.baseClientUrl;
+        this.baseUrl = urlFetcher.baseClientUrl; // Use the processed baseClientUrl
         this.baseUrlValid = true;
         if (loginOptionSection) loginOptionSection.style.display = "block";
 
@@ -285,6 +293,7 @@ class App {
       }
     }
     this._checkCaptureButtonState();
+    this._updateRelativePathInfoDisplay(); // Update info on base URL change
   }
 
   _performFullReset() {
@@ -294,6 +303,21 @@ class App {
     if (urlSelector.clearRenderedUrls) {
       urlSelector.clearRenderedUrls();
     }
+    const jsonTextArea = document.getElementById("manualJsonText");
+    if (jsonTextArea) jsonTextArea.value = "";
+    const fileInput = document.getElementById("manualJsonFile");
+    if (fileInput) fileInput.value = "";
+    const fileNameDisplay = document.getElementById("fileNameDisplay");
+    if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
+
+    const relativePathsTextArea = document.getElementById("relativePathsText");
+    if (relativePathsTextArea) relativePathsTextArea.value = "";
+    const loadRelativeListBtn = document.getElementById("loadRelativeListBtn");
+    if (loadRelativeListBtn) loadRelativeListBtn.disabled = true;
+    const loadManualJsonBtn = document.getElementById("loadManualJsonBtn");
+    if (loadManualJsonBtn) loadManualJsonBtn.disabled = true;
+    this._updateRelativePathInfoDisplay(); // Clear/update info on reset
+
     this.captureQueue = [];
     this.currentCaptureIndex = 0;
     if (this.isPaused) {
@@ -362,6 +386,34 @@ class App {
     } else {
       console.error("#manualJsonFile input not found!");
     }
+
+    const loadRelativeListBtn = document.getElementById("loadRelativeListBtn");
+    if (loadRelativeListBtn) {
+      events.addDOMEventListener(
+        loadRelativeListBtn,
+        "click",
+        this._handleLoadRelativeListSource
+      );
+    } else {
+      console.error("#loadRelativeListBtn not found!");
+    }
+    const relativePathsTextArea = document.getElementById("relativePathsText");
+    if (relativePathsTextArea) {
+      events.addDOMEventListener(relativePathsTextArea, "input", () => {
+        if (loadRelativeListBtn) {
+          loadRelativeListBtn.disabled = !relativePathsTextArea.value.trim();
+        }
+        this._checkCaptureButtonState();
+        // No need to call _updateRelativePathInfoDisplay here, as it doesn't depend on textarea content, only base URL.
+      });
+    }
+    const manualJsonTextArea = document.getElementById("manualJsonText");
+    if (manualJsonTextArea && loadManualBtn) {
+      events.addDOMEventListener(manualJsonTextArea, "input", () => {
+        loadManualBtn.disabled = !manualJsonTextArea.value.trim();
+        this._checkCaptureButtonState();
+      });
+    }
   }
 
   _initializeUI() {
@@ -384,6 +436,8 @@ class App {
 
     const manualArea = document.getElementById("manualJsonInputArea");
     if (manualArea) manualArea.style.display = "none";
+    const relativeListArea = document.getElementById("relativeListInputArea");
+    if (relativeListArea) relativeListArea.style.display = "none";
 
     const pageSourceSelection = document.getElementById("pageSourceSelection");
     if (pageSourceSelection) pageSourceSelection.style.display = "none";
@@ -396,6 +450,7 @@ class App {
       baseUrlInput.readOnly = true;
     }
     this._setCaptureSettingsUIsDisabled(true);
+    this._updateRelativePathInfoDisplay(); // Initial call
   }
 
   _ensureHiddenWaitTimeStorage() {
@@ -444,6 +499,15 @@ class App {
     if (pageSourceSelection) pageSourceSelection.style.display = "none";
     if (buttonContainer) buttonContainer.style.display = "none";
 
+    const manualArea = document.getElementById("manualJsonInputArea");
+    if (manualArea) manualArea.style.display = "none";
+    const relativeListArea = document.getElementById("relativeListInputArea");
+    if (relativeListArea) relativeListArea.style.display = "none";
+    const urlSelectorContainer = document.getElementById(
+      "urlSelectorContainer"
+    );
+    if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
+
     if (urlSelector.cleanup) urlSelector.cleanup();
     this._checkCaptureButtonState();
   }
@@ -461,6 +525,7 @@ class App {
       if (typeof urlSelector.initialize === "function") {
         try {
           await urlSelector.initialize();
+
           const captureFormVisible =
             UI.elements.captureForm?.style.display !== "none";
           const pageSourceVisible =
@@ -528,35 +593,51 @@ class App {
       'input[name="pageSourceOption"]:checked'
     )?.value;
     const manualArea = document.getElementById("manualJsonInputArea");
+    const relativeListArea = document.getElementById("relativeListInputArea");
     const urlSelectorContainer = document.getElementById(
       "urlSelectorContainer"
     );
+
     const manualJsonStatus = document.getElementById("manualJsonStatus");
     const jsonTextArea = document.getElementById("manualJsonText");
     const fileInput = document.getElementById("manualJsonFile");
     const fileNameDisplay = document.getElementById("fileNameDisplay");
+    const loadManualJsonBtn = document.getElementById("loadManualJsonBtn");
 
-    if (!manualArea) return;
+    const relativeListStatus = document.getElementById("relativeListStatus");
+    const relativePathsTextArea = document.getElementById("relativePathsText");
+    const loadRelativeListBtn = document.getElementById("loadRelativeListBtn");
+
+    if (!manualArea || !relativeListArea) return;
     if (manualJsonStatus) manualJsonStatus.textContent = "";
+    if (relativeListStatus) relativeListStatus.textContent = "";
 
     if (urlSelector.selectedUrls) urlSelector.selectedUrls.clear();
     if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+    if (urlFetcher) urlFetcher.dataLoadedDirectly = false;
+
+    manualArea.style.display = "none";
+    relativeListArea.style.display = "none";
+    if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
+    if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
 
     if (selectedSource === "manual") {
       manualArea.style.display = "";
-      if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
-      if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
-      if (urlFetcher) urlFetcher.dataLoadedDirectly = false;
-      this.captureQueue = [];
-      AppState.reset();
-      UI.utils.resetUI();
-    } else {
-      manualArea.style.display = "none";
-      if (urlSelectorContainer) urlSelectorContainer.style.display = "";
-      if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
       if (jsonTextArea) jsonTextArea.value = "";
       if (fileInput) fileInput.value = "";
       if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
+      if (loadManualJsonBtn) loadManualJsonBtn.disabled = true;
+    } else if (selectedSource === "relativeList") {
+      relativeListArea.style.display = "";
+      if (relativePathsTextArea) relativePathsTextArea.value = "";
+      if (loadRelativeListBtn) loadRelativeListBtn.disabled = true;
+    } else {
+      // Automatic mode
+      if (urlSelectorContainer) urlSelectorContainer.style.display = "";
+      if (jsonTextArea) jsonTextArea.value = "";
+      if (fileInput) fileInput.value = "";
+      if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
+      if (relativePathsTextArea) relativePathsTextArea.value = "";
 
       const authOk =
         this.loginHandler.selectedLoginOption === "continueWithoutLogin" ||
@@ -574,6 +655,7 @@ class App {
         }
       }
     }
+    this._updateRelativePathInfoDisplay(); // Update/show/hide info based on mode
     this._checkCaptureButtonState();
   }
 
@@ -710,6 +792,94 @@ class App {
     }
   }
 
+  async _handleLoadRelativeListSource() {
+    const pathsTextArea = document.getElementById("relativePathsText");
+    const relativeListStatus = document.getElementById("relativeListStatus");
+    const urlSelectorContainer = document.getElementById(
+      "urlSelectorContainer"
+    );
+    const loadBtn = document.getElementById("loadRelativeListBtn");
+
+    if (!pathsTextArea || !relativeListStatus || !loadBtn) return;
+
+    relativeListStatus.textContent = "";
+    relativeListStatus.style.color = "";
+    loadBtn.disabled = true;
+    loadBtn.textContent = "Loading...";
+    if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
+
+    const pathsContent = pathsTextArea.value.trim();
+
+    if (!pathsContent) {
+      relativeListStatus.textContent = "Error: No relative paths to load.";
+      relativeListStatus.style.color = "red";
+      loadBtn.disabled = false;
+      loadBtn.textContent = "Load Paths";
+      return;
+    }
+
+    const pathsArray = pathsContent
+      .split("\n")
+      .map((p) => p.trim())
+      .filter((p) => p && !p.startsWith("#") && !p.startsWith("//"));
+
+    if (pathsArray.length === 0) {
+      relativeListStatus.textContent =
+        "Error: No valid relative paths entered (after filtering comments/empty lines).";
+      relativeListStatus.style.color = "red";
+      loadBtn.disabled = !pathsTextArea.value.trim();
+      loadBtn.textContent = "Load Paths";
+      return;
+    }
+
+    try {
+      relativeListStatus.textContent = `Processing ${pathsArray.length} relative paths...`;
+      relativeListStatus.style.color = "orange";
+
+      await urlFetcher.setPathsDirectly(pathsArray);
+
+      if (urlFetcher.dataLoadedDirectly) {
+        if (
+          !urlSelectorContainer &&
+          typeof urlSelector.initialize === "function"
+        ) {
+          await urlSelector.initialize();
+        }
+        if (document.getElementById("urlSelectorContainer")) {
+          urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
+          document.getElementById("urlSelectorContainer").style.display = "";
+        } else {
+          throw new Error(
+            "URL Selector UI could not be prepared for relative path list data."
+          );
+        }
+        relativeListStatus.textContent = `Success: Loaded ${urlFetcher.urlsList.length} pages. Select pages to capture.`;
+        relativeListStatus.style.color = "green";
+      } else {
+        const errorMsg =
+          urlFetcher.error?.message || "Failed to process relative path list.";
+        relativeListStatus.textContent = `Error: ${errorMsg}`;
+        relativeListStatus.style.color = "red";
+        if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
+        if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
+      }
+    } catch (error) {
+      console.error(`Error loading relative path list source:`, error);
+      const errorMsg =
+        error instanceof AppError
+          ? error.message
+          : "Error processing path list.";
+      relativeListStatus.textContent = `Error: ${errorMsg}`;
+      relativeListStatus.style.color = "red";
+      if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
+      if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
+    } finally {
+      loadBtn.disabled = !pathsTextArea.value.trim();
+      loadBtn.textContent = "Load Paths";
+      this._checkCaptureButtonState();
+    }
+  }
+
   _readFileContent(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -722,7 +892,8 @@ class App {
   _checkCaptureButtonState() {
     const captureBtn = UI.elements.captureBtn;
     const buttonContainer = UI.elements.buttonContainer;
-    const loadManualBtn = document.getElementById("loadManualJsonBtn");
+    const loadManualJsonBtn = document.getElementById("loadManualJsonBtn");
+    const loadRelativeListBtn = document.getElementById("loadRelativeListBtn");
 
     if (!captureBtn || !buttonContainer) return;
 
@@ -730,13 +901,22 @@ class App {
       'input[name="pageSourceOption"]:checked'
     )?.value;
 
-    if (loadManualBtn && selectedSource === "manual") {
+    if (loadManualJsonBtn && selectedSource === "manual") {
       const jsonTextArea = document.getElementById("manualJsonText");
-      loadManualBtn.disabled =
+      loadManualJsonBtn.disabled =
         !(jsonTextArea && jsonTextArea.value.trim()) ||
-        loadManualBtn.textContent === "Loading...";
-    } else if (loadManualBtn) {
-      loadManualBtn.disabled = true;
+        loadManualJsonBtn.textContent === "Loading...";
+    } else if (loadManualJsonBtn) {
+      loadManualJsonBtn.disabled = true;
+    }
+
+    if (loadRelativeListBtn && selectedSource === "relativeList") {
+      const pathsTextArea = document.getElementById("relativePathsText");
+      loadRelativeListBtn.disabled =
+        !(pathsTextArea && pathsTextArea.value.trim()) ||
+        loadRelativeListBtn.textContent === "Loading...";
+    } else if (loadRelativeListBtn) {
+      loadRelativeListBtn.disabled = true;
     }
 
     const authOk =
@@ -749,7 +929,10 @@ class App {
     if (selectedSource === "automatic") {
       urlsAvailableAndSelected =
         urlFetcher.urlsList.length > 0 && urlSelector.selectedUrls.size > 0;
-    } else if (selectedSource === "manual") {
+    } else if (
+      selectedSource === "manual" ||
+      selectedSource === "relativeList"
+    ) {
       urlsAvailableAndSelected =
         urlFetcher.dataLoadedDirectly && urlSelector.selectedUrls.size > 0;
     }
@@ -1064,7 +1247,6 @@ class App {
         `[App.captureScreenshots] AppState.failedUrls.length BEFORE AppState.reset(): ${AppState.failedUrls.length}`
       );
 
-      // Ensure AppState and UI are reset for a new capture batch
       AppState.reset();
       UI.utils.resetUI();
 
@@ -1588,6 +1770,36 @@ class App {
 
     content.classList.toggle("collapsed", collapsed);
     wrapper.classList.toggle("collapsed", collapsed);
+  }
+
+  // Renamed from _updateRelativePathExample
+  _updateRelativePathInfoDisplay() {
+    const infoDiv = document.getElementById("relativePathInfo");
+    const currentProjectUrlDisplay = document.getElementById(
+      "currentProjectUrlDisplay"
+    );
+    const finalUrlExamplePrefix = document.getElementById(
+      "finalUrlExamplePrefix"
+    );
+    const selectedSource = document.querySelector(
+      'input[name="pageSourceOption"]:checked'
+    )?.value;
+
+    if (!infoDiv || !currentProjectUrlDisplay || !finalUrlExamplePrefix) return;
+
+    if (
+      selectedSource === "relativeList" &&
+      this.baseUrlValid &&
+      urlFetcher.baseClientUrl
+    ) {
+      infoDiv.style.display = "block";
+      currentProjectUrlDisplay.textContent = urlFetcher.baseClientUrl;
+      finalUrlExamplePrefix.textContent = urlFetcher.baseClientUrl;
+    } else {
+      infoDiv.style.display = "none";
+      currentProjectUrlDisplay.textContent = "N/A";
+      finalUrlExamplePrefix.textContent = "PROJECT_URL";
+    }
   }
 }
 
