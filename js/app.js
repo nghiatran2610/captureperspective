@@ -42,7 +42,7 @@ class App {
     this._handleLoadRelativeListSource =
       this._handleLoadRelativeListSource.bind(this);
     this._updateRelativePathInfoDisplay =
-      this._updateRelativePathInfoDisplay.bind(this); // Renamed
+      this._updateRelativePathInfoDisplay.bind(this);
   }
 
   initialize() {
@@ -218,7 +218,7 @@ class App {
       this._setCaptureSettingsUIsDisabled(false);
     }
     this._checkCaptureButtonState();
-    this._updateRelativePathInfoDisplay(); // Update info on project change
+    this._updateRelativePathInfoDisplay();
   }
 
   async _handleBaseUrlInput(event) {
@@ -229,10 +229,10 @@ class App {
 
     if (!url || !url.includes("/client/")) {
       this.baseUrlValid = false;
-      this.baseUrl = url; // Store it even if invalid for now
+      this.baseUrl = url;
       if (urlFetcher) {
-        urlFetcher.setBaseClientUrl(url); // Allow urlFetcher to also know, it might invalidate its state
-        urlFetcher.projectName = ""; // Explicitly clear project name if URL is invalid
+        urlFetcher.setBaseClientUrl(url);
+        urlFetcher.projectName = "";
       }
       UI.utils.showStatus(
         url ? "Invalid Project URL format." : "Project URL is required.",
@@ -250,7 +250,7 @@ class App {
     } else {
       const success = urlFetcher.setBaseClientUrl(url);
       if (success) {
-        this.baseUrl = urlFetcher.baseClientUrl; // Use the processed baseClientUrl
+        this.baseUrl = urlFetcher.baseClientUrl;
         this.baseUrlValid = true;
         if (loginOptionSection) loginOptionSection.style.display = "block";
 
@@ -293,7 +293,7 @@ class App {
       }
     }
     this._checkCaptureButtonState();
-    this._updateRelativePathInfoDisplay(); // Update info on base URL change
+    this._updateRelativePathInfoDisplay();
   }
 
   _performFullReset() {
@@ -316,7 +316,7 @@ class App {
     if (loadRelativeListBtn) loadRelativeListBtn.disabled = true;
     const loadManualJsonBtn = document.getElementById("loadManualJsonBtn");
     if (loadManualJsonBtn) loadManualJsonBtn.disabled = true;
-    this._updateRelativePathInfoDisplay(); // Clear/update info on reset
+    this._updateRelativePathInfoDisplay();
 
     this.captureQueue = [];
     this.currentCaptureIndex = 0;
@@ -404,7 +404,6 @@ class App {
           loadRelativeListBtn.disabled = !relativePathsTextArea.value.trim();
         }
         this._checkCaptureButtonState();
-        // No need to call _updateRelativePathInfoDisplay here, as it doesn't depend on textarea content, only base URL.
       });
     }
     const manualJsonTextArea = document.getElementById("manualJsonText");
@@ -450,7 +449,7 @@ class App {
       baseUrlInput.readOnly = true;
     }
     this._setCaptureSettingsUIsDisabled(true);
-    this._updateRelativePathInfoDisplay(); // Initial call
+    this._updateRelativePathInfoDisplay();
   }
 
   _ensureHiddenWaitTimeStorage() {
@@ -655,7 +654,7 @@ class App {
         }
       }
     }
-    this._updateRelativePathInfoDisplay(); // Update/show/hide info based on mode
+    this._updateRelativePathInfoDisplay();
     this._checkCaptureButtonState();
   }
 
@@ -847,13 +846,17 @@ class App {
         }
         if (document.getElementById("urlSelectorContainer")) {
           urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
+          // Default to select all after loading
+          if (typeof urlSelector.selectAll === "function") {
+            urlSelector.selectAll(); // Select all loaded paths
+          }
           document.getElementById("urlSelectorContainer").style.display = "";
         } else {
           throw new Error(
             "URL Selector UI could not be prepared for relative path list data."
           );
         }
-        relativeListStatus.textContent = `Success: Loaded ${urlFetcher.urlsList.length} pages. Select pages to capture.`;
+        relativeListStatus.textContent = `Success: Loaded ${urlFetcher.urlsList.length} pages. All selected.`;
         relativeListStatus.style.color = "green";
       } else {
         const errorMsg =
@@ -876,7 +879,7 @@ class App {
     } finally {
       loadBtn.disabled = !pathsTextArea.value.trim();
       loadBtn.textContent = "Load Paths";
-      this._checkCaptureButtonState();
+      this._checkCaptureButtonState(); // This will also update the main capture button
     }
   }
 
@@ -1772,7 +1775,6 @@ class App {
     wrapper.classList.toggle("collapsed", collapsed);
   }
 
-  // Renamed from _updateRelativePathExample
   _updateRelativePathInfoDisplay() {
     const infoDiv = document.getElementById("relativePathInfo");
     const currentProjectUrlDisplay = document.getElementById(
@@ -1798,7 +1800,7 @@ class App {
     } else {
       infoDiv.style.display = "none";
       currentProjectUrlDisplay.textContent = "N/A";
-      finalUrlExamplePrefix.textContent = "PROJECT_URL";
+      finalUrlExamplePrefix.textContent = "PROJECT_URL"; // Placeholder for example
     }
   }
 }
