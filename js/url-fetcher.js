@@ -188,7 +188,7 @@ class URLFetcher {
         'Invalid page data format received. Expected { "pages": { ... } }:',
         data
       );
-      const endpointDesc = this.dataLoadedDirectly
+      const endpointDesc = this.dataLoadedDirectly // Check current state before this processing
         ? "Direct Data"
         : this.pageListEndpoint;
       this.error = new URLProcessingError(
@@ -361,6 +361,7 @@ class URLFetcher {
         console.log("Received page data from fetch:", data);
 
         if (this._processData(data)) {
+          this.dataLoadedDirectly = false; // Explicitly set: data was fetched, not loaded directly by user input
           this.isLoading = false;
           resolve(this.urlsList);
         } else {
