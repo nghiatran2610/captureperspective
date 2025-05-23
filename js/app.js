@@ -44,6 +44,8 @@ class App {
       this._handleLoadRelativeListSource.bind(this);
     this._prefillRelativePathsFromAutomaticSource =
       this._prefillRelativePathsFromAutomaticSource.bind(this);
+    this._setSpecificOptionsDisabled =
+      this._setSpecificOptionsDisabled.bind(this); // Make sure it's bound
     this._setAllOptionsDisabledDuringCapture =
       this._setAllOptionsDisabledDuringCapture.bind(this);
   }
@@ -66,12 +68,13 @@ class App {
     document.body.classList.remove("advanced-mode");
 
     this.loginHandler.initialize();
-    this._fetchAndPopulateProjects();
+    this._fetchAndPopulateProjects(); // This now enables projectDropdown upon success
 
     const baseUrlSection = document.getElementById("baseUrlSection");
     if (baseUrlSection) baseUrlSection.style.display = "";
 
-    this._setAllOptionsDisabledDuringCapture(true);
+    // Initially, disable most options until a project is selected and then an auth option
+    this._setSpecificOptionsDisabled(true, false); // keepProjectDropdownEnabled = false, initially project dropdown is also disabled until populated
 
     console.log("Application initialized.");
   }
@@ -113,7 +116,7 @@ class App {
             projectDropdown.appendChild(option);
           }
         });
-        projectDropdown.disabled = false;
+        projectDropdown.disabled = false; // Enable project dropdown after population
       } else {
         projectDropdown.innerHTML =
           '<option value="">No projects found</option>';
@@ -136,14 +139,15 @@ class App {
     }
   }
 
-  _setAllOptionsDisabledDuringCapture(disabled) {
+  _setSpecificOptionsDisabled(disabled, keepProjectDropdownEnabled = false) {
     const projectDropdown = document.getElementById("projectSelectorDropdown");
-    if (projectDropdown) projectDropdown.disabled = disabled;
+    if (projectDropdown && !keepProjectDropdownEnabled) {
+      projectDropdown.disabled = disabled;
+    }
 
-    const loginOptionRadios = document.querySelectorAll(
-      'input[name="loginOption"]'
-    );
-    loginOptionRadios.forEach((radio) => (radio.disabled = disabled));
+    // Login options are handled separately based on context (e.g., after logout vs. during project selection)
+    // So, this function will not manage loginOptionRadios directly anymore for general purpose.
+    // It will focus on capture and page source settings.
 
     const capturePresetSelect = UI.elements.capturePreset;
     const fullPageCheckbox = document.getElementById("fullPageCheckbox");
@@ -172,16 +176,26 @@ class App {
         ? true
         : !(relativePathsText && relativePathsText.value.trim());
     }
+
     if (disabled) {
       if (loadManualJsonBtn) loadManualJsonBtn.disabled = true;
       if (loadRelativeListBtn) loadRelativeListBtn.disabled = true;
     }
+  }
 
-    console.log(
-      `All project/login/capture/page source options ${
-        disabled ? "Disabled" : "Enabled (or managed by their specific logic)"
-      }.`
+  _setAllOptionsDisabledDuringCapture(disabled) {
+    const projectDropdown = document.getElementById("projectSelectorDropdown");
+    if (projectDropdown) projectDropdown.disabled = disabled;
+
+    const loginOptionRadios = document.querySelectorAll(
+      'input[name="loginOption"]'
     );
+    loginOptionRadios.forEach((radio) => (radio.disabled = disabled));
+
+    this._setSpecificOptionsDisabled(disabled, true); // true to keep project dropdown as is (it's handled above)
+
+    const captureBtn = UI.elements.captureBtn;
+    if (captureBtn) captureBtn.disabled = disabled;
   }
 
   _handleProjectSelection(event) {
@@ -197,44 +211,53 @@ class App {
     this._hideCaptureFormAndPageSource();
     if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
 
-    this._performFullReset();
+    // Reset UI parts related to a previous project's data
+    UI.utils.resetUI(); // Resets thumbnails, progress, stats
+    AppState.reset(); // Resets screenshot data, failed URLs
+    if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
 
+    const jsonTextArea = document.getElementById("manualJsonText");
+    if (jsonTextArea) jsonTextArea.value = "";
+    const fileInput = document.getElementById("manualJsonFile");
+    if (fileInput) fileInput.value = "";
+    const fileNameDisplay = document.getElementById("fileNameDisplay");
+    if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
+    const relativePathsTextArea = document.getElementById("relativePathsText");
+    if (relativePathsTextArea) relativePathsTextArea.value = "";
+    if (document.getElementById("loadRelativeListBtn"))
+      document.getElementById("loadRelativeListBtn").disabled = true;
+    if (document.getElementById("loadManualJsonBtn"))
+      document.getElementById("loadManualJsonBtn").disabled = true;
+    const sourceAutomaticRadio = document.getElementById("sourceAutomatic"); // Reset to automatic
+    if (sourceAutomaticRadio) sourceAutomaticRadio.checked = true;
+
+    // Reset login handler state for the new project selection
     this.loginHandler.updateLoginOptionsUI(null, false);
-
-    if (this.loginHandler.optionLoginRadio) {
+    if (this.loginHandler.optionLoginRadio)
       this.loginHandler.optionLoginRadio.checked = false;
-    }
-    if (this.loginHandler.optionContinueGuestRadio) {
+    if (this.loginHandler.optionContinueGuestRadio)
       this.loginHandler.optionContinueGuestRadio.checked = false;
-    }
     this.loginHandler.selectedLoginOption = "";
+    // Stop any previous session monitors/polls as we are changing project context
+    this.loginHandler.stopSessionMonitor();
+    this.loginHandler.stopSessionPolling();
 
     if (!selectedProjectName) {
       baseUrlInputElement.value = "";
       if (urlFetcher) urlFetcher.projectName = "";
       this.baseUrlValid = false;
+
       this.loginHandler.isLoggedIn = false;
       this.loginHandler.loggedInUsername = null;
-      this.loginHandler.stopSessionMonitor();
-      this.loginHandler.stopSessionPolling();
+      this.loginHandler.activeSessionId = null;
       this.loginHandler.updateLoginStatus("logged-out", "Project not selected");
 
       loginOptionSection.style.display = "none";
       loginRadios.forEach((radio) => (radio.disabled = true));
-      this._setAllOptionsDisabledDuringCapture(true);
-      const projectDropdown = document.getElementById(
-        "projectSelectorDropdown"
-      );
-      if (projectDropdown) projectDropdown.disabled = false;
+      this._setSpecificOptionsDisabled(true, false); // keepProjectDropdownEnabled = false
     } else {
-      loginOptionSection.style.display = "block";
-      loginRadios.forEach((radio) => (radio.disabled = false));
-
-      const sourceAutomaticRadio = document.getElementById("sourceAutomatic");
-      if (sourceAutomaticRadio) {
-        sourceAutomaticRadio.checked = true;
-        this._handleSourceChange();
-      }
+      loginOptionSection.style.display = "block"; // Show login options
+      loginRadios.forEach((radio) => (radio.disabled = false)); // Enable login options
 
       if (!this.gatewayBaseForProjects) {
         UI.utils.showStatus("Error: Gateway configuration missing.", true, 0);
@@ -244,19 +267,12 @@ class App {
         const fullProjectUrl =
           this.gatewayBaseForProjects + selectedProjectName;
         baseUrlInputElement.value = fullProjectUrl;
+        // _handleBaseUrlInput will be called, which then calls checkInitialSessionAndSetupUI
         this._handleBaseUrlInput({ target: baseUrlInputElement });
       }
-      const capturePresetSelect = UI.elements.capturePreset;
-      const fullPageCheckbox = document.getElementById("fullPageCheckbox");
-      const simpleWaitTimeInput = document.getElementById("simpleWaitTime");
-      if (capturePresetSelect) capturePresetSelect.disabled = false;
-      if (fullPageCheckbox) fullPageCheckbox.disabled = false;
-      if (simpleWaitTimeInput) simpleWaitTimeInput.disabled = false;
-
-      const sourceRadios = document.querySelectorAll(
-        'input[name="pageSourceOption"]'
-      );
-      sourceRadios.forEach((radio) => (radio.disabled = false));
+      // Other capture settings (preset, page source etc.) remain disabled until auth option is chosen.
+      this._setSpecificOptionsDisabled(true, true); // keep project dropdown enabled, disable others.
+      loginRadios.forEach((radio) => (radio.disabled = false)); // Ensure login options are specifically enabled.
     }
     this._checkCaptureButtonState();
   }
@@ -265,7 +281,7 @@ class App {
     const url = event.target.value.trim();
     const loginOptionSection = document.getElementById("loginOptionSection");
 
-    this._hideCaptureFormAndPageSource();
+    this._hideCaptureFormAndPageSource(); // Ensure capture form is hidden when base URL changes
 
     if (!url || !url.includes("/client/")) {
       this.baseUrlValid = false;
@@ -283,6 +299,7 @@ class App {
       this.loginHandler.updateLoginOptionsUI(null, false);
       this.loginHandler.isLoggedIn = false;
       this.loginHandler.loggedInUsername = null;
+      this.loginHandler.activeSessionId = null;
       this.loginHandler.selectedLoginOption = "";
       this.loginHandler.stopSessionMonitor();
       this.loginHandler.stopSessionPolling();
@@ -292,33 +309,25 @@ class App {
       if (success) {
         this.baseUrl = urlFetcher.baseClientUrl;
         this.baseUrlValid = true;
-        if (loginOptionSection) loginOptionSection.style.display = "block";
+        if (loginOptionSection && loginOptionSection.style.display === "none") {
+          loginOptionSection.style.display = "block"; // Ensure it's visible
+        }
+        const loginRadios = loginOptionSection.querySelectorAll(
+          'input[name="loginOption"]'
+        );
+        loginRadios.forEach((radio) => (radio.disabled = false)); // And enabled
 
         UI.utils.showStatus(
-          `Project '${urlFetcher.projectName}' loaded. Checking session...`,
+          `Project '${urlFetcher.projectName}' selected. Checking session...`,
           false,
           4000
         );
 
-        const sessionState =
-          await this.loginHandler.checkInitialSessionAndSetupUI();
-
+        await this.loginHandler.checkInitialSessionAndSetupUI();
+        // After session check, the login status text will be updated.
+        // If user was previously logged into this project, the "Continue as X" option will appear.
+        // Capture form remains hidden until a login option is chosen.
         this._hideCaptureFormAndPageSource();
-
-        if (sessionState.isLoggedIn) {
-          // Logged in, but user still needs to pick an option
-        } else {
-          // Not logged in
-        }
-        if (
-          this.loginHandler.loginSection &&
-          this.loginHandler.loginSection.style.display !== "none"
-        ) {
-          if (!this.loginHandler._pollInterval && !this.loginHandler.loginTab) {
-            this.loginHandler.loginSection.style.display = "none";
-            this.loginHandler.loginSection.innerHTML = "";
-          }
-        }
       } else {
         this.baseUrlValid = false;
         this.baseUrl = url;
@@ -360,6 +369,20 @@ class App {
     this._processingQueue = false;
     if (UI.elements.progressOutput)
       UI.elements.progressOutput.style.display = "none";
+
+    const capturePresetSelect = UI.elements.capturePreset;
+    if (capturePresetSelect)
+      capturePresetSelect.value = config.screenshot.defaultPreset;
+    const fullPageCheckbox = document.getElementById("fullPageCheckbox");
+    if (fullPageCheckbox) fullPageCheckbox.checked = false;
+    const simpleWaitTimeInput = document.getElementById("simpleWaitTime");
+    const defaultWait = String(config.ui.defaultWaitTime || 5);
+    if (simpleWaitTimeInput) simpleWaitTimeInput.value = defaultWait;
+    const hiddenWaitTimeInput = document.getElementById("hiddenWaitTime");
+    if (hiddenWaitTimeInput) hiddenWaitTimeInput.value = defaultWait;
+
+    const sourceAutomaticRadio = document.getElementById("sourceAutomatic");
+    if (sourceAutomaticRadio) sourceAutomaticRadio.checked = true;
   }
 
   _setupEventListeners() {
@@ -465,6 +488,9 @@ class App {
     const loginStatusSection = document.getElementById("loginSection");
     if (loginStatusSection) loginStatusSection.style.display = "none";
 
+    const loginOptionSection = document.getElementById("loginOptionSection");
+    if (loginOptionSection) loginOptionSection.style.display = "none";
+
     const baseUrlInput = document.getElementById("baseUrlInput");
     if (baseUrlInput && document.getElementById("projectSelectorDropdown")) {
       baseUrlInput.readOnly = true;
@@ -504,7 +530,10 @@ class App {
       this.loginHandler.loginSection.innerHTML = "";
     }
 
-    this._updateUIMode();
+    this._setSpecificOptionsDisabled(false, true); // Enable capture settings, keep project dropdown enabled
+
+    // This will also trigger _initiateUrlFetching if "automatic" is selected and conditions are met
+    this._handleSourceChange();
     this._checkCaptureButtonState();
   }
 
@@ -527,6 +556,10 @@ class App {
     if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
 
     if (urlSelector.cleanup) urlSelector.cleanup();
+
+    // Disable capture and page source settings when hiding the form
+    this._setSpecificOptionsDisabled(true, true); // keep project dropdown enabled
+
     this._checkCaptureButtonState();
   }
 
@@ -539,33 +572,9 @@ class App {
 
     this._setupSimpleModeSettings();
 
-    setTimeout(async () => {
-      if (typeof urlSelector.initialize === "function") {
-        try {
-          await urlSelector.initialize();
-
-          const captureFormVisible =
-            UI.elements.captureForm?.style.display !== "none";
-          const pageSourceVisible =
-            document.getElementById("pageSourceSelection")?.style.display !==
-            "none";
-
-          if (captureFormVisible && pageSourceVisible) {
-            const selectedSource = document.querySelector(
-              'input[name="pageSourceOption"]:checked'
-            )?.value;
-            if (selectedSource === "automatic") {
-              this._initiateUrlFetching();
-            }
-          }
-        } catch (error) {
-          if (typeof urlSelector.showFallbackUIIfNeeded === "function") {
-            urlSelector.showFallbackUIIfNeeded();
-          }
-        }
-      }
-      this._checkCaptureButtonState();
-    }, 0);
+    // setTimeout is removed as _initiateUrlFetching is better handled by _handleSourceChange
+    // or directly when auth is confirmed.
+    this._checkCaptureButtonState();
   }
 
   _setupSimpleModeSettings() {
@@ -624,7 +633,6 @@ class App {
 
     if (!manualArea || !relativeListArea) return;
     if (manualJsonStatus) manualJsonStatus.textContent = "";
-    // No relativeListStatus to clear
 
     if (urlSelector.selectedUrls) urlSelector.selectedUrls.clear();
     if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
@@ -644,29 +652,20 @@ class App {
       relativeListArea.style.display = "";
       if (relativePathsTextArea) relativePathsTextArea.value = "";
       if (loadRelativeListBtn) loadRelativeListBtn.disabled = true;
-
       this._prefillRelativePathsFromAutomaticSource();
     } else {
-      // Automatic mode
       if (urlSelectorContainer) urlSelectorContainer.style.display = "";
       if (jsonTextArea) jsonTextArea.value = "";
       if (fileInput) fileInput.value = "";
       if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
       if (relativePathsTextArea) relativePathsTextArea.value = "";
 
-      // --- RESET LOGIC WHEN SWITCHING TO AUTOMATIC ---
       if (urlFetcher.dataLoadedDirectly) {
-        console.log(
-          "Switching to Automatic: Clearing previously directly loaded URL data."
-        );
         urlFetcher.urlsList = [];
         urlFetcher.categorizedUrls = {};
-        if (urlSelector.clearRenderedUrls) {
-          urlSelector.clearRenderedUrls();
-        }
+        if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
       }
-      urlFetcher.dataLoadedDirectly = false; // Ensure automatic mode fetches fresh or uses its own cache
-      // --- END RESET LOGIC ---
+      urlFetcher.dataLoadedDirectly = false;
 
       if (this.baseUrlValid && authOk) {
         this._initiateUrlFetching();
@@ -687,7 +686,6 @@ class App {
   async _prefillRelativePathsFromAutomaticSource() {
     const relativePathsTextArea = document.getElementById("relativePathsText");
     const loadRelativeListBtn = document.getElementById("loadRelativeListBtn");
-    // No relativeListStatus
 
     if (!relativePathsTextArea || !loadRelativeListBtn) return;
 
@@ -728,21 +726,14 @@ class App {
       `Workspaceing pages for ${urlFetcher.projectName} to pre-fill...`,
       false,
       0
-    ); // Keep message until fetch completes
+    );
     loadRelativeListBtn.disabled = true;
 
     try {
       const currentDataLoadedDirectlyState = urlFetcher.dataLoadedDirectly;
       urlFetcher.dataLoadedDirectly = false;
-
       await urlFetcher.loadUrls();
-
-      if (
-        urlFetcher.urlsList &&
-        urlFetcher.urlsList.length > 0 &&
-        urlFetcher.dataLoadedDirectly !== false
-      ) {
-      } else if (!urlFetcher.urlsList || urlFetcher.urlsList.length === 0) {
+      if (!urlFetcher.urlsList || urlFetcher.urlsList.length === 0) {
         urlFetcher.dataLoadedDirectly = currentDataLoadedDirectlyState;
       }
 
@@ -909,15 +900,14 @@ class App {
 
   async _handleLoadRelativeListSource() {
     const pathsTextArea = document.getElementById("relativePathsText");
-    // No relativeListStatus
     const urlSelectorContainer = document.getElementById(
       "urlSelectorContainer"
     );
     const loadBtn = document.getElementById("loadRelativeListBtn");
 
-    if (!pathsTextArea || !loadBtn) return; // Removed relativeListStatus from check
+    if (!pathsTextArea || !loadBtn) return;
 
-    UI.utils.showStatus("", false, 1); // Clear general status
+    UI.utils.showStatus("", false, 1);
     loadBtn.disabled = true;
     loadBtn.textContent = "Loading...";
     if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
@@ -952,7 +942,6 @@ class App {
         false,
         0
       );
-
       await urlFetcher.setPathsDirectly(pathsArray);
 
       if (urlFetcher.dataLoadedDirectly) {
@@ -964,9 +953,8 @@ class App {
         }
         if (document.getElementById("urlSelectorContainer")) {
           urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
-          if (typeof urlSelector.selectAll === "function") {
+          if (typeof urlSelector.selectAll === "function")
             urlSelector.selectAll();
-          }
           document.getElementById("urlSelectorContainer").style.display = "";
         } else {
           throw new Error(
@@ -1111,7 +1099,6 @@ class App {
       } else {
         statusMessageText = `✓ Captured: ${pageName} - ${sizeDesc} (${timeTaken}s)`;
       }
-
       UI.utils.showStatus(
         statusMessageText,
         data.result.detectedMountIssue,
@@ -1129,16 +1116,28 @@ class App {
         AppState.reset();
       }
 
+      const loginOptionSection = document.getElementById("loginOptionSection");
+
       if (
         !this.baseUrlValid &&
         data.option === "login" &&
         !data.loginPendingInNewTab
       ) {
         UI.utils.showStatus("Please select a valid Project URL first.", true);
-        const radioLogin = document.getElementById("optionLogin");
-        if (radioLogin) radioLogin.checked = false;
+        if (this.loginHandler.optionLoginRadio)
+          this.loginHandler.optionLoginRadio.checked = false;
         this.loginHandler.selectedLoginOption = "";
         this._hideCaptureFormAndPageSource();
+        if (loginOptionSection) loginOptionSection.style.display = "block";
+        const loginRadios = loginOptionSection.querySelectorAll(
+          'input[name="loginOption"]'
+        );
+        // Enable login radios if a project is selected, disable if no project selected.
+        const projectDropdown = document.getElementById(
+          "projectSelectorDropdown"
+        );
+        const projectSelected = projectDropdown && projectDropdown.value;
+        loginRadios.forEach((radio) => (radio.disabled = !projectSelected));
         return;
       }
 
@@ -1157,6 +1156,7 @@ class App {
         this._hideCaptureFormAndPageSource();
       } else if (data.option === "") {
         this._hideCaptureFormAndPageSource();
+        if (loginOptionSection) loginOptionSection.style.display = "none";
       }
       this._checkCaptureButtonState();
     });
@@ -1175,60 +1175,100 @@ class App {
       this._checkCaptureButtonState();
     });
 
-    events.on(events.events.AUTO_LOGOUT_DETECTED, (data) => {
+    const handleSessionEnd = (username, isAutoLogout = false) => {
       this._performFullReset();
+      this._hideCaptureFormAndPageSource();
+
+      const projectDropdown = document.getElementById(
+        "projectSelectorDropdown"
+      );
+      const baseUrlInput = document.getElementById("baseUrlInput");
+      const loginOptionSection = document.getElementById("loginOptionSection");
+
+      // Keep project selected and its URL in baseUrlInput
+      if (projectDropdown && projectDropdown.value) {
+        // Project is still selected, keep it enabled
+        projectDropdown.disabled = false;
+        // baseUrlInput should already reflect the selected project's URL
+        // If not, or if it needs to be re-ensured:
+        if (
+          baseUrlInput &&
+          this.gatewayBaseForProjects &&
+          projectDropdown.value
+        ) {
+          baseUrlInput.value =
+            this.gatewayBaseForProjects + projectDropdown.value;
+          this.baseUrl = baseUrlInput.value;
+          this.baseUrlValid = true; // Assuming project value means it's valid
+          if (urlFetcher) urlFetcher.setBaseClientUrl(this.baseUrl);
+        }
+      } else {
+        // No project was selected, or explicitly reset it
+        if (projectDropdown) {
+          projectDropdown.disabled = false;
+          projectDropdown.value = "";
+        }
+        if (baseUrlInput) baseUrlInput.value = "";
+        this.baseUrlValid = false;
+        if (urlFetcher) {
+          urlFetcher.setBaseClientUrl("");
+          urlFetcher.projectName = "";
+        }
+      }
+
+      this.loginHandler.updateLoginOptionsUI(null, false);
+      this.loginHandler.isLoggedIn = false;
+      this.loginHandler.loggedInUsername = null;
+      this.loginHandler.activeSessionId = null;
+      this.loginHandler.selectedLoginOption = "";
+      // LoginHandler's updateLoginStatus will be called by its own methods.
+
+      if (loginOptionSection) {
+        loginOptionSection.style.display = "block"; // Show login options
+        const loginRadios = loginOptionSection.querySelectorAll(
+          'input[name="loginOption"]'
+        );
+        loginRadios.forEach((radio) => {
+          // Enable login options only if a project is currently selected
+          radio.disabled = !(projectDropdown && projectDropdown.value);
+          radio.checked = false;
+        });
+      }
+
+      this._setSpecificOptionsDisabled(true, true); // Disable capture/page settings, keep project dropdown enabled
+
+      if (loginOptionSection && projectDropdown && projectDropdown.value) {
+        const loginRadios = loginOptionSection.querySelectorAll(
+          'input[name="loginOption"]'
+        );
+        loginRadios.forEach((radio) => (radio.disabled = false));
+      }
+
+      if (this.loginHandler.loginSection) {
+        this.loginHandler.loginSection.style.display = "none";
+        this.loginHandler.loginSection.innerHTML = "";
+      }
+      this._checkCaptureButtonState();
+    };
+
+    events.on(events.events.AUTO_LOGOUT_DETECTED, (data) => {
       UI.utils.showStatus(
-        `Your session has expired. Please log in again or continue as guest.`,
+        `Your session has expired. Please select an authentication option.`,
         true,
         0
       );
-      this._hideCaptureFormAndPageSource();
-      this._setAllOptionsDisabledDuringCapture(true);
-      const projectDropdown = document.getElementById(
-        "projectSelectorDropdown"
-      );
-      if (projectDropdown) {
-        projectDropdown.disabled = false;
-      }
-      const loginOptionRadios = document.querySelectorAll(
-        'input[name="loginOption"]'
-      );
-      loginOptionRadios.forEach((radio) => (radio.checked = false));
-
-      if (this.loginHandler.loginSection) {
-        this.loginHandler.loginSection.style.display = "none";
-        this.loginHandler.loginSection.innerHTML = "";
-      }
-      this._checkCaptureButtonState();
+      handleSessionEnd(data?.username, true);
     });
 
     events.on(events.events.USER_LOGGED_OUT, (data) => {
-      this._performFullReset();
       UI.utils.showStatus(
         `Successfully logged out ${
           data?.username || "user"
-        }. Select a login option.`,
+        }. Please select an authentication option.`,
         false,
         5000
       );
-      this._hideCaptureFormAndPageSource();
-      this._setAllOptionsDisabledDuringCapture(true);
-      const projectDropdown = document.getElementById(
-        "projectSelectorDropdown"
-      );
-      if (projectDropdown) {
-        projectDropdown.disabled = false;
-      }
-      const loginOptionRadios = document.querySelectorAll(
-        'input[name="loginOption"]'
-      );
-      loginOptionRadios.forEach((radio) => (radio.checked = false));
-
-      if (this.loginHandler.loginSection) {
-        this.loginHandler.loginSection.style.display = "none";
-        this.loginHandler.loginSection.innerHTML = "";
-      }
-      this._checkCaptureButtonState();
+      handleSessionEnd(data?.username, false);
     });
   }
 
@@ -1409,7 +1449,34 @@ class App {
 
       if (!this.isPaused) {
         this._processingQueue = false;
-        this._setAllOptionsDisabledDuringCapture(false);
+
+        const projectDropdown = document.getElementById(
+          "projectSelectorDropdown"
+        );
+        if (projectDropdown && projectDropdown.value) {
+          // If a project is still selected
+          this._setSpecificOptionsDisabled(false, true); // Enable capture settings, keep project dropdown enabled
+          const loginOptionSection =
+            document.getElementById("loginOptionSection");
+          if (loginOptionSection) {
+            const loginRadios = loginOptionSection.querySelectorAll(
+              'input[name="loginOption"]'
+            );
+            loginRadios.forEach((radio) => (radio.disabled = false)); // Enable login options
+          }
+        } else {
+          // No project selected (should not happen if baseUrlValid is true, but as a fallback)
+          this._setSpecificOptionsDisabled(true, false); // Disable most, enable project dropdown
+          const loginOptionSection =
+            document.getElementById("loginOptionSection");
+          if (loginOptionSection) {
+            const loginRadios = loginOptionSection.querySelectorAll(
+              'input[name="loginOption"]'
+            );
+            loginRadios.forEach((radio) => (radio.disabled = true));
+          }
+        }
+        if (projectDropdown) projectDropdown.disabled = false;
 
         if (isQueueFullyProcessed && this.startTotalTime > 0) {
           UI.progress.updateStats(
@@ -1499,16 +1566,13 @@ class App {
     );
 
     if (this.isPaused || this.currentCaptureIndex >= this.captureQueue.length) {
-      if (this.isPaused) {
-        this._processingQueue = false;
-      }
+      if (this.isPaused) this._processingQueue = false;
       if (
         !this.isPaused &&
         this.currentCaptureIndex >= this.captureQueue.length
       ) {
         this._processingQueue = false;
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
-        this._setAllOptionsDisabledDuringCapture(false);
       }
       this.updatePauseResumeButton();
       return;
@@ -1547,7 +1611,6 @@ class App {
 
       const { url, index, capturePreset, captureFullPage, actionSequences } =
         item;
-
       if (UI.elements.progress)
         UI.progress.updateProgressMessage(
           `⏳ Processing ${
@@ -1564,7 +1627,6 @@ class App {
           captureFullPage,
           actionSequences || []
         );
-
         if (this.isPaused) {
           this._processingQueue = false;
           break;
@@ -1631,10 +1693,8 @@ class App {
       this.currentCaptureIndex++;
       if (UI.elements.progressBar)
         UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
-
-      if (this.currentCaptureIndex < totalUrls && !this.isPaused) {
+      if (this.currentCaptureIndex < totalUrls && !this.isPaused)
         await new Promise((resolve) => setTimeout(resolve, 250));
-      }
       if (this.isPaused) {
         this._processingQueue = false;
         break;
@@ -1646,7 +1706,6 @@ class App {
     if (!this.isPaused) {
       this._processingQueue = false;
       if (isFinished) {
-        this._setAllOptionsDisabledDuringCapture(false);
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
       }
     } else {
@@ -1697,9 +1756,7 @@ class App {
     if (this.isPaused) {
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
     } else {
-      this._setAllOptionsDisabledDuringCapture(true);
       UI.utils.showStatus("", false, 1);
-
       if (
         captureWarningMessage &&
         this.captureQueue.length > this.currentCaptureIndex
@@ -1715,10 +1772,35 @@ class App {
       ) {
         this.processCaptureQueue();
       } else if (this._processingQueue) {
-        // Already processing, do nothing
+        // Already processing
       } else {
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
-        this._setAllOptionsDisabledDuringCapture(false);
+
+        const projectDropdown = document.getElementById(
+          "projectSelectorDropdown"
+        );
+        if (projectDropdown && projectDropdown.value) {
+          this._setSpecificOptionsDisabled(false, true);
+          const loginOptionSection =
+            document.getElementById("loginOptionSection");
+          if (loginOptionSection) {
+            const loginRadios = loginOptionSection.querySelectorAll(
+              'input[name="loginOption"]'
+            );
+            loginRadios.forEach((radio) => (radio.disabled = false));
+          }
+        } else {
+          this._setSpecificOptionsDisabled(true, true); // Keep project dropdown enabled
+          const loginOptionSection =
+            document.getElementById("loginOptionSection");
+          if (loginOptionSection) {
+            const loginRadios = loginOptionSection.querySelectorAll(
+              'input[name="loginOption"]'
+            );
+            loginRadios.forEach((radio) => (radio.disabled = true));
+          }
+        }
+        if (projectDropdown) projectDropdown.disabled = false;
       }
     }
     this.updatePauseResumeButton();
@@ -1742,7 +1824,7 @@ class App {
       pauseResumeBtn.classList.remove("paused");
       pauseResumeBtn.disabled = !this._processingQueue || !hasItemsToProcess;
     }
-    if (!hasItemsToProcess && !this._processingQueue) {
+    if (!hasItemsToProcess && !this._processingQueue && !this.isPaused) {
       pauseResumeBtn.disabled = true;
     }
   }
