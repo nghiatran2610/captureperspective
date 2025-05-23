@@ -42,49 +42,40 @@ export const urlSelector = {
         console.log(
           "URL Selector: Container (#urlSelectorContainer) not found. Creating DOM structure."
         );
-        // Use a known stable parent from your HTML. '#captureSettingsContent' is a good candidate.
-        // For even more robustness, add a dedicated <div id="url-selector-host"></div> in your index.html
-        // within #captureSettingsContent, and pass that ID to _createDOMStructure.
         const parentElement =
-          document.getElementById("captureSettingsContent") || document.body; // Fallback to body if parent not found
+          document.getElementById("captureSettingsContent") || document.body;
 
         if (!parentElement) {
-          // Should not happen if #captureSettingsContent exists
           console.error(
             "Critical: Cannot find a suitable parent element for URL selector. UI may be broken."
           );
-          this.showFallbackUIIfNeeded(); // Attempt fallback
+          this.showFallbackUIIfNeeded();
           return;
         }
         this._createDOMStructure(parentElement);
-        this.isInitialized = true; // Mark that DOM structure is now created
+        this.isInitialized = true;
       } else {
-        // Container was found in DOM, likely already initialized.
-        // console.log("URL Selector: Container (#urlSelectorContainer) found. Setting internal references.");
         this.categoriesContainer = document.getElementById(
           "urlCategoriesContainer"
         );
         this.searchInput = document.getElementById("urlSearch");
         this.selectionCounter = document.getElementById("selectionCounter");
         this.toggleSelectionBtn = document.getElementById("toggleSelectionBtn");
-        this.isInitialized = true; // Mark as initialized since DOM exists
+        this.isInitialized = true;
       }
 
-      // Attach event listeners only once
       if (this.container && !this.container.dataset.listenersAttached) {
         this.setupEventListeners();
         this.container.dataset.listenersAttached = "true";
         console.log("URL Selector: Event listeners attached.");
       }
 
-      // Set initial placeholder text if the categories area is empty and ready
       if (
         this.categoriesContainer &&
         this.categoriesContainer.innerHTML.trim() === ""
       ) {
         this.categoriesContainer.innerHTML = `<div class="url-selector-initial"><p>Select 'Automatic' source or load manual JSON.</p></div>`;
       }
-      // Visibility of this.container is managed by app.js based on selected source type.
     } catch (error) {
       console.error("Failed to initialize URL selector:", error);
       if (typeof utils !== "undefined" && utils.showStatus) {
@@ -102,13 +93,11 @@ export const urlSelector = {
       return;
     }
 
-    // Create main container
     this.container = document.createElement("div");
     this.container.id = "urlSelectorContainer";
     this.container.className = "url-selector-container";
-    this.container.style.display = "none"; // Initially hidden; app.js controls overall visibility
+    this.container.style.display = "none";
 
-    // Create Toolbar
     const toolbar = document.createElement("div");
     toolbar.className = "url-selector-toolbar";
 
@@ -124,7 +113,7 @@ export const urlSelector = {
 
     this.toggleSelectionBtn = document.createElement("button");
     this.toggleSelectionBtn.textContent = "Select All";
-    this.toggleSelectionBtn.className = "btn btn-small toggle-select-btn"; // Uses new unified button class
+    this.toggleSelectionBtn.className = "btn btn-small toggle-select-btn";
     this.toggleSelectionBtn.id = "toggleSelectionBtn";
     actionsContainer.appendChild(this.toggleSelectionBtn);
 
@@ -137,19 +126,14 @@ export const urlSelector = {
     toolbar.appendChild(actionsContainer);
     this.container.appendChild(toolbar);
 
-    // Create Categories Area
     this.categoriesContainer = document.createElement("div");
     this.categoriesContainer.className = "url-categories-container";
     this.categoriesContainer.id = "urlCategoriesContainer";
     this.container.appendChild(this.categoriesContainer);
 
-    // Append the new container to the specified parent.
-    // If #urlSelectorPlaceholder exists, insert before it and hide it.
-    // Otherwise, append to parentElement.
     const placeholderEl = document.getElementById("urlSelectorPlaceholder");
     if (placeholderEl && placeholderEl.parentElement === parentElement) {
       parentElement.insertBefore(this.container, placeholderEl);
-      // placeholderEl.style.display = 'none'; // Hide the original placeholder as it's now replaced in function
     } else {
       parentElement.appendChild(this.container);
       console.warn(
@@ -157,69 +141,51 @@ export const urlSelector = {
       );
     }
 
-    // Disable controls initially
     this.toggleSelectionBtn.disabled = true;
     this.searchInput.disabled = true;
     console.log("URL Selector: DOM structure created and appended.");
   },
 
   cleanup() {
-    // This function is called when the Project URL changes, or when switching source types.
-    // It should reset the selector's state and clear its content, but NOT remove the main container from DOM.
     console.log(
       "URL Selector: cleanup called - clearing content, resetting state, and hiding container."
     );
-
-    // Clear rendered URLs and reset internal selection state and UI controls within the selector
     this.clearRenderedUrls();
-
-    // Hide the main container. Its re-appearance is managed by app.js (_handleSourceChange)
     if (this.container) {
       this.container.style.display = "none";
     }
-    // Note: We no longer nullify this.container and other DOM element references here,
-    // as the container persists in the DOM. initialize() will re-acquire them if needed.
-    // this.isInitialized flag remains true as the DOM structure was created.
   },
 
   clearRenderedUrls() {
-    // This is called by cleanup() or when switching from manual to auto source.
     if (!this.isInitialized || !this.container) {
-      // console.log("URL Selector: Clear request ignored - not initialized or container missing.");
       return;
     }
-    // console.log("URL Selector: Clearing rendered URL categories and resetting controls.");
 
     if (this.categoriesContainer) {
       this.categoriesContainer.innerHTML = `<div class="url-selector-initial"><p>Select 'Automatic' source or load manual JSON.</p></div>`;
     }
-    this.selectedUrls.clear();
+    this.selectedUrls.clear(); // Ensure selectedUrls is cleared here too
 
     if (this.searchInput) {
       this.searchInput.value = "";
-      this.searchInput.disabled = true; // Disable until new URLs are loaded
+      this.searchInput.disabled = true;
     }
     if (this.toggleSelectionBtn) {
-      this.toggleSelectionBtn.disabled = true; // Disable until new URLs are loaded
+      this.toggleSelectionBtn.disabled = true;
       this.toggleSelectionBtn.textContent = "Select All";
       this.toggleSelectionBtn.classList.remove("clear-mode");
     }
 
-    this.updateSelectionCounter(); // Update counter to "0 selected"
-    this.updateCaptureButtonState(); // Notify app to update main capture button (likely disable it)
-
-    // Visibility of this.container is managed by app.js logic (e.g. in _handleSourceChange)
-    // Do not hide this.container here directly as it might conflict with app.js's intentions.
+    this.updateSelectionCounter();
+    this.updateCaptureButtonState();
   },
 
   showLoadingState(message = "Loading available pages...") {
     if (!this.isInitialized) {
-      // Try to initialize if not already. This might happen if called too early.
       console.warn(
         "URL Selector: showLoadingState called before full initialization. Attempting init."
       );
       this.initialize().then(() => {
-        // Ensure initialize is async if it wasn't already
         if (this.container) this._displayLoadingState(message);
       });
       return;
@@ -236,7 +202,7 @@ export const urlSelector = {
   _displayLoadingState(message) {
     if (!this.container || !this.categoriesContainer) return;
 
-    this.container.style.display = ""; // Make the main selector container visible
+    this.container.style.display = "";
     this.categoriesContainer.innerHTML = `
       <div class="url-selector-loading">
         <div class="loading-spinner"></div>
@@ -256,9 +222,7 @@ export const urlSelector = {
         "URL Selector: Attempted to render URLs, but selector UI not fully ready. Attempting to initialize first."
       );
       this.initialize().then(() => {
-        // Ensure initialize is async if it wasn't already
         if (this.container && this.categoriesContainer) {
-          // Check again after init attempt
           this._doRenderUrlCategories(categorizedUrls);
         } else {
           console.error(
@@ -274,17 +238,20 @@ export const urlSelector = {
   _doRenderUrlCategories(categorizedUrls) {
     if (!this.container || !this.categoriesContainer) return;
 
-    this.container.style.display = ""; // Make selector visible
-    this.categoriesContainer.innerHTML = ""; // Clear previous (loading, initial, or old list)
+    // --- KEY FIX: Clear previous selections before rendering new items ---
+    this.selectedUrls.clear();
+    // --- END FIX ---
+
+    this.container.style.display = "";
+    this.categoriesContainer.innerHTML = "";
 
     if (!categorizedUrls || Object.keys(categorizedUrls).length === 0) {
       this.categoriesContainer.innerHTML =
         "<div class='url-selector-initial'><p>No pages found or provided.</p></div>";
       if (this.searchInput) this.searchInput.disabled = true;
       if (this.toggleSelectionBtn) this.toggleSelectionBtn.disabled = true;
-      this.selectedUrls.clear();
-      this.updateSelectionCounter();
-      this.updateCaptureButtonState();
+      this.updateSelectionCounter(); // Will show 0 due to selectedUrls.clear()
+      this.updateCaptureButtonState(); // Will reflect no selection
       return;
     }
 
@@ -319,6 +286,7 @@ export const urlSelector = {
         urlCheckbox.type = "checkbox";
         urlCheckbox.className = "url-checkbox";
         urlCheckbox.dataset.path = url.path;
+        // Checkbox will be unchecked because selectedUrls was just cleared
         urlCheckbox.checked = this.selectedUrls.has(url.path);
         urlItem.appendChild(urlCheckbox);
         const urlTitle = document.createElement("span");
@@ -339,11 +307,13 @@ export const urlSelector = {
     if (this.searchInput) this.searchInput.disabled = false;
     if (this.toggleSelectionBtn) this.toggleSelectionBtn.disabled = false;
 
-    this.updateCategoryCheckboxes();
-    this.updateSelectionCounter();
-    this.updateCaptureButtonState();
+    this.updateCategoryCheckboxes(); // Reflects cleared selection (all categories unchecked)
+    this.updateSelectionCounter(); // Reflects cleared selection (0 selected)
+    this.updateCaptureButtonState(); // Reflects cleared selection
     this.categoriesContainer.scrollTop = 0;
-    console.log("URL Selector: Categories rendered.");
+    console.log(
+      "URL Selector: Categories rendered, selection cleared by render."
+    );
   },
 
   setupEventListeners() {
@@ -356,7 +326,6 @@ export const urlSelector = {
       console.warn("URL Selector: Elements not ready for event listeners.");
       return;
     }
-    // Using a flag to prevent multiple attachments if setupEventListeners is called again
     if (this.container.dataset.listenersAttached === "true") return;
 
     this.categoriesContainer.addEventListener("click", (event) => {
@@ -400,7 +369,7 @@ export const urlSelector = {
       this.handleToggleSelection();
     });
 
-    this.container.dataset.listenersAttached = "true"; // Mark as attached
+    this.container.dataset.listenersAttached = "true";
     console.log("URL Selector: Event listeners setup complete.");
   },
 
@@ -448,12 +417,10 @@ export const urlSelector = {
         ".url-item:not([style*='display: none']) .url-checkbox"
       );
       if (urlCheckboxes.length === 0 && category.style.display !== "none") {
-        // If category is visible but has no visible items (due to filter)
         categoryCheckbox.checked = false;
         categoryCheckbox.indeterminate = false;
         return;
       } else if (urlCheckboxes.length === 0) {
-        // Category itself is hidden or genuinely empty
         return;
       }
       const checkedCount = Array.from(urlCheckboxes).filter(
@@ -486,10 +453,6 @@ export const urlSelector = {
       '.url-item:not([style*="display: none"]) .url-checkbox'
     ).length;
 
-    const allCategoriesHidden = Array.from(
-      this.categoriesContainer.querySelectorAll(".url-category")
-    ).every((cat) => cat.style.display === "none");
-
     if (
       totalVisibleUrls === 0 ||
       (this.categoriesContainer.children.length === 1 &&
@@ -497,7 +460,6 @@ export const urlSelector = {
           "url-selector-initial"
         ))
     ) {
-      // No items or only placeholder
       this.toggleSelectionBtn.disabled = true;
       this.toggleSelectionBtn.textContent = "Select All";
       this.toggleSelectionBtn.classList.remove("clear-mode");
@@ -545,9 +507,8 @@ export const urlSelector = {
             visibleItemsOverall++;
           }
         });
-        // Hide or show the entire category section based on whether it has visible items
         categorySection.style.display =
-          visibleItemsInCategory === 0 && term ? "none" : ""; // Hide if search term active and no items match in category
+          visibleItemsInCategory === 0 && term ? "none" : "";
       });
 
     this.updateCategoryCheckboxes();
@@ -566,10 +527,7 @@ export const urlSelector = {
     }
   },
 
-  // updateCategoryVisibility was integrated into filterUrls for simplicity and directness
-
   selectAll() {
-    // Selects all *currently visible* URLs after filtering
     if (!this.categoriesContainer) return;
     const visibleCheckboxes = Array.from(
       this.categoriesContainer.querySelectorAll(
@@ -589,7 +547,6 @@ export const urlSelector = {
   },
 
   clearSelection() {
-    // Clears selection for ALL URLs (visible or not, effectively)
     if (!this.categoriesContainer) return;
     this.categoriesContainer
       .querySelectorAll(".url-checkbox")
@@ -606,7 +563,6 @@ export const urlSelector = {
 
   handleToggleSelection() {
     if (!this.toggleSelectionBtn || !this.categoriesContainer) return;
-    const selectedCount = this.selectedUrls.size;
     const totalVisibleUrls = this.categoriesContainer.querySelectorAll(
       '.url-item:not([style*="display: none"]) .url-checkbox'
     ).length;
@@ -614,11 +570,9 @@ export const urlSelector = {
     if (totalVisibleUrls === 0) return;
 
     if (this.toggleSelectionBtn.classList.contains("clear-mode")) {
-      // If it says "Deselect All"
-      this.clearSelection(); // Clears all selected, including hidden ones
+      this.clearSelection();
     } else {
-      // If it says "Select All"
-      this.selectAll(); // Selects only currently visible ones
+      this.selectAll();
     }
   },
 
@@ -631,14 +585,9 @@ export const urlSelector = {
   },
 
   showFallbackUIIfNeeded() {
-    // Renamed from showFallbackUI for clarity
-    // This method is a placeholder. Actual fallback UI (like showing original textarea)
-    // would ideally be managed by app.js if urlSelector fails to initialize critically.
     console.error(
       "URL Selector Fallback: Displaying critical error or basic input if possible."
     );
-    // Example: if (UIElements.urlList) UIElements.urlList.style.display = 'block';
-    // This part needs careful consideration of the overall app structure for fallback.
   },
 };
 
