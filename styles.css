@@ -1571,3 +1571,13 @@ body.simple-mode .context-actions-header {
 #screenSizeLabel select#capturePreset {
   margin-left: var(--spacing-md); /* Adds 10px space */
 }
+
+/* Existing styles for .manual-input-options or add new */
+.manual-input-options {
+  margin-bottom: var(--spacing-lg); /* Or any other spacing variable you prefer, e.g., 15px */
+}
+
+/* OR if you want to be more specific to relativeListInputArea and ensure it only applies when it's actually followed by something like urlSelectorContainer */
+#relativeListInputArea {
+  margin-bottom: 15px; /* Adjust as needed */
+}
