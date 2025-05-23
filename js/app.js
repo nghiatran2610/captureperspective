@@ -42,8 +42,10 @@ class App {
     this._handleFileUpload = this._handleFileUpload.bind(this);
     this._handleLoadRelativeListSource =
       this._handleLoadRelativeListSource.bind(this);
-    this._prefillRelativePathsFromAutomaticSource = this._prefillRelativePathsFromAutomaticSource.bind(this);
-    this._setAllOptionsDisabledDuringCapture = this._setAllOptionsDisabledDuringCapture.bind(this);
+    this._prefillRelativePathsFromAutomaticSource =
+      this._prefillRelativePathsFromAutomaticSource.bind(this);
+    this._setAllOptionsDisabledDuringCapture =
+      this._setAllOptionsDisabledDuringCapture.bind(this);
   }
 
   initialize() {
@@ -68,11 +70,8 @@ class App {
 
     const baseUrlSection = document.getElementById("baseUrlSection");
     if (baseUrlSection) baseUrlSection.style.display = "";
-    
-    // Initially, all options should be disabled until a project and login option are chosen
+
     this._setAllOptionsDisabledDuringCapture(true);
-    // But, project dropdown itself should be enabled after projects are loaded (handled in _fetchAndPopulateProjects)
-    // Login options enabled once project is chosen (handled in _handleProjectSelection)
 
     console.log("Application initialized.");
   }
@@ -84,20 +83,11 @@ class App {
       if (gatewayMatch && gatewayMatch[1]) {
         const gatewayAddress = gatewayMatch[1];
         this.gatewayBaseForProjects = `${gatewayAddress}/data/perspective/client/`;
-        console.log(
-          "Gateway base for project URLs derived:",
-          this.gatewayBaseForProjects
-        );
       } else {
         this.gatewayBaseForProjects =
           "http://localhost:8088/data/perspective/client/";
-        console.warn(
-          "Could not derive gateway base from current URL. Using fallback:",
-          this.gatewayBaseForProjects
-        );
       }
     } catch (e) {
-      console.error("Error deriving gateway base:", e);
       this.gatewayBaseForProjects =
         "http://localhost:8088/data/perspective/client/";
     }
@@ -108,7 +98,7 @@ class App {
     const excludedProjectName = "PerspectiveCapture";
     if (!projectDropdown) return;
 
-    projectDropdown.disabled = true; // Keep it disabled while loading
+    projectDropdown.disabled = true;
     projectDropdown.innerHTML = '<option value="">Loading projects...</option>';
     try {
       const projects = await urlFetcher.fetchProjectList();
@@ -123,11 +113,11 @@ class App {
             projectDropdown.appendChild(option);
           }
         });
-        projectDropdown.disabled = false; // Enable after loading
+        projectDropdown.disabled = false;
       } else {
         projectDropdown.innerHTML =
           '<option value="">No projects found</option>';
-        projectDropdown.disabled = true; // Keep disabled if no projects
+        projectDropdown.disabled = true;
         UI.utils.showStatus(
           "No projects available or error fetching list.",
           true,
@@ -135,10 +125,9 @@ class App {
         );
       }
     } catch (error) {
-      console.error("Failed to fetch or populate project list:", error);
       projectDropdown.innerHTML =
         '<option value="">Error loading projects</option>';
-      projectDropdown.disabled = true; // Keep disabled on error
+      projectDropdown.disabled = true;
       UI.utils.showStatus(
         error.message || "Could not load project list.",
         true,
@@ -151,9 +140,10 @@ class App {
     const projectDropdown = document.getElementById("projectSelectorDropdown");
     if (projectDropdown) projectDropdown.disabled = disabled;
 
-    const loginOptionRadios = document.querySelectorAll('input[name="loginOption"]');
-    loginOptionRadios.forEach(radio => (radio.disabled = disabled));
-    // Note: Logout button's state is managed by loginHandler based on login state, not directly by capture process.
+    const loginOptionRadios = document.querySelectorAll(
+      'input[name="loginOption"]'
+    );
+    loginOptionRadios.forEach((radio) => (radio.disabled = disabled));
 
     const capturePresetSelect = UI.elements.capturePreset;
     const fullPageCheckbox = document.getElementById("fullPageCheckbox");
@@ -162,24 +152,29 @@ class App {
     if (fullPageCheckbox) fullPageCheckbox.disabled = disabled;
     if (simpleWaitTimeInput) simpleWaitTimeInput.disabled = disabled;
 
-    const sourceRadios = document.querySelectorAll('input[name="pageSourceOption"]');
-    sourceRadios.forEach(radio => (radio.disabled = disabled));
+    const sourceRadios = document.querySelectorAll(
+      'input[name="pageSourceOption"]'
+    );
+    sourceRadios.forEach((radio) => (radio.disabled = disabled));
 
     const loadManualJsonBtn = document.getElementById("loadManualJsonBtn");
     const manualJsonText = document.getElementById("manualJsonText");
     if (loadManualJsonBtn) {
-        loadManualJsonBtn.disabled = disabled ? true : !(manualJsonText && manualJsonText.value.trim());
+      loadManualJsonBtn.disabled = disabled
+        ? true
+        : !(manualJsonText && manualJsonText.value.trim());
     }
 
     const loadRelativeListBtn = document.getElementById("loadRelativeListBtn");
     const relativePathsText = document.getElementById("relativePathsText");
     if (loadRelativeListBtn) {
-        loadRelativeListBtn.disabled = disabled ? true : !(relativePathsText && relativePathsText.value.trim());
+      loadRelativeListBtn.disabled = disabled
+        ? true
+        : !(relativePathsText && relativePathsText.value.trim());
     }
-     // If overall disabling (during capture), ensure these load buttons are definitively off
     if (disabled) {
-        if (loadManualJsonBtn) loadManualJsonBtn.disabled = true;
-        if (loadRelativeListBtn) loadRelativeListBtn.disabled = true;
+      if (loadManualJsonBtn) loadManualJsonBtn.disabled = true;
+      if (loadRelativeListBtn) loadRelativeListBtn.disabled = true;
     }
 
     console.log(
@@ -188,7 +183,6 @@ class App {
       }.`
     );
   }
-
 
   _handleProjectSelection(event) {
     const selectedProjectName = event.target.value;
@@ -227,23 +221,20 @@ class App {
 
       loginOptionSection.style.display = "none";
       loginRadios.forEach((radio) => (radio.disabled = true));
-      this._setAllOptionsDisabledDuringCapture(true); // Disable all other options
-      if (projectDropdown) projectDropdown.disabled = false; // Except project dropdown itself
-
+      this._setAllOptionsDisabledDuringCapture(true);
+      const projectDropdown = document.getElementById(
+        "projectSelectorDropdown"
+      );
+      if (projectDropdown) projectDropdown.disabled = false;
     } else {
       loginOptionSection.style.display = "block";
-      loginRadios.forEach((radio) => (radio.disabled = false)); // Enable login options
+      loginRadios.forEach((radio) => (radio.disabled = false));
 
-       // Reset "Load Pages" to "Automatic" and trigger its UI update
       const sourceAutomaticRadio = document.getElementById("sourceAutomatic");
       if (sourceAutomaticRadio) {
-          sourceAutomaticRadio.checked = true;
-          // Manually dispatch change event if _handleSourceChange relies on it
-          // or call _handleSourceChange directly if that's cleaner.
-          // Calling _handleSourceChange directly ensures the logic runs.
-          this._handleSourceChange();
+        sourceAutomaticRadio.checked = true;
+        this._handleSourceChange();
       }
-
 
       if (!this.gatewayBaseForProjects) {
         UI.utils.showStatus("Error: Gateway configuration missing.", true, 0);
@@ -253,20 +244,19 @@ class App {
         const fullProjectUrl =
           this.gatewayBaseForProjects + selectedProjectName;
         baseUrlInputElement.value = fullProjectUrl;
-        this._handleBaseUrlInput({ target: baseUrlInputElement }); // This will eventually call _checkCaptureButtonState
+        this._handleBaseUrlInput({ target: baseUrlInputElement });
       }
-      // Enable capture settings; page source options managed by _handleSourceChange
       const capturePresetSelect = UI.elements.capturePreset;
       const fullPageCheckbox = document.getElementById("fullPageCheckbox");
       const simpleWaitTimeInput = document.getElementById("simpleWaitTime");
       if (capturePresetSelect) capturePresetSelect.disabled = false;
       if (fullPageCheckbox) fullPageCheckbox.disabled = false;
       if (simpleWaitTimeInput) simpleWaitTimeInput.disabled = false;
-      
-      const sourceRadios = document.querySelectorAll('input[name="pageSourceOption"]');
-      sourceRadios.forEach(radio => (radio.disabled = false));
 
-
+      const sourceRadios = document.querySelectorAll(
+        'input[name="pageSourceOption"]'
+      );
+      sourceRadios.forEach((radio) => (radio.disabled = false));
     }
     this._checkCaptureButtonState();
   }
@@ -316,13 +306,9 @@ class App {
         this._hideCaptureFormAndPageSource();
 
         if (sessionState.isLoggedIn) {
-          console.log(
-            `App: Initial session check found user: ${sessionState.username}. Login option UI updated, but user must select an option.`
-          );
+          // Logged in, but user still needs to pick an option
         } else {
-          console.log(
-            "App: No active session found on initial check. User needs to choose login option."
-          );
+          // Not logged in
         }
         if (
           this.loginHandler.loginSection &&
@@ -346,7 +332,6 @@ class App {
   }
 
   _performFullReset() {
-    console.log("[App._performFullReset] Performing full UI and data reset.");
     UI.utils.resetUI();
     AppState.reset();
     if (urlSelector.clearRenderedUrls) {
@@ -385,8 +370,6 @@ class App {
         "change",
         this._handleProjectSelection
       );
-    } else {
-      console.error("#projectSelectorDropdown element not found!");
     }
 
     if (UI.elements.captureBtn) {
@@ -395,8 +378,6 @@ class App {
         "click",
         this.captureScreenshots
       );
-    } else {
-      console.error("#captureBtn element not found!");
     }
 
     const titleToggleWrapper = document.getElementById("captureSettingsToggle");
@@ -406,8 +387,6 @@ class App {
         "click",
         this._toggleCaptureSettings
       );
-    } else {
-      console.error("#captureSettingsToggle element not found.");
     }
 
     const sourceRadios = document.querySelectorAll(
@@ -424,15 +403,11 @@ class App {
         "click",
         this._handleLoadManualSource
       );
-    } else {
-      console.error("#loadManualJsonBtn not found!");
     }
 
     const fileInput = document.getElementById("manualJsonFile");
     if (fileInput) {
       events.addDOMEventListener(fileInput, "change", this._handleFileUpload);
-    } else {
-      console.error("#manualJsonFile input not found!");
     }
 
     const loadRelativeListBtn = document.getElementById("loadRelativeListBtn");
@@ -442,8 +417,6 @@ class App {
         "click",
         this._handleLoadRelativeListSource
       );
-    } else {
-      console.error("#loadRelativeListBtn not found!");
     }
     const relativePathsTextArea = document.getElementById("relativePathsText");
     if (relativePathsTextArea) {
@@ -496,7 +469,6 @@ class App {
     if (baseUrlInput && document.getElementById("projectSelectorDropdown")) {
       baseUrlInput.readOnly = true;
     }
-    // this._setAllOptionsDisabledDuringCapture(true); // Already called in initialize
   }
 
   _ensureHiddenWaitTimeStorage() {
@@ -587,10 +559,6 @@ class App {
             }
           }
         } catch (error) {
-          console.error(
-            "Failed to initialize/update URL selector in _updateUIMode:",
-            error
-          );
           if (typeof urlSelector.showFallbackUIIfNeeded === "function") {
             urlSelector.showFallbackUIIfNeeded();
           }
@@ -612,9 +580,6 @@ class App {
     } else if (hiddenWaitTimeInput) {
       UI.elements.waitTime = hiddenWaitTimeInput;
     } else {
-      console.error(
-        "Critical UI Error: No wait time input found for simple mode settings."
-      );
       this._ensureHiddenWaitTimeStorage();
       UI.elements.waitTime = document.getElementById("hiddenWaitTime");
     }
@@ -628,7 +593,7 @@ class App {
           JSON.parse(actionsField.value);
         }
       } catch (e) {
-        console.warn("Invalid JSON in actions field:", e.message);
+        // warning only
       }
     }
     this._checkCaptureButtonState();
@@ -650,7 +615,6 @@ class App {
     const fileNameDisplay = document.getElementById("fileNameDisplay");
     const loadManualJsonBtn = document.getElementById("loadManualJsonBtn");
 
-    const relativeListStatus = document.getElementById("relativeListStatus");
     const relativePathsTextArea = document.getElementById("relativePathsText");
     const loadRelativeListBtn = document.getElementById("loadRelativeListBtn");
 
@@ -660,7 +624,7 @@ class App {
 
     if (!manualArea || !relativeListArea) return;
     if (manualJsonStatus) manualJsonStatus.textContent = "";
-    if (relativeListStatus) relativeListStatus.textContent = "";
+    // No relativeListStatus to clear
 
     if (urlSelector.selectedUrls) urlSelector.selectedUrls.clear();
     if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
@@ -678,18 +642,31 @@ class App {
       if (loadManualJsonBtn) loadManualJsonBtn.disabled = true;
     } else if (selectedSource === "relativeList") {
       relativeListArea.style.display = "";
-      if (relativePathsTextArea) relativePathsTextArea.value = ""; 
-      if (loadRelativeListBtn) loadRelativeListBtn.disabled = true; 
-      
-      this._prefillRelativePathsFromAutomaticSource();
+      if (relativePathsTextArea) relativePathsTextArea.value = "";
+      if (loadRelativeListBtn) loadRelativeListBtn.disabled = true;
 
-    } else { 
+      this._prefillRelativePathsFromAutomaticSource();
+    } else {
+      // Automatic mode
       if (urlSelectorContainer) urlSelectorContainer.style.display = "";
-      if (jsonTextArea) jsonTextArea.value = ""; 
+      if (jsonTextArea) jsonTextArea.value = "";
       if (fileInput) fileInput.value = "";
       if (fileNameDisplay) fileNameDisplay.textContent = "No file chosen";
       if (relativePathsTextArea) relativePathsTextArea.value = "";
 
+      // --- RESET LOGIC WHEN SWITCHING TO AUTOMATIC ---
+      if (urlFetcher.dataLoadedDirectly) {
+        console.log(
+          "Switching to Automatic: Clearing previously directly loaded URL data."
+        );
+        urlFetcher.urlsList = [];
+        urlFetcher.categorizedUrls = {};
+        if (urlSelector.clearRenderedUrls) {
+          urlSelector.clearRenderedUrls();
+        }
+      }
+      urlFetcher.dataLoadedDirectly = false; // Ensure automatic mode fetches fresh or uses its own cache
+      // --- END RESET LOGIC ---
 
       if (this.baseUrlValid && authOk) {
         this._initiateUrlFetching();
@@ -710,68 +687,95 @@ class App {
   async _prefillRelativePathsFromAutomaticSource() {
     const relativePathsTextArea = document.getElementById("relativePathsText");
     const loadRelativeListBtn = document.getElementById("loadRelativeListBtn");
-    const relativeListStatus = document.getElementById("relativeListStatus");
+    // No relativeListStatus
 
-    if (!relativePathsTextArea || !loadRelativeListBtn || !relativeListStatus) return;
+    if (!relativePathsTextArea || !loadRelativeListBtn) return;
 
-    const authOk = this.loginHandler.selectedLoginOption === "continueWithoutLogin" || this.loginHandler.isLoggedIn;
+    const authOk =
+      this.loginHandler.selectedLoginOption === "continueWithoutLogin" ||
+      this.loginHandler.isLoggedIn;
 
     if (!this.baseUrlValid || !authOk) {
-      relativeListStatus.textContent = "Project URL not set or not authenticated. Cannot pre-fill.";
-      relativeListStatus.style.color = "orange";
-      loadRelativeListBtn.disabled = true; 
+      UI.utils.showStatus(
+        "Project URL not set or not authenticated. Cannot pre-fill.",
+        true,
+        3000
+      );
+      loadRelativeListBtn.disabled = true;
       return;
     }
 
-    if (urlFetcher.urlsList && urlFetcher.urlsList.length > 0 && !urlFetcher.dataLoadedDirectly) {
-      console.log("Pre-filling relativePathsText from existing automatically fetched URLs.");
-      const paths = urlFetcher.urlsList.map(urlInfo => urlInfo.path).join("\n");
+    if (
+      urlFetcher.urlsList &&
+      urlFetcher.urlsList.length > 0 &&
+      !urlFetcher.dataLoadedDirectly
+    ) {
+      const paths = urlFetcher.urlsList
+        .map((urlInfo) => urlInfo.path)
+        .join("\n");
       relativePathsTextArea.value = paths;
-      loadRelativeListBtn.disabled = !paths.trim(); 
-      relativeListStatus.textContent = `Pre-filled with ${urlFetcher.urlsList.length} paths.`;
-      relativeListStatus.style.color = "green";
+      loadRelativeListBtn.disabled = !paths.trim();
+      UI.utils.showStatus(
+        `Pre-filled with ${urlFetcher.urlsList.length} paths.`,
+        false,
+        3000
+      );
       this._checkCaptureButtonState();
       return;
     }
 
-    relativeListStatus.textContent = `Workspaceing pages for ${urlFetcher.projectName} to pre-fill...`;
-    relativeListStatus.style.color = "orange";
+    UI.utils.showStatus(
+      `Workspaceing pages for ${urlFetcher.projectName} to pre-fill...`,
+      false,
+      0
+    ); // Keep message until fetch completes
     loadRelativeListBtn.disabled = true;
 
     try {
       const currentDataLoadedDirectlyState = urlFetcher.dataLoadedDirectly;
-      urlFetcher.dataLoadedDirectly = false; 
+      urlFetcher.dataLoadedDirectly = false;
 
       await urlFetcher.loadUrls();
 
-      if(urlFetcher.urlsList && urlFetcher.urlsList.length > 0 && urlFetcher.dataLoadedDirectly !== false) {
-         // This case should ideally not happen
+      if (
+        urlFetcher.urlsList &&
+        urlFetcher.urlsList.length > 0 &&
+        urlFetcher.dataLoadedDirectly !== false
+      ) {
       } else if (!urlFetcher.urlsList || urlFetcher.urlsList.length === 0) {
-         urlFetcher.dataLoadedDirectly = currentDataLoadedDirectlyState;
+        urlFetcher.dataLoadedDirectly = currentDataLoadedDirectlyState;
       }
 
       if (urlFetcher.urlsList && urlFetcher.urlsList.length > 0) {
-        const paths = urlFetcher.urlsList.map(urlInfo => urlInfo.path).join("\n");
+        const paths = urlFetcher.urlsList
+          .map((urlInfo) => urlInfo.path)
+          .join("\n");
         relativePathsTextArea.value = paths;
         loadRelativeListBtn.disabled = !paths.trim();
-        relativeListStatus.textContent = `Pre-filled with ${urlFetcher.urlsList.length} paths.`;
-        relativeListStatus.style.color = "green";
+        UI.utils.showStatus(
+          `Pre-filled with ${urlFetcher.urlsList.length} paths.`,
+          false,
+          3000
+        );
       } else {
-        relativeListStatus.textContent = "No pages found from automatic source to pre-fill.";
-        relativeListStatus.style.color = "orange";
-        loadRelativeListBtn.disabled = true; 
+        UI.utils.showStatus(
+          "No pages found from automatic source to pre-fill.",
+          true,
+          3000
+        );
+        loadRelativeListBtn.disabled = true;
       }
     } catch (error) {
-      console.error("Error pre-filling relative paths from automatic source:", error);
-      const displayError = error instanceof AppError ? error.message : "Failed to fetch pages for pre-fill.";
-      relativeListStatus.textContent = `Error: ${displayError}`;
-      relativeListStatus.style.color = "red";
+      const displayError =
+        error instanceof AppError
+          ? error.message
+          : "Failed to fetch pages for pre-fill.";
+      UI.utils.showStatus(`Error pre-filling: ${displayError}`, true);
       loadRelativeListBtn.disabled = true;
     } finally {
       this._checkCaptureButtonState();
     }
   }
-
 
   async _handleFileUpload(event) {
     const fileInput = event.target;
@@ -810,11 +814,9 @@ class App {
       const fileContent = await this._readFileContent(file);
       if (jsonTextArea) {
         jsonTextArea.value = fileContent;
-        console.log(`File "${file.name}" content loaded into textarea.`);
         if (loadManualBtn) loadManualBtn.disabled = false;
       }
     } catch (readError) {
-      console.error("Error reading file:", readError);
       if (manualJsonStatus) {
         manualJsonStatus.textContent = `Error reading file: ${readError.message}`;
         manualJsonStatus.style.color = "red";
@@ -866,7 +868,7 @@ class App {
 
       if (urlFetcher.dataLoadedDirectly) {
         if (
-          !urlSelectorContainer &&
+          !document.getElementById("urlSelectorContainer") &&
           typeof urlSelector.initialize === "function"
         ) {
           await urlSelector.initialize();
@@ -890,7 +892,6 @@ class App {
         if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
       }
     } catch (error) {
-      console.error(`Error loading manual source:`, error);
       const errorMsg =
         error instanceof AppError
           ? error.message
@@ -908,16 +909,15 @@ class App {
 
   async _handleLoadRelativeListSource() {
     const pathsTextArea = document.getElementById("relativePathsText");
-    const relativeListStatus = document.getElementById("relativeListStatus");
+    // No relativeListStatus
     const urlSelectorContainer = document.getElementById(
       "urlSelectorContainer"
     );
     const loadBtn = document.getElementById("loadRelativeListBtn");
 
-    if (!pathsTextArea || !relativeListStatus || !loadBtn) return;
+    if (!pathsTextArea || !loadBtn) return; // Removed relativeListStatus from check
 
-    relativeListStatus.textContent = "";
-    relativeListStatus.style.color = "";
+    UI.utils.showStatus("", false, 1); // Clear general status
     loadBtn.disabled = true;
     loadBtn.textContent = "Loading...";
     if (UI.elements.captureBtn) UI.elements.captureBtn.disabled = true;
@@ -925,8 +925,7 @@ class App {
     const pathsContent = pathsTextArea.value.trim();
 
     if (!pathsContent) {
-      relativeListStatus.textContent = "Error: No relative paths to load.";
-      relativeListStatus.style.color = "red";
+      UI.utils.showStatus("Error: No relative paths to load.", true);
       loadBtn.disabled = false;
       loadBtn.textContent = "Load Paths";
       return;
@@ -938,23 +937,27 @@ class App {
       .filter((p) => p && !p.startsWith("#") && !p.startsWith("//"));
 
     if (pathsArray.length === 0) {
-      relativeListStatus.textContent =
-        "Error: No valid relative paths entered (after filtering comments/empty lines).";
-      relativeListStatus.style.color = "red";
+      UI.utils.showStatus(
+        "Error: No valid relative paths entered (after filtering comments/empty lines).",
+        true
+      );
       loadBtn.disabled = !pathsTextArea.value.trim();
       loadBtn.textContent = "Load Paths";
       return;
     }
 
     try {
-      relativeListStatus.textContent = `Processing ${pathsArray.length} relative paths...`;
-      relativeListStatus.style.color = "orange";
+      UI.utils.showStatus(
+        `Processing ${pathsArray.length} relative paths...`,
+        false,
+        0
+      );
 
       await urlFetcher.setPathsDirectly(pathsArray);
 
       if (urlFetcher.dataLoadedDirectly) {
         if (
-          !urlSelectorContainer &&
+          !document.getElementById("urlSelectorContainer") &&
           typeof urlSelector.initialize === "function"
         ) {
           await urlSelector.initialize();
@@ -962,7 +965,7 @@ class App {
         if (document.getElementById("urlSelectorContainer")) {
           urlSelector.renderUrlCategories(urlFetcher.categorizedUrls);
           if (typeof urlSelector.selectAll === "function") {
-            urlSelector.selectAll(); 
+            urlSelector.selectAll();
           }
           document.getElementById("urlSelectorContainer").style.display = "";
         } else {
@@ -970,30 +973,30 @@ class App {
             "URL Selector UI could not be prepared for relative path list data."
           );
         }
-        relativeListStatus.textContent = `Success: Loaded ${urlFetcher.urlsList.length} pages. All selected.`;
-        relativeListStatus.style.color = "green";
+        UI.utils.showStatus(
+          `Success: Loaded ${urlFetcher.urlsList.length} pages. All selected.`,
+          false,
+          3000
+        );
       } else {
         const errorMsg =
           urlFetcher.error?.message || "Failed to process relative path list.";
-        relativeListStatus.textContent = `Error: ${errorMsg}`;
-        relativeListStatus.style.color = "red";
+        UI.utils.showStatus(`Error: ${errorMsg}`, true);
         if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
         if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
       }
     } catch (error) {
-      console.error(`Error loading relative path list source:`, error);
       const errorMsg =
         error instanceof AppError
           ? error.message
           : "Error processing path list.";
-      relativeListStatus.textContent = `Error: ${errorMsg}`;
-      relativeListStatus.style.color = "red";
+      UI.utils.showStatus(`Error: ${errorMsg}`, true);
       if (urlSelector.clearRenderedUrls) urlSelector.clearRenderedUrls();
       if (urlSelectorContainer) urlSelectorContainer.style.display = "none";
     } finally {
       loadBtn.disabled = !pathsTextArea.value.trim();
       loadBtn.textContent = "Load Paths";
-      this._checkCaptureButtonState(); 
+      this._checkCaptureButtonState();
     }
   }
 
@@ -1119,10 +1122,6 @@ class App {
     events.on("URL_SELECTION_CHANGED", () => this._checkCaptureButtonState());
 
     events.on(events.events.LOGIN_OPTION_SELECTED, (data) => {
-      console.log(
-        `[App Event] LOGIN_OPTION_SELECTED: Option: ${data.option}, LoggedIn: ${data.isLoggedIn}, Pending: ${data.loginPendingInNewTab}`
-      );
-
       if (!data.loginPendingInNewTab) {
         this._performFullReset();
       } else {
@@ -1163,11 +1162,7 @@ class App {
     });
 
     events.on(events.events.LOGIN_COMPLETE, (data) => {
-      console.log(
-        `[App Event] LOGIN_COMPLETE: User ${data.username}, LoggedIn: ${data.loggedIn}`
-      );
       this._performFullReset();
-
       if (data.loggedIn) {
         this._showCaptureFormAndPageSource();
         if (this.loginHandler.loginSection) {
@@ -1181,11 +1176,6 @@ class App {
     });
 
     events.on(events.events.AUTO_LOGOUT_DETECTED, (data) => {
-      console.log(
-        `[App Event] AUTO_LOGOUT_DETECTED for user: ${
-          data?.username || "unknown"
-        }`
-      );
       this._performFullReset();
       UI.utils.showStatus(
         `Your session has expired. Please log in again or continue as guest.`,
@@ -1193,15 +1183,17 @@ class App {
         0
       );
       this._hideCaptureFormAndPageSource();
-      this._setAllOptionsDisabledDuringCapture(true); // Disable options
-      if(document.getElementById("projectSelectorDropdown")) { // Except project dropdown
-          document.getElementById("projectSelectorDropdown").disabled = false;
+      this._setAllOptionsDisabledDuringCapture(true);
+      const projectDropdown = document.getElementById(
+        "projectSelectorDropdown"
+      );
+      if (projectDropdown) {
+        projectDropdown.disabled = false;
       }
       const loginOptionRadios = document.querySelectorAll(
         'input[name="loginOption"]'
       );
       loginOptionRadios.forEach((radio) => (radio.checked = false));
-
 
       if (this.loginHandler.loginSection) {
         this.loginHandler.loginSection.style.display = "none";
@@ -1211,9 +1203,6 @@ class App {
     });
 
     events.on(events.events.USER_LOGGED_OUT, (data) => {
-      console.log(
-        `[App Event] USER_LOGGED_OUT for user: ${data?.username || "unknown"}`
-      );
       this._performFullReset();
       UI.utils.showStatus(
         `Successfully logged out ${
@@ -1223,15 +1212,17 @@ class App {
         5000
       );
       this._hideCaptureFormAndPageSource();
-      this._setAllOptionsDisabledDuringCapture(true); // Disable options
-      if(document.getElementById("projectSelectorDropdown")) { // Except project dropdown
-          document.getElementById("projectSelectorDropdown").disabled = false;
+      this._setAllOptionsDisabledDuringCapture(true);
+      const projectDropdown = document.getElementById(
+        "projectSelectorDropdown"
+      );
+      if (projectDropdown) {
+        projectDropdown.disabled = false;
       }
       const loginOptionRadios = document.querySelectorAll(
         'input[name="loginOption"]'
       );
       loginOptionRadios.forEach((radio) => (radio.checked = false));
-
 
       if (this.loginHandler.loginSection) {
         this.loginHandler.loginSection.style.display = "none";
@@ -1295,7 +1286,6 @@ class App {
       if (urlSelector.updateSelectionCounter)
         urlSelector.updateSelectionCounter();
     } catch (error) {
-      console.error("Error initiating URL fetching or rendering:", error);
       const displayError =
         error instanceof AppError ? error.message : "Failed to load page list.";
       if (urlSelector.categoriesContainer) {
@@ -1311,7 +1301,6 @@ class App {
   }
 
   async captureScreenshots() {
-    console.log("[App.captureScreenshots] Method invoked.");
     const progressOutput = UI.elements.progressOutput;
     const captureWarningMessage = document.getElementById(
       "captureWarningMessage"
@@ -1319,9 +1308,6 @@ class App {
 
     if (!progressOutput) {
       UI.utils.showStatus("UI Error: Progress area missing.", true);
-      console.error(
-        "[App.captureScreenshots] Exiting: Progress output element missing."
-      );
       return;
     }
     progressOutput.style.display = "";
@@ -1400,7 +1386,7 @@ class App {
     } catch (error) {
       errorInCaptureSetup = true;
       handleError(error, { logToConsole: true, showToUser: true });
-      this._processingQueue = false; // Ensure this is reset on setup error
+      this._processingQueue = false;
       this._setCaptureSettingsCollapsed(false);
       if (
         errorInCaptureSetup &&
@@ -1422,7 +1408,7 @@ class App {
         this.currentCaptureIndex >= this.captureQueue.length;
 
       if (!this.isPaused) {
-        this._processingQueue = false; // Should be false if not paused and loop ended or error
+        this._processingQueue = false;
         this._setAllOptionsDisabledDuringCapture(false);
 
         if (isQueueFullyProcessed && this.startTotalTime > 0) {
@@ -1449,22 +1435,34 @@ class App {
           !errorInCaptureSetup &&
           this.startTotalTime > 0
         ) {
-           if ( AppState.screenshots.size > 0 || AppState.failedUrls.length > 0 || this.captureQueue.length > 0 ) {
+          if (
+            AppState.screenshots.size > 0 ||
+            AppState.failedUrls.length > 0 ||
+            this.captureQueue.length > 0
+          ) {
             const failedCount = AppState.failedUrls.length;
             const successCount = AppState.screenshots.size;
-            const totalInQueue = this.captureQueue?.length || (successCount + failedCount);
+            const totalInQueue =
+              this.captureQueue?.length || successCount + failedCount;
             const icon = failedCount > 0 ? "⚠️ " : "ℹ️ ";
-             UI.utils.showStatus(
-              `${icon}Processing finished. Captured ${successCount + failedCount} of ${totalInQueue} pages.`,
-              failedCount > 0, 0
+            UI.utils.showStatus(
+              `${icon}Processing finished. Captured ${
+                successCount + failedCount
+              } of ${totalInQueue} pages.`,
+              failedCount > 0,
+              0
             );
-            UI.progress.updateStats(totalInQueue, successCount, failedCount, totalTimeTakenSec);
+            UI.progress.updateStats(
+              totalInQueue,
+              successCount,
+              failedCount,
+              totalTimeTakenSec
+            );
           } else if (!errorInCaptureSetup) {
-             UI.utils.showStatus("ℹ️ No pages were processed.", false, 0);
+            UI.utils.showStatus("ℹ️ No pages were processed.", false, 0);
           }
         }
       } else {
-        // If paused, _processingQueue should have been set to false by processCaptureQueue
         if (this.startTotalTime > 0)
           UI.progress.updateStats(
             this.captureQueue.length,
@@ -1496,17 +1494,18 @@ class App {
   }
 
   async processCaptureQueue() {
-    const captureWarningMessage = document.getElementById("captureWarningMessage");
-    
-    console.log(
-      `[App.processCaptureQueue] Starting. isPaused: ${this.isPaused}, currentCaptureIndex: ${this.currentCaptureIndex}, queueLength: ${this.captureQueue.length}`
+    const captureWarningMessage = document.getElementById(
+      "captureWarningMessage"
     );
 
     if (this.isPaused || this.currentCaptureIndex >= this.captureQueue.length) {
       if (this.isPaused) {
         this._processingQueue = false;
       }
-      if (!this.isPaused && this.currentCaptureIndex >= this.captureQueue.length) {
+      if (
+        !this.isPaused &&
+        this.currentCaptureIndex >= this.captureQueue.length
+      ) {
         this._processingQueue = false;
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
         this._setAllOptionsDisabledDuringCapture(false);
@@ -1516,14 +1515,18 @@ class App {
     }
 
     if (!this._processingQueue) {
-      this._processingQueue = true; // Mark as processing
-      this._setAllOptionsDisabledDuringCapture(true); // Ensure all options are disabled
+      this._processingQueue = true;
+      this._setAllOptionsDisabledDuringCapture(true);
     }
     this.updatePauseResumeButton();
 
-
-    if (captureWarningMessage && captureWarningMessage.style.display === "none" && !this.isPaused) {
-      captureWarningMessage.textContent = "The browser needs to be active for screenshots.";
+    if (
+      captureWarningMessage &&
+      captureWarningMessage.style.display === "none" &&
+      !this.isPaused
+    ) {
+      captureWarningMessage.textContent =
+        "The browser needs to be active for screenshots.";
       captureWarningMessage.style.display = "block";
     }
 
@@ -1537,81 +1540,124 @@ class App {
       if (!item || !item.url) {
         AppState.addFailedUrl(`Invalid Item @ Queue Index ${itemIndex}`);
         this.currentCaptureIndex++;
-        if (UI.elements.progressBar) UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
+        if (UI.elements.progressBar)
+          UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
         continue;
       }
 
-      const { url, index, capturePreset, captureFullPage, actionSequences } = item;
+      const { url, index, capturePreset, captureFullPage, actionSequences } =
+        item;
 
       if (UI.elements.progress)
         UI.progress.updateProgressMessage(
-          `⏳ Processing ${itemIndex + 1} of ${totalUrls}: ${URLProcessor.extractDefaultUrlSegment(url)}`
+          `⏳ Processing ${
+            itemIndex + 1
+          } of ${totalUrls}: ${URLProcessor.extractDefaultUrlSegment(url)}`
         );
-      if (UI.elements.progressBar) UI.progress.updateProgress(itemIndex, totalUrls);
+      if (UI.elements.progressBar)
+        UI.progress.updateProgress(itemIndex, totalUrls);
 
       try {
         const result = await ScreenshotCapture.takeScreenshot(
-          url, capturePreset, captureFullPage, actionSequences || []
+          url,
+          capturePreset,
+          captureFullPage,
+          actionSequences || []
         );
 
-        if (this.isPaused) { this._processingQueue = false; break; }
+        if (this.isPaused) {
+          this._processingQueue = false;
+          break;
+        }
 
         const timestamp = URLProcessor.getTimestamp();
         const baseFileName = URLProcessor.generateFilename(url, index, "");
         const fullPageSuffix = captureFullPage ? "_FullPage" : "";
-        const mountIssueSuffix = result.detectedMountIssue ? "_MountIssueDetected" : "";
-        const fileName = baseFileName.replace(".png", `${fullPageSuffix}${mountIssueSuffix}_${timestamp}.png`);
+        const mountIssueSuffix = result.detectedMountIssue
+          ? "_MountIssueDetected"
+          : "";
+        const fileName = baseFileName.replace(
+          ".png",
+          `${fullPageSuffix}${mountIssueSuffix}_${timestamp}.png`
+        );
         result.fileName = fileName;
 
         UI.thumbnails.addLiveThumbnail(result, result.fileName, url);
         AppState.addScreenshot(url, result);
         AppState.removeFailedUrl(url);
-
       } catch (error) {
-        if (this.isPaused) { this._processingQueue = false; break; }
-        
+        if (this.isPaused) {
+          this._processingQueue = false;
+          break;
+        }
+
         handleError(error, { logToConsole: true, showToUser: false });
         const timestamp = URLProcessor.getTimestamp();
         const baseFileName = URLProcessor.generateFilename(url, index, "");
         const fullPageSuffix = captureFullPage ? "_FullPage" : "";
-        const wasMountIssueCatastrophic = error.message?.includes("No view configured") || error.message?.includes("Mount definition");
-        const errorSuffix = wasMountIssueCatastrophic ? "_MountCaptureFailed" : "_Error";
-        const fileName = baseFileName.replace(".png", `${fullPageSuffix}${errorSuffix}_${timestamp}.png`);
+        const wasMountIssueCatastrophic =
+          error.message?.includes("No view configured") ||
+          error.message?.includes("Mount definition");
+        const errorSuffix = wasMountIssueCatastrophic
+          ? "_MountCaptureFailed"
+          : "_Error";
+        const fileName = baseFileName.replace(
+          ".png",
+          `${fullPageSuffix}${errorSuffix}_${timestamp}.png`
+        );
 
         const errorResult = {
-          error: true, errorMessage: error.message || "Unknown error", sequenceName: url,
-          url: error.url || url, detectedMountIssue: wasMountIssueCatastrophic,
+          error: true,
+          errorMessage: error.message || "Unknown error",
+          sequenceName: url,
+          url: error.url || url,
+          detectedMountIssue: wasMountIssueCatastrophic,
           mountIssueMessage: wasMountIssueCatastrophic ? error.message : null,
         };
         UI.thumbnails.addLiveThumbnail(errorResult, fileName, url);
         AppState.addFailedUrl(url);
-        const displayError = error instanceof ScreenshotError ? `(${error.reason || error.message})` : `(${error.message || "Unknown"})`;
-        UI.utils.showStatus(`✗ Failed: ${URLProcessor.extractDefaultUrlSegment(url)} ${displayError}`, true);
+        const displayError =
+          error instanceof ScreenshotError
+            ? `(${error.reason || error.message})`
+            : `(${error.message || "Unknown"})`;
+        UI.utils.showStatus(
+          `✗ Failed: ${URLProcessor.extractDefaultUrlSegment(
+            url
+          )} ${displayError}`,
+          true
+        );
       }
 
       this.currentCaptureIndex++;
-      if (UI.elements.progressBar) UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
+      if (UI.elements.progressBar)
+        UI.progress.updateProgress(this.currentCaptureIndex, totalUrls);
 
       if (this.currentCaptureIndex < totalUrls && !this.isPaused) {
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
-      if (this.isPaused) { this._processingQueue = false; break; }
+      if (this.isPaused) {
+        this._processingQueue = false;
+        break;
+      }
     }
 
     const isFinished = this.currentCaptureIndex >= totalUrls;
 
     if (!this.isPaused) {
-      this._processingQueue = false; // Mark as not processing if loop finished or broke due to error (not pause)
+      this._processingQueue = false;
       if (isFinished) {
         this._setAllOptionsDisabledDuringCapture(false);
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
       }
-    } else { // If paused
-      this._processingQueue = false; // Mark as not processing because it's paused
+    } else {
+      this._processingQueue = false;
       if (UI.elements.progress)
         UI.utils.showStatus(
-          `⏳ Paused at ${this.currentCaptureIndex + 1} of ${totalUrls}. Resume (▶️) to continue.`,
-          false, 0
+          `⏳ Paused at ${
+            this.currentCaptureIndex + 1
+          } of ${totalUrls}. Resume (▶️) to continue.`,
+          false,
+          0
         );
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
     }
@@ -1644,24 +1690,33 @@ class App {
 
   pauseResumeCapture() {
     this.isPaused = !this.isPaused;
-    const captureWarningMessage = document.getElementById("captureWarningMessage");
+    const captureWarningMessage = document.getElementById(
+      "captureWarningMessage"
+    );
 
     if (this.isPaused) {
       if (captureWarningMessage) captureWarningMessage.style.display = "block";
-    } else { // Resuming
-      this._setAllOptionsDisabledDuringCapture(true); 
+    } else {
+      this._setAllOptionsDisabledDuringCapture(true);
       UI.utils.showStatus("", false, 1);
 
-      if (captureWarningMessage && this.captureQueue.length > this.currentCaptureIndex) {
-        captureWarningMessage.textContent = "The browser needs to be active for screenshots.";
+      if (
+        captureWarningMessage &&
+        this.captureQueue.length > this.currentCaptureIndex
+      ) {
+        captureWarningMessage.textContent =
+          "The browser needs to be active for screenshots.";
         captureWarningMessage.style.display = "block";
       }
 
-      if (this.currentCaptureIndex < this.captureQueue.length && !this._processingQueue) {
+      if (
+        this.currentCaptureIndex < this.captureQueue.length &&
+        !this._processingQueue
+      ) {
         this.processCaptureQueue();
       } else if (this._processingQueue) {
-        // This case should ideally not happen if logic is correct
-      } else { // Queue finished or nothing to process
+        // Already processing, do nothing
+      } else {
         if (captureWarningMessage) captureWarningMessage.style.display = "none";
         this._setAllOptionsDisabledDuringCapture(false);
       }
@@ -1675,24 +1730,20 @@ class App {
 
     const hasItemsToProcess =
       this.currentCaptureIndex < this.captureQueue.length;
-    const isActivelyProcessingOrCanResume = this._processingQueue || (this.isPaused && hasItemsToProcess);
-
 
     if (this.isPaused) {
       pauseResumeBtn.innerHTML = "▶️";
       pauseResumeBtn.title = "Resume capture";
       pauseResumeBtn.classList.add("paused");
-      pauseResumeBtn.disabled = !hasItemsToProcess; // Can only resume if items are left
+      pauseResumeBtn.disabled = !hasItemsToProcess;
     } else {
       pauseResumeBtn.innerHTML = "⏸️";
       pauseResumeBtn.title = "Pause capture";
       pauseResumeBtn.classList.remove("paused");
-      // Can only pause if actively processing and items are left
       pauseResumeBtn.disabled = !this._processingQueue || !hasItemsToProcess;
     }
-     // If no items to process at all (queue empty or finished), disable pause/resume
     if (!hasItemsToProcess && !this._processingQueue) {
-        pauseResumeBtn.disabled = true;
+      pauseResumeBtn.disabled = true;
     }
   }
 
@@ -1703,7 +1754,6 @@ class App {
 
     const isCollapsed = content.classList.toggle("collapsed");
     wrapper.classList.toggle("collapsed", isCollapsed);
-    console.log(`"Pages" section toggled. Collapsed: ${isCollapsed}`);
   }
 
   _setCaptureSettingsCollapsed(collapsed) {
