@@ -174,9 +174,13 @@ class URLFetcher {
         title: details.title || path, // Ensure title defaults to path if not provided
         viewPath: details.viewPath,
       }));
+
+      // ** ADD THIS LINE TO SORT THE URLS BY PATH ALPHABETICALLY **
+      this.urlsList.sort((a, b) => a.path.localeCompare(b.path));
+
       this.categorizeUrls();
       console.log(
-        `Processed ${this.urlsList.length} pages for project ${this.projectName}.`
+        `Processed ${this.urlsList.length} pages for project ${this.projectName}. List is now sorted alphabetically by path.`
       );
       events.emit(events.events.URL_PROCESSING_COMPLETED, {
         message: `Processed ${this.urlsList.length} pages`,
