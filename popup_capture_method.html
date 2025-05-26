@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross-Origin Bypass Screenshot Capture</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image-more/3.1.6/dom-to-image-more.min.js"></script>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        #controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        #controls input[type="url"] {
+            flex: 1;
+            min-width: 300px;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+        }
+        .settings {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .setting-group label {
+            font-size: 14px;
+            font-weight: 500;
+            min-width: 60px;
+        }
+        .setting-group input {
+            padding: 8px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            width: 80px;
+        }
+        .setting-group select {
+            padding: 8px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+        }
+        button {
+            padding: 12px 20px;
+            background: linear-gradient(45deg, #00b894, #00cec9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #iframeContainer {
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+            background: white;
+        }
+        #screenshotIframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+        #result {
+            margin: 20px 0;
+            text-align: center;
+        }
+        #result img {
+            max-width: 100%;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 10px;
+            background: white;
+        }
+        #status {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #00cec9;
+        }
+        .status-working {
+            border-left-color: #fdcb6e;
+            animation: pulse 2s infinite;
+        }
+        .status-success {
+            border-left-color: #00b894;
+        }
+        .status-error {
+            border-left-color: #d63031;
+        }
+        #log {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 15px;
+            height: 250px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 3px 0;
+        }
+        .log-info { color: #74b9ff; }
+        .log-warn { color: #fdcb6e; }
+        .log-error { color: #d63031; }
+        .log-success { color: #00b894; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .method-selector {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .method-option {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .method-option:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .method-option.selected {
+            background: rgba(0,184,148,0.3);
+            border: 2px solid #00b894;
+        }
+        .method-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .method-desc {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Cross-Origin Bypass Screenshot Capture</h1>
+        
+        <div class="method-selector">
+            <h3>Choose Bypass Method:</h3>
+            <div class="method-option selected" data-method="proxy">
+                <div class="method-title">🔄 Proxy Method (Recommended)</div>
+                <div class="method-desc">Uses cors-anywhere proxy to bypass restrictions</div>
+            </div>
+            <div class="method-option" data-method="postmessage">
+                <div class="method-title">📨 PostMessage Method</div>
+                <div class="method-desc">Communicates with iframe via postMessage API</div>
+            </div>
+            <div class="method-option" data-method="document-domain">
+                <div class="method-title">🌐 Document Domain Method</div>
+                <div class="method-desc">Attempts to set document.domain for localhost</div>
+            </div>
+            <div class="method-option" data-method="data-url">
+                <div class="method-title">📄 Data URL Method</div>
+                <div class="method-desc">Fetch content and load as data URL</div>
+            </div>
+        </div>
+
+        <div id="controls">
+            <input type="url" id="urlInput" 
+                   placeholder="Enter URL to capture" 
+                   value="http://localhost:8088/data/perspective/client/Bordertown/RO/BalanceTank">
+            <button id="captureBtn">📸 Capture Screenshot</button>
+        </div>
+
+        <div class="settings">
+            <div class="setting-group">
+                <label>Width:</label>
+                <input type="number" id="widthInput" value="1280" min="300" max="1920">
+            </div>
+            <div class="setting-group">
+                <label>Height:</label>
+                <input type="number" id="heightInput" value="720" min="200" max="1080">
+            </div>
+            <div class="setting-group">
+                <label>Delay:</label>
+                <input type="number" id="delayInput" value="3" min="1" max="10" step="0.5">
+                <span style="font-size: 12px;">sec</span>
+            </div>
+            <div class="setting-group">
+                <label>Proxy:</label>
+                <select id="proxySelect">
+                    <option value="https://cors-anywhere.herokuapp.com/">cors-anywhere</option>
+                    <option value="https://api.allorigins.win/raw?url=">allorigins</option>
+                    <option value="https://corsproxy.io/?">corsproxy.io</option>
+                    <option value="">None</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="status">
+            <div id="statusText">Ready to capture. Select a bypass method and click capture.</div>
+        </div>
+
+        <div id="iframeContainer">
+            <iframe id="screenshotIframe" 
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals">
+            </iframe>
+        </div>
+
+        <div id="result"></div>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        let selectedMethod = 'proxy';
+        let isCapturing = false;
+
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function updateStatus(text, type = 'info') {
+            const statusElement = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+            statusText.textContent = text;
+            statusElement.className = type ? `status-${type}` : '';
+        }
+
+        // Method selection
+        document.querySelectorAll('.method-option').forEach(option => {
+            option.addEventListener('click', () => {
+                document.querySelectorAll('.method-option').forEach(o => o.classList.remove('selected'));
+                option.classList.add('selected');
+                selectedMethod = option.dataset.method;
+                log(`Selected method: ${option.querySelector('.method-title').textContent}`, 'info');
+            });
+        });
+
+        // Cross-origin bypass methods
+        const bypassMethods = {
+            async proxy(url) {
+                const proxyUrl = document.getElementById('proxySelect').value;
+                if (!proxyUrl) {
+                    throw new Error('No proxy selected');
+                }
+                
+                log(`Using proxy: ${proxyUrl}`, 'info');
+                const proxiedUrl = proxyUrl + encodeURIComponent(url);
+                
+                const iframe = document.getElementById('screenshotIframe');
+                iframe.src = proxiedUrl;
+                
+                return new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => reject(new Error('Proxy load timeout')), 15000);
+                    
+                    iframe.onload = () => {
+                        clearTimeout(timeout);
+                        log('Proxy method: iframe loaded', 'success');
+                        resolve(iframe);
+                    };
+                    
+                    iframe.onerror = () => {
+                        clearTimeout(timeout);
+                        reject(new Error('Proxy method failed'));
+                    };
+                });
+            },
+
+            async postmessage(url) {
+                log('Attempting PostMessage method', 'info');
+                const iframe = document.getElementById('screenshotIframe');
+                
+                // Create a capture script to inject
+                const captureScript = `
+                    <script>
+                        window.addEventListener('message', function(event) {
+                            if (event.data.action === 'capture') {
+                                // Load html2canvas
+                                const script = document.createElement('script');
+                                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                                document.head.appendChild(script);
+                                script.onload = async function() {
+                                    try {
+                                        const canvas = await html2canvas(document.body, {
+                                            width: event.data.width,
+                                            height: event.data.height,
+                                            useCORS: true,
+                                            allowTaint: true
+                                        });
+                                        const dataUrl = canvas.toDataURL('image/png');
+                                        event.source.postMessage({
+                                            action: 'capture-result',
+                                            success: true,
+                                            dataUrl: dataUrl
+                                        }, '*');
+                                    } catch (error) {
+                                        event.source.postMessage({
+                                            action: 'capture-result',
+                                            success: false,
+                                            error: error.message
+                                        }, '*');
+                                    }
+                                };
+                            }
+                        });
+                    </script>
+                `;
+
+                // Try to load URL with injected script
+                try {
+                    const response = await fetch(url);
+                    const html = await response.text();
+                    const modifiedHtml = html.replace('</head>', captureScript + '</head>');
+                    const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(modifiedHtml);
+                    iframe.src = dataUrl;
+                } catch (e) {
+                    // Fallback: direct iframe load
+                    iframe.src = url;
+                }
+
+                return new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => reject(new Error('PostMessage timeout')), 15000);
+                    
+                    iframe.onload = () => {
+                        clearTimeout(timeout);
+                        log('PostMessage method: iframe loaded', 'success');
+                        resolve(iframe);
+                    };
+                });
+            },
+
+            async documentDomain(url) {
+                log('Attempting Document Domain method', 'info');
+                
+                // Only works for localhost
+                if (!url.includes('localhost')) {
+                    throw new Error('Document domain method only works with localhost URLs');
+                }
+
+                try {
+                    document.domain = 'localhost';
+                    log('Set document.domain to localhost', 'info');
+                } catch (e) {
+                    log('Failed to set document.domain: ' + e.message, 'warn');
+                }
+
+                const iframe = document.getElementById('screenshotIframe');
+                iframe.src = url;
+
+                return new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => reject(new Error('Document domain timeout')), 15000);
+                    
+                    iframe.onload = () => {
+                        clearTimeout(timeout);
+                        log('Document domain method: iframe loaded', 'success');
+                        resolve(iframe);
+                    };
+                });
+            },
+
+            async dataUrl(url) {
+                log('Attempting Data URL method', 'info');
+                
+                try {
+                    updateStatus('Fetching page content...', 'working');
+                    const response = await fetch(url, {
+                        mode: 'cors',
+                        credentials: 'omit'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const html = await response.text();
+                    log('Fetched HTML content successfully', 'success');
+                    
+                    // Convert to data URL
+                    const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+                    const iframe = document.getElementById('screenshotIframe');
+                    iframe.src = dataUrl;
+                    
+                    return new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => reject(new Error('Data URL load timeout')), 15000);
+                        
+                        iframe.onload = () => {
+                            clearTimeout(timeout);
+                            log('Data URL method: content loaded', 'success');
+                            resolve(iframe);
+                        };
+                    });
+                } catch (error) {
+                    throw new Error(`Data URL method failed: ${error.message}`);
+                }
+            }
+        };
+
+        async function captureScreenshot() {
+            if (isCapturing) return;
+            
+            const url = document.getElementById('urlInput').value.trim();
+            const width = parseInt(document.getElementById('widthInput').value) || 1280;
+            const height = parseInt(document.getElementById('heightInput').value) || 720;
+            const delay = parseFloat(document.getElementById('delayInput').value) || 3;
+            
+            if (!url) {
+                updateStatus('Please enter a URL', 'error');
+                return;
+            }
+
+            isCapturing = true;
+            document.getElementById('captureBtn').disabled = true;
+            
+            try {
+                updateStatus(`Loading page using ${selectedMethod} method...`, 'working');
+                log(`Starting capture with ${selectedMethod} method`, 'info');
+                
+                // Set iframe dimensions
+                const iframeContainer = document.getElementById('iframeContainer');
+                iframeContainer.style.width = `${width}px`;
+                iframeContainer.style.height = `${height}px`;
+                
+                // Use selected bypass method
+                const iframe = await bypassMethods[selectedMethod](url);
+                
+                updateStatus(`Waiting ${delay}s for content to stabilize...`, 'working');
+                log(`Waiting ${delay} seconds for content stabilization`, 'info');
+                
+                // Wait for content to stabilize
+                await new Promise(resolve => setTimeout(resolve, delay * 1000));
+                
+                updateStatus('Capturing screenshot...', 'working');
+                log('Starting dom-to-image capture', 'info');
+                
+                let targetElement;
+                try {
+                    // Try to access iframe content
+                    targetElement = iframe.contentDocument?.documentElement || iframe.contentDocument?.body;
+                    if (targetElement) {
+                        log('Successfully accessed iframe content', 'success');
+                        
+                        // Apply SVG fixes if needed
+                        if (iframe.contentWindow) {
+                            try {
+                                const svgs = iframe.contentDocument.querySelectorAll('svg');
+                                log(`Found ${svgs.length} SVG elements to process`, 'info');
+                                // Apply SVG processing here...
+                            } catch (e) {
+                                log('SVG processing skipped: ' + e.message, 'warn');
+                            }
+                        }
+                    }
+                } catch (e) {
+                    log('Cannot access iframe content directly, using iframe element', 'warn');
+                    targetElement = iframe;
+                }
+
+                // Capture using dom-to-image
+                const options = {
+                    width: width,
+                    height: height,
+                    bgcolor: '#ffffff',
+                    useCORS: true,
+                    allowTaint: true,
+                    scrollX: 0,
+                    scrollY: 0
+                };
+
+                log('Executing dom-to-image capture', 'info');
+                const dataUrl = await domtoimage.toPng(targetElement || iframe, options);
+                
+                log('Screenshot captured successfully!', 'success');
+                updateStatus('✅ Screenshot captured successfully!', 'success');
+                
+                // Display result
+                const resultElement = document.getElementById('result');
+                resultElement.innerHTML = '';
+                
+                const img = document.createElement('img');
+                img.src = dataUrl;
+                resultElement.appendChild(img);
+                
+                // Create download link
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                const hostname = new URL(url).hostname;
+                link.download = 'screenshot-' + hostname + '-' + Date.now() + '.png';
+                link.textContent = '💾 Download Screenshot';
+                link.style.display = 'block';
+                link.style.marginTop = '10px';
+                link.style.textAlign = 'center';
+                link.style.color = '#00b894';
+                link.style.textDecoration = 'none';
+                link.style.fontWeight = 'bold';
+                resultElement.appendChild(link);
+
+            } catch (error) {
+                log(`Capture failed: ${error.message}`, 'error');
+                updateStatus(`❌ Capture failed: ${error.message}`, 'error');
+                
+                // Try next method automatically
+                const methods = ['proxy', 'dataUrl', 'postmessage', 'document-domain'];
+                const currentIndex = methods.indexOf(selectedMethod);
+                if (currentIndex < methods.length - 1) {
+                    const nextMethod = methods[currentIndex + 1];
+                    log(`Trying next method: ${nextMethod}`, 'info');
+                    selectedMethod = nextMethod;
+                    document.querySelectorAll('.method-option').forEach(o => o.classList.remove('selected'));
+                    document.querySelector(`[data-method="${nextMethod}"]`).classList.add('selected');
+                    
+                    setTimeout(() => {
+                        if (!isCapturing) captureScreenshot();
+                    }, 1000);
+                }
+            } finally {
+                isCapturing = false;
+                document.getElementById('captureBtn').disabled = false;
+            }
+        }
+
+        // Event listeners
+        document.getElementById('captureBtn').addEventListener('click', captureScreenshot);
+        document.getElementById('urlInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !isCapturing) {
+                captureScreenshot();
+            }
+        });
+
+        // Initialize
+        log('Cross-origin bypass screenshot tool initialized', 'success');
+        log('Multiple bypass methods available - will auto-fallback if one fails', 'info');
+    </script>
+</body>
+</html>
